@@ -1,4 +1,5 @@
-use axum::Json;
+use axum::{extract::State, Json};
+use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -15,8 +16,12 @@ pub struct ResponSetoran {
     pub estimasi_harga: f32,
 }
 
-// Tambahkan "pub" (public) agar fungsi ini bisa dipanggil dari main.rs
-pub async fn terima_setoran(Json(payload): Json<InputSetoran>) -> Json<ResponSetoran> {
+// Tambahkan State(db) di dalam kurung parameter untuk menerima koneksi database
+pub async fn terima_setoran(
+    State(_db): State<DatabaseConnection>, // Pake garis bawah _db karena belum dipakai
+    Json(payload): Json<InputSetoran>
+) -> Json<ResponSetoran> {
+    
     let harga_per_kg = 4000.0;
     let total = payload.berat_kg * harga_per_kg;
 
