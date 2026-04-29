@@ -7,35 +7,38 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // Replace the sample below with your own migration scripts
-        todo!();
-
+        // Fungsi "up" dieksekusi saat kita ingin MEMBUAT tabel
         manager
             .create_table(
                 Table::create()
-                    .table(Post::Table)
+                    .table(Setoran::Table)
                     .if_not_exists()
-                    .col(pk_auto(Post::Id))
-                    .col(string(Post::Title))
-                    .col(string(Post::Text))
+                    .col(pk_auto(Setoran::Id)) // Primary Key, Auto Increment
+                    .col(string(Setoran::IdWilayah))
+                    .col(string(Setoran::Kategori))
+                    .col(float(Setoran::BeratKg))
+                    .col(float(Setoran::EstimasiHarga))
                     .to_owned(),
             )
             .await
     }
 
+    // Fungsi "down" dieksekusi saat kita ingin MENGHAPUS tabel (rollback)
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // Replace the sample below with your own migration scripts
-        todo!();
-
         manager
-            .drop_table(Table::drop().table(Post::Table).to_owned())
+            .drop_table(Table::drop().table(Setoran::Table).to_owned())
             .await
     }
 }
 
+// Ini adalah penamaan kolomnya agar tidak rawan typo (salah ketik)
 #[derive(DeriveIden)]
-enum Post {
+enum Setoran {
     Table,
     Id,
-    Title,
-    Text,
+    IdWilayah,
+    Kategori,
+    BeratKg,
+    EstimasiHarga,
 }
