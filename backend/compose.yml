@@ -1,0 +1,15 @@
+services:
+  db_sim_th:
+    image: docker.io/library/postgres:18.3-alpine3.22
+    environment:
+      # Compose akan otomatis mencari nilai ini di dalam file .env
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
