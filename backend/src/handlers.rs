@@ -1,6 +1,9 @@
 use axum::{extract::State, Json};
-use sea_orm::DatabaseConnection;
+use sea_orm::{DatabaseConnection, ActiveModelTrait, Set}; // Tambahkan Set & ActiveModelTrait
 use serde::{Deserialize, Serialize};
+
+// Import cetakan tabel yang baru saja kita generate!
+use crate::entity::setoran;
 
 #[derive(Deserialize)]
 pub struct InputSetoran {
@@ -16,25 +19,47 @@ pub struct ResponSetoran {
     pub estimasi_harga: f32,
 }
 
-// Tambahkan State(db) di dalam kurung parameter untuk menerima koneksi database
 pub async fn terima_setoran(
-    State(_db): State<DatabaseConnection>, // Pake garis bawah _db karena belum dipakai
+    // Hapus tanda garis bawah pada _db, karena sekarang kita akan paksa dia bekerja!
+    State(db): State<DatabaseConnection>, 
     Json(payload): Json<InputSetoran>
 ) -> Json<ResponSetoran> {
     
     let harga_per_kg = 4000.0;
     let total = payload.berat_kg * harga_per_kg;
 
-    let pesan_balasan = format!(
-        "Setoran {} dari {} seberat {} kg berhasil dicatat dapur!",
-        payload.kategori, payload.id_wilayah, payload.berat_kg
-    );
-
-    let respon = ResponSetoran {
-        status: "sukses".to_string(),
-        pesan: pesan_balasan,
-        estimasi_harga: total,
+    // 1. Bungkus data dari frontend ke dalam format pengiriman SeaORM (ActiveModel)
+    // Kita pakai Set() untuk memberi tahu SeaORM: "Tolong ubah kolom ini"
+    let data_baru = setoran::ActiveModel {
+        id_wilayah: Set(payload.id_wilayah.clone()),
+        kategori: Set(payload.kategori.clone()),
+        berat_kg: Set(payload.berat_kg),
+        estimasi_harga: Set(total),
+        ..Default::default() // Sisa kolomnya (seperti ID) biarkan database yang isi otomatis
     };
 
-    Json(respon)
+    // 2. Tembakkan ke dalam brankas PostgreSQL!
+    match data_baru.insert(&db).await {
+        Ok(hasil) => {
+            // Kalau sukses, kita ambil ID yang baru saja dibuat oleh database
+            let pesan_balasan = format!(
+                "Sukses! Setoran {} seberat {} kg berhasil dicatat dengan ID Transaksi: {}",
+                hasil.kategori, hasil.berat_kg, hasil.id
+            );
+
+            Json(ResponSetoran {
+                status: "sukses".to_string(),
+                pesan: pesan_balasan,
+                estimasi_harga: total,
+            })
+        },
+        Err(e) => {
+            // Kalau gagal (misal koneksi putus), balas pesan error
+            Json(ResponSetoran {
+                status: "gagal".to_string(),
+                pesan: format!("Waduh, gagal menyimpan ke database: {}", e),
+                estimasi_harga: 0.0,
+            })
+        }
+    }
 }

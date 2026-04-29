@@ -3,6 +3,7 @@ use sea_orm::Database;
 use std::env;
 
 mod handlers;
+mod entity;
 
 #[tokio::main]
 async fn main() {
