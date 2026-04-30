@@ -1,6 +1,8 @@
 use axum::{routing::{get, post, delete, put}, Router, middleware};
 use sea_orm::Database;
 use std::env;
+use tower_http::cors::{CorsLayer, Any};
+use axum::http::{Method, header};
 
 mod handlers;
 mod entity;
@@ -18,7 +20,16 @@ async fn main() {
     let db = Database::connect(&db_url).await.expect("Gagal menyambung ke database! Pastikan Podman nyala.");
     println!("✅ Berhasil tersambung ke PostgreSQL!");
 
-    // 1. Buat wilayah khusus yang DIJAGA SATPAM
+    // 1. Buat aturan CORS (Jembatan Lintas Domain)
+    let jembatan_cors = CorsLayer::new()
+        // Izinkan tamu dari alamat mana saja (nanti bisa diganti ke localhost:5173 spesifik kalau mau lebih ketat)
+        .allow_origin(Any) 
+        // Izinkan mereka membawa JWT dan format JSON
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
+        // Izinkan mereka melakukan aksi CRUD
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE]);
+    
+    // 2. Buat wilayah khusus yang DIJAGA SATPAM
     let rute_setoran = Router::new()
         .route("/", get(handlers::ambil_semua_setoran).post(handlers::terima_setoran))
         .route("/{id_target}", delete(handlers::hapus_setoran).put(handlers::update_setoran))
@@ -31,7 +42,8 @@ async fn main() {
         .route("/api/register", post(handlers::register))// Rute untuk registrasi user baru
         .route("/api/login", post(handlers::login)) // Rute untuk login
         .nest("/api/setoran", rute_setoran)
-        .with_state(db); // <-- Kunci dititipkan di sini
+        .with_state(db) // <-- Kunci dititipkan di sini
+        .layer(jembatan_cors); 
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
     println!("🚀 Server SIM-TH berjalan di http://localhost:3000");
