@@ -2,9 +2,11 @@ use axum::extract::{Path, State, Query};
 use axum::Json;
 use sea_orm::{DatabaseConnection, ActiveModelTrait, EntityTrait, Set, QueryFilter, ColumnTrait}; // Tambahkan Set & ActiveModelTrait
 use serde::{Deserialize, Serialize};
+use bcrypt::{hash, verify, DEFAULT_COST}; // Tambahkan alat bcrypt
 
 // Import cetakan tabel yang baru saja kita generate!
 use crate::entity::setoran;
+use crate::entity::users; // Panggil cetakan tabel users
 
 #[derive(Deserialize)]
 pub struct InputSetoran {
@@ -24,6 +26,18 @@ pub struct ResponSetoran {
     pub status: String,
     pub pesan: String,
     pub estimasi_harga: f32,
+}
+
+#[derive(Deserialize)]
+pub struct InputUser {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Serialize)]
+pub struct ResponPesan {
+    pub status: String,
+    pub pesan: String,
 }
 
 pub async fn terima_setoran(
@@ -187,6 +201,85 @@ pub async fn update_setoran(
                 status: "error".to_string(),
                 pesan: format!("Sistem bermasalah saat mencari data: {}", e),
                 estimasi_harga: 0.0,
+            })
+        }
+    }
+}
+
+pub async fn register(
+    State(db): State<DatabaseConnection>,
+    Json(payload): Json<InputUser>,
+) -> Json<ResponPesan> {
+
+    // 1. Acak password menggunakan algoritma bcrypt!
+    // DEFAULT_COST menentukan seberapa rumit pengacakannya (biasanya bernilai 12)
+    let password_acak = match hash(&payload.password, DEFAULT_COST) {
+        Ok(hasil_hash) => hasil_hash,
+        Err(_) => return Json(ResponPesan {
+            status: "error".to_string(),
+            pesan: "Sistem bermasalah saat mengamankan password.".to_string(),
+        }),
+    };
+
+    // 2. Bungkus data untuk dimasukkan ke tabel users
+    let user_baru = users::ActiveModel {
+        username: Set(payload.username.clone()),
+        password: Set(password_acak), // Masukkan password yang SUDAH DIACAK
+        ..Default::default()
+    };
+
+    // 3. Tembakkan ke database
+    match user_baru.insert(&db).await {
+        Ok(_) => Json(ResponPesan {
+            status: "sukses".to_string(),
+            pesan: format!("Beres! Akun '{}' berhasil didaftarkan.", payload.username),
+        }),
+        Err(_) => Json(ResponPesan {
+            status: "gagal".to_string(),
+            // Error biasanya terjadi karena username sudah ada (karena aturan unique_key tadi)
+            pesan: "Gagal mendaftar. Username mungkin sudah dipakai orang lain.".to_string(),
+        }),
+    }
+}
+
+pub async fn login(
+    State(db): State<DatabaseConnection>,
+    Json(payload): Json<InputUser>, // Kita pinjam format input yang sama seperti register
+) -> Json<ResponPesan> {
+
+    // 1. Cari user di database berdasarkan username
+    let pencarian_user = users::Entity::find()
+        .filter(users::Column::Username.eq(payload.username.clone()))
+        .one(&db)
+        .await;
+
+    match pencarian_user {
+        Ok(Some(data_user)) => {
+            // 2. Kalau usernya ketemu, suruh bcrypt mengecek kecocokan passwordnya
+            let password_cocok = verify(&payload.password, &data_user.password).unwrap_or(false);
+
+            if password_cocok {
+                Json(ResponPesan {
+                    status: "sukses".to_string(),
+                    pesan: format!("Selamat datang, {}! Login berhasil.", payload.username),
+                })
+            } else {
+                Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: "Waduh, password yang kamu masukkan salah.".to_string(),
+                })
+            }
+        },
+        Ok(None) => {
+            Json(ResponPesan {
+                status: "gagal".to_string(),
+                pesan: "Akun tidak ditemukan. Silakan daftar terlebih dahulu.".to_string(),
+            })
+        },
+        Err(_) => {
+            Json(ResponPesan {
+                status: "error".to_string(),
+                pesan: "Sistem bermasalah saat mencari data user.".to_string(),
             })
         }
     }

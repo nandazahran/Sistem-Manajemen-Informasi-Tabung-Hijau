@@ -21,6 +21,8 @@ async fn main() {
     // 4. Titipkan kunci brankas (db) ke dalam aplikasi (State)
     let app = Router::new()
         .route("/", get(|| async { "Halo Tim! Backend SIM-TH sudah menyala!" }))
+        .route("/api/register", post(handlers::register))// Rute untuk registrasi user baru
+        .route("/api/login", post(handlers::login)) // Rute untuk login
         .route("/api/setoran", get(handlers::ambil_semua_setoran).post(handlers::terima_setoran))
         .route("/api/setoran/{id_target}", delete(handlers::hapus_setoran).put(handlers::update_setoran))
         .with_state(db); // <-- Kunci dititipkan di sini
