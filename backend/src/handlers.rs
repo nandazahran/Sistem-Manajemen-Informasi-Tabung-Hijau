@@ -110,3 +110,63 @@ pub async fn hapus_setoran(
         }
     }
 }
+
+// Fungsi untuk mengubah data (Update)
+pub async fn update_setoran(
+    State(db): State<DatabaseConnection>,
+    Path(id_target): Path<i32>,       // 1. Ambil ID dari URL
+    Json(payload): Json<InputSetoran>, // 2. Ambil data perubahannya dari Body JSON
+) -> Json<ResponSetoran> {
+
+    // 3. Cari data lamanya di dalam database
+    match setoran::Entity::find_by_id(id_target).one(&db).await {
+        Ok(Some(data_lama)) => {
+            // Kalau datanya KETEMU, ubah formatnya jadi "bisa diedit" (ActiveModel)
+            let mut data_edit: setoran::ActiveModel = data_lama.into();
+
+            // Hitung estimasi harga baru berdasarkan berat yang baru
+            let harga_per_kg = 4000.0;
+            let total_baru = payload.berat_kg * harga_per_kg;
+
+            // Masukkan data baru dari frontend untuk menimpa data lama
+            data_edit.id_wilayah = Set(payload.id_wilayah.clone());
+            data_edit.kategori = Set(payload.kategori.clone());
+            data_edit.berat_kg = Set(payload.berat_kg);
+            data_edit.estimasi_harga = Set(total_baru);
+
+            // 4. Simpan kembali ke brankas!
+            match data_edit.update(&db).await {
+                Ok(_) => {
+                    Json(ResponSetoran {
+                        status: "sukses".to_string(),
+                        pesan: format!("Sip! Data setoran ID {} berhasil diperbarui.", id_target),
+                        estimasi_harga: total_baru,
+                    })
+                },
+                Err(e) => {
+                    Json(ResponSetoran {
+                        status: "error".to_string(),
+                        pesan: format!("Gagal menyimpan pembaruan ke database: {}", e),
+                        estimasi_harga: 0.0,
+                    })
+                }
+            }
+        },
+        Ok(None) => {
+            // Kalau pencarian sukses, TAPI datanya kosong/tidak ada
+            Json(ResponSetoran {
+                status: "gagal".to_string(),
+                pesan: format!("Tidak bisa diedit karena data dengan ID {} tidak ditemukan.", id_target),
+                estimasi_harga: 0.0,
+            })
+        },
+        Err(e) => {
+            // Kalau terjadi masalah koneksi saat mencari
+            Json(ResponSetoran {
+                status: "error".to_string(),
+                pesan: format!("Sistem bermasalah saat mencari data: {}", e),
+                estimasi_harga: 0.0,
+            })
+        }
+    }
+}

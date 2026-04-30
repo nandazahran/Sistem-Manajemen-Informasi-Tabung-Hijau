@@ -1,4 +1,4 @@
-use axum::{routing::{get, post, delete}, Router};
+use axum::{routing::{get, post, delete, put}, Router};
 use sea_orm::Database;
 use std::env;
 
@@ -22,7 +22,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(|| async { "Halo Tim! Backend SIM-TH sudah menyala!" }))
         .route("/api/setoran", get(handlers::ambil_semua_setoran).post(handlers::terima_setoran))
-        .route("/api/setoran/{id_target}", delete(handlers::hapus_setoran))
+        .route("/api/setoran/{id_target}", delete(handlers::hapus_setoran).put(handlers::update_setoran))
         .with_state(db); // <-- Kunci dititipkan di sini
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
