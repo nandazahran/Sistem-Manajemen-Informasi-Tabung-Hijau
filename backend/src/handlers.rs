@@ -1,4 +1,5 @@
-use axum::{extract::State, Json};
+use axum::extract::{Path, State};
+use axum::Json;
 use sea_orm::{DatabaseConnection, ActiveModelTrait, EntityTrait, Set}; // Tambahkan Set & ActiveModelTrait
 use serde::{Deserialize, Serialize};
 
@@ -73,4 +74,39 @@ pub async fn ambil_semua_setoran(
 
     // Langsung bungkus hasilnya ke dalam format JSON dan kirim ke frontend
     Json(daftar_setoran)
+}
+
+// Fungsi untuk menghapus data berdasarkan ID
+pub async fn hapus_setoran(
+    State(db): State<DatabaseConnection>,
+    Path(id_target): Path<i32>, // Mengambil angka ID dari URL
+) -> Json<ResponSetoran> { // Kita pinjam format ResponSetoran yang sudah ada
+    
+    // Suruh SeaORM mencari ID tersebut dan langsung hapus!
+    match setoran::Entity::delete_by_id(id_target).exec(&db).await {
+        Ok(hasil) => {
+            // Cek apakah ada baris yang benar-benar terhapus
+            if hasil.rows_affected > 0 {
+                Json(ResponSetoran {
+                    status: "sukses".to_string(),
+                    pesan: format!("Beres! Setoran dengan ID {} berhasil dimusnahkan dari brankas.", id_target),
+                    estimasi_harga: 0.0,
+                })
+            } else {
+                // Kalau ID-nya tidak ada di database
+                Json(ResponSetoran {
+                    status: "gagal".to_string(),
+                    pesan: format!("Waduh, data dengan ID {} tidak ditemukan.", id_target),
+                    estimasi_harga: 0.0,
+                })
+            }
+        },
+        Err(e) => {
+            Json(ResponSetoran {
+                status: "error".to_string(),
+                pesan: format!("Sistem bermasalah saat menghapus data: {}", e),
+                estimasi_harga: 0.0,
+            })
+        }
+    }
 }
