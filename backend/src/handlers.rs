@@ -1,6 +1,6 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, State, Query};
 use axum::Json;
-use sea_orm::{DatabaseConnection, ActiveModelTrait, EntityTrait, Set}; // Tambahkan Set & ActiveModelTrait
+use sea_orm::{DatabaseConnection, ActiveModelTrait, EntityTrait, Set, QueryFilter, ColumnTrait}; // Tambahkan Set & ActiveModelTrait
 use serde::{Deserialize, Serialize};
 
 // Import cetakan tabel yang baru saja kita generate!
@@ -11,6 +11,12 @@ pub struct InputSetoran {
     pub id_wilayah: String,
     pub kategori: String,
     pub berat_kg: f32,
+}
+
+#[derive(Deserialize)]
+pub struct FilterSetoran {
+    pub id_wilayah: Option<String>,
+    pub kategori: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -65,14 +71,29 @@ pub async fn terima_setoran(
     }
 }
 // Ini fungsi baru untuk mengambil semua data
+// Tambahkan Query(filter) sebagai parameter baru
 pub async fn ambil_semua_setoran(
     State(db): State<DatabaseConnection>,
-) -> Json<Vec<setoran::Model>> { // Mengembalikan sebuah list (Vector) berisi cetakan model setoran
+    Query(filter): Query<FilterSetoran>, 
+) -> Json<Vec<setoran::Model>> {
     
-    // Suruh SeaORM mencari (.find) dan mengambil semua (.all) data dari tabel
-    let daftar_setoran = setoran::Entity::find().all(&db).await.unwrap_or_default();
+    // 1. Siapkan query dasar: "Cari data di tabel setoran"
+    let mut pencarian = setoran::Entity::find();
 
-    // Langsung bungkus hasilnya ke dalam format JSON dan kirim ke frontend
+    // 2. Kalau di URL ada ?id_wilayah=..., tambahkan filter wilayah (sama persis)
+    if let Some(wilayah) = filter.id_wilayah {
+        pencarian = pencarian.filter(setoran::Column::IdWilayah.eq(wilayah));
+    }
+
+    // 3. Kalau di URL ada &kategori=..., tambahkan filter kategori
+    if let Some(kat) = filter.kategori {
+        // Pakai .contains() biar fleksibel, misalnya cari "Plastik" bakal dapat "Plastik PET"
+        pencarian = pencarian.filter(setoran::Column::Kategori.contains(kat));
+    }
+
+    // 4. Eksekusi query finalnya ke brankas
+    let daftar_setoran = pencarian.all(&db).await.unwrap_or_default();
+
     Json(daftar_setoran)
 }
 
