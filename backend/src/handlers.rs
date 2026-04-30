@@ -1,8 +1,16 @@
 use axum::extract::{Path, State, Query};
 use axum::Json;
+use axum::{
+    extract::Request,
+    http::{header, StatusCode},
+    middleware::Next,
+    response::Response,
+};
 use sea_orm::{DatabaseConnection, ActiveModelTrait, EntityTrait, Set, QueryFilter, ColumnTrait}; // Tambahkan Set & ActiveModelTrait
 use serde::{Deserialize, Serialize};
 use bcrypt::{hash, verify, DEFAULT_COST}; // Tambahkan alat bcrypt
+use jsonwebtoken::{encode, EncodingKey, Header, decode, DecodingKey, Validation}; // Alat pembuat JWT
+use chrono::{Utc, Duration}; // Jam digital untuk masa berlaku token
 
 // Import cetakan tabel yang baru saja kita generate!
 use crate::entity::setoran;
@@ -38,6 +46,21 @@ pub struct InputUser {
 pub struct ResponPesan {
     pub status: String,
     pub pesan: String,
+}
+
+// Ini adalah isi dari KTP Digital-nya
+#[derive(Serialize, Deserialize)]
+pub struct KlaimToken {
+    pub sub: String, // sub = subject (siapa pemilik KTP ini)
+    pub exp: usize,  // exp = expiration (kapan KTP ini hangus)
+}
+
+// Balasan khusus untuk fitur Login
+#[derive(Serialize)]
+pub struct ResponLogin {
+    pub status: String,
+    pub pesan: String,
+    pub token: Option<String>, // Option karena kalau gagal login, token-nya kosong (None)
 }
 
 pub async fn terima_setoran(
@@ -244,10 +267,9 @@ pub async fn register(
 
 pub async fn login(
     State(db): State<DatabaseConnection>,
-    Json(payload): Json<InputUser>, // Kita pinjam format input yang sama seperti register
-) -> Json<ResponPesan> {
+    Json(payload): Json<InputUser>,
+) -> Json<ResponLogin> {
 
-    // 1. Cari user di database berdasarkan username
     let pencarian_user = users::Entity::find()
         .filter(users::Column::Username.eq(payload.username.clone()))
         .one(&db)
@@ -255,32 +277,120 @@ pub async fn login(
 
     match pencarian_user {
         Ok(Some(data_user)) => {
-            // 2. Kalau usernya ketemu, suruh bcrypt mengecek kecocokan passwordnya
             let password_cocok = verify(&payload.password, &data_user.password).unwrap_or(false);
 
             if password_cocok {
-                Json(ResponPesan {
+                // --- PROSES PEMBUATAN KTP DIGITAL (JWT) MULAI DARI SINI ---
+                
+                // 1. Tentukan masa berlaku (misal: 24 jam dari sekarang)
+                let waktu_hangus = Utc::now()
+                    .checked_add_signed(Duration::hours(24))
+                    .expect("Gagal menghitung waktu")
+                    .timestamp() as usize;
+
+                // 2. Isi data KTP-nya
+                let klaim = KlaimToken {
+                    sub: data_user.username.clone(),
+                    exp: waktu_hangus,
+                };
+
+                // 3. Stempel resmi KTP menggunakan "Kunci Rahasia"
+                // CATATAN: Di dunia nyata, kunci ini ditaruh di file .env supaya tidak bocor!
+                let kunci_rahasia = b"kunci_rahasia_sim_th_super_aman"; 
+
+                // 4. Cetak KTP-nya!
+                let token_jwt = encode(
+                    &Header::default(),
+                    &klaim,
+                    &EncodingKey::from_secret(kunci_rahasia),
+                ).unwrap();
+
+                Json(ResponLogin {
                     status: "sukses".to_string(),
-                    pesan: format!("Selamat datang, {}! Login berhasil.", payload.username),
+                    pesan: format!("Selamat datang, {}! Ini token aksesmu.", payload.username),
+                    token: Some(token_jwt), // Kirim token-nya ke frontend
                 })
             } else {
-                Json(ResponPesan {
+                Json(ResponLogin {
                     status: "gagal".to_string(),
                     pesan: "Waduh, password yang kamu masukkan salah.".to_string(),
+                    token: None,
                 })
             }
         },
         Ok(None) => {
-            Json(ResponPesan {
+            Json(ResponLogin {
                 status: "gagal".to_string(),
                 pesan: "Akun tidak ditemukan. Silakan daftar terlebih dahulu.".to_string(),
+                token: None,
             })
         },
         Err(_) => {
-            Json(ResponPesan {
+            Json(ResponLogin {
                 status: "error".to_string(),
                 pesan: "Sistem bermasalah saat mencari data user.".to_string(),
+                token: None,
             })
+        }
+    }
+}
+
+// Fungsi Satpam Penjaga Pintu (Middleware)
+pub async fn satpam_jwt(
+    req: Request, // Tangkap tamu yang datang
+    next: Next,   // Pintu menuju fungsi CRUD
+) -> Result<Response, (StatusCode, Json<ResponPesan>)> {
+    
+    // 1. Cek apakah tamu tersebut menempelkan KTP-nya di kepala (Header) suratnya
+    let header_auth = req.headers().get(header::AUTHORIZATION).and_then(|h| h.to_str().ok());
+
+    let token_lengkap = match header_auth {
+        Some(isi_header) => isi_header,
+        None => return Err((
+            StatusCode::UNAUTHORIZED, // Kode 401: Tidak punya izin
+            Json(ResponPesan { 
+                status: "gagal".to_string(), 
+                pesan: "Akses ditolak! Kamu tidak membawa KTP Digital (Token JWT).".to_string() 
+            })
+        )),
+    };
+
+    // 2. Sesuai standar API, token harus diawali dengan kata "Bearer "
+    if !token_lengkap.starts_with("Bearer ") {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(ResponPesan { 
+                status: "gagal".to_string(), 
+                pesan: "Format token salah! Harus diawali dengan 'Bearer '.".to_string() 
+            })
+        ));
+    }
+
+    // 3. Potong 7 huruf pertama ("Bearer ") untuk mengambil kode acaknya saja
+    let token_asli = &token_lengkap[7..];
+    
+    // Harus sama persis dengan kunci saat login tadi!
+    let kunci_rahasia = b"kunci_rahasia_sim_th_super_aman"; 
+
+    // 4. Alat Scanner: Periksa keaslian KTP menggunakan kunci rahasia
+    match decode::<KlaimToken>(
+        token_asli,
+        &DecodingKey::from_secret(kunci_rahasia),
+        &Validation::default(),
+    ) {
+        Ok(_data_ktp) => {
+            // Kalau KTP asli dan belum hangus (expired), bukakan pintu!
+            Ok(next.run(req).await)
+        }
+        Err(_) => {
+            // Kalau KTP palsu hasil editan orang iseng, atau waktunya sudah habis
+            Err((
+                StatusCode::UNAUTHORIZED,
+                Json(ResponPesan { 
+                    status: "gagal".to_string(), 
+                    pesan: "Token JWT palsu atau sudah kadaluarsa! Silakan login ulang.".to_string() 
+                })
+            ))
         }
     }
 }

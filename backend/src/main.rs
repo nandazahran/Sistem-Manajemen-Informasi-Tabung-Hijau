@@ -1,4 +1,4 @@
-use axum::{routing::{get, post, delete, put}, Router};
+use axum::{routing::{get, post, delete, put}, Router, middleware};
 use sea_orm::Database;
 use std::env;
 
@@ -18,13 +18,19 @@ async fn main() {
     let db = Database::connect(&db_url).await.expect("Gagal menyambung ke database! Pastikan Podman nyala.");
     println!("✅ Berhasil tersambung ke PostgreSQL!");
 
+    // 1. Buat wilayah khusus yang DIJAGA SATPAM
+    let rute_setoran = Router::new()
+        .route("/", get(handlers::ambil_semua_setoran).post(handlers::terima_setoran))
+        .route("/{id_target}", delete(handlers::hapus_setoran).put(handlers::update_setoran))
+        // Pasang satpam di sini! Semua rute di dalam blok ini akan diperiksa.
+        .route_layer(middleware::from_fn(handlers::satpam_jwt));
+
     // 4. Titipkan kunci brankas (db) ke dalam aplikasi (State)
     let app = Router::new()
         .route("/", get(|| async { "Halo Tim! Backend SIM-TH sudah menyala!" }))
         .route("/api/register", post(handlers::register))// Rute untuk registrasi user baru
         .route("/api/login", post(handlers::login)) // Rute untuk login
-        .route("/api/setoran", get(handlers::ambil_semua_setoran).post(handlers::terima_setoran))
-        .route("/api/setoran/{id_target}", delete(handlers::hapus_setoran).put(handlers::update_setoran))
+        .nest("/api/setoran", rute_setoran)
         .with_state(db); // <-- Kunci dititipkan di sini
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
