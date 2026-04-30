@@ -21,7 +21,7 @@ async fn main() {
     // 4. Titipkan kunci brankas (db) ke dalam aplikasi (State)
     let app = Router::new()
         .route("/", get(|| async { "Halo Tim! Backend SIM-TH sudah menyala!" }))
-        .route("/api/setoran", post(handlers::terima_setoran))
+        .route("/api/setoran", get(handlers::ambil_semua_setoran).post(handlers::terima_setoran))
         .with_state(db); // <-- Kunci dititipkan di sini
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();

@@ -1,5 +1,5 @@
 use axum::{extract::State, Json};
-use sea_orm::{DatabaseConnection, ActiveModelTrait, Set}; // Tambahkan Set & ActiveModelTrait
+use sea_orm::{DatabaseConnection, ActiveModelTrait, EntityTrait, Set}; // Tambahkan Set & ActiveModelTrait
 use serde::{Deserialize, Serialize};
 
 // Import cetakan tabel yang baru saja kita generate!
@@ -62,4 +62,15 @@ pub async fn terima_setoran(
             })
         }
     }
+}
+// Ini fungsi baru untuk mengambil semua data
+pub async fn ambil_semua_setoran(
+    State(db): State<DatabaseConnection>,
+) -> Json<Vec<setoran::Model>> { // Mengembalikan sebuah list (Vector) berisi cetakan model setoran
+    
+    // Suruh SeaORM mencari (.find) dan mengambil semua (.all) data dari tabel
+    let daftar_setoran = setoran::Entity::find().all(&db).await.unwrap_or_default();
+
+    // Langsung bungkus hasilnya ke dalam format JSON dan kirim ke frontend
+    Json(daftar_setoran)
 }
