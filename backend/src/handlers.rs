@@ -12,7 +12,7 @@ use bcrypt::{hash, verify, DEFAULT_COST}; // Tambahkan alat bcrypt
 use jsonwebtoken::{encode, EncodingKey, Header, decode, DecodingKey, Validation}; // Alat pembuat JWT
 use chrono::{Utc, Duration}; // Jam digital untuk masa berlaku token
 
-use crate::entities::{user,wilayah,kategori_sampah, transaksi_sampah};
+use crate::entities::{user,wilayah,kategori_sampah, transaksi_sampah, tabungan_sampah};
 
 #[derive(Deserialize)]
 pub struct InputSetoran {
@@ -403,18 +403,50 @@ pub async fn tambah_transaksi(
     };
 
     match transaksi_baru.insert(&db).await {
-        Ok(_) => Json(ResponPesan {
+    Ok(_) => {
+        // --- TAHAP 5: OTOMATISASI SALDO TABUNGAN WILAYAH ---
+        // 1. Cek apakah wilayah ini sudah punya dompet?
+        let pencarian_dompet = tabungan_sampah::Entity::find()
+            .filter(tabungan_sampah::Column::WilayahId.eq(payload.wilayah_id))
+            .one(&db)
+            .await
+            .unwrap();
+
+        match pencarian_dompet {
+            Some(dompet_lama) => {
+                // 2. Kalau dompetnya sudah ada, Trik Sulap: Tambah saldonya!
+                let mut dompet_aktif: tabungan_sampah::ActiveModel = dompet_lama.into();
+                // Ambil saldo yang sekarang (karena ini asalnya dari database, pakai unwrap aman)
+                let saldo_sekarang = dompet_aktif.saldo.clone().unwrap(); 
+                
+                dompet_aktif.saldo = Set(saldo_sekarang + kalkulasi_total_nilai);
+                let _ = dompet_aktif.update(&db).await; 
+            },
+            None => {
+                // 3. Kalau wilayahnya baru pertama kali menyetor, buatkan dompet baru
+                let dompet_baru = tabungan_sampah::ActiveModel {
+                    saldo: Set(kalkulasi_total_nilai),
+                    status: Set("Aktif".to_string()),
+                    wilayah_id: Set(payload.wilayah_id),
+                    ..Default::default()
+                };
+                let _ = dompet_baru.insert(&db).await;
+            }
+        }
+
+        Json(ResponPesan {
             status: "sukses".to_string(),
             pesan: format!(
-                "Mantap! Setoran seberat {} gram setara dengan Rp {} berhasil dicatat oleh {}.", 
-                payload.berat_gram, kalkulasi_total_nilai, petugas.nama
+                "Mantap! Setoran seberat {} gram setara dengan Rp {} berhasil dicatat dan otomatis masuk ke tabungan wilayah.", 
+                payload.berat_gram, kalkulasi_total_nilai
             ),
-        }),
-        Err(e) => Json(ResponPesan {
-            status: "gagal".to_string(),
-            pesan: format!("Gagal mencatat transaksi. Pastikan ID Wilayah benar. Error: {}", e),
-        }),
-    }
+        })
+    },
+    Err(e) => Json(ResponPesan {
+        status: "gagal".to_string(),
+        pesan: format!("Gagal mencatat transaksi. Error: {}", e),
+    }),
+}
 }
 
 // 4. Fungsi Lihat Transaksi
@@ -432,6 +464,25 @@ pub async fn lihat_transaksi(
         Err(_) => Json(serde_json::json!({
             "status": "error",
             "pesan": "Gagal mengambil data transaksi"
+        })),
+    }
+}
+
+// Fungsi Lihat Tabungan
+pub async fn lihat_tabungan(
+    State(db): State<DatabaseConnection>,
+) -> Json<serde_json::Value> {
+    
+    let daftar_tabungan = tabungan_sampah::Entity::find().all(&db).await;
+
+    match daftar_tabungan {
+        Ok(data) => Json(serde_json::json!({
+            "status": "sukses",
+            "data": data
+        })),
+        Err(_) => Json(serde_json::json!({
+            "status": "error",
+            "pesan": "Gagal mengambil data tabungan"
         })),
     }
 }
