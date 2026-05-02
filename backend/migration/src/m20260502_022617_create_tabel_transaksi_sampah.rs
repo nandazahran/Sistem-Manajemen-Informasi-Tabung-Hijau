@@ -14,8 +14,8 @@ impl MigrationTrait for Migration {
                     .col(pk_auto(TransaksiSampah::Id))
                     // Catat waktu transaksi otomatis
                     .col(timestamp(TransaksiSampah::Tanggal).default(Expr::current_timestamp())) 
-                    .col(float(TransaksiSampah::Berat))
-                    .col(float(TransaksiSampah::TotalNilai))
+                    .col(integer(TransaksiSampah::Berat)) // Simpan dalam satuan Gram
+                    .col(integer(TransaksiSampah::TotalNilai))
                     .col(string(TransaksiSampah::Status))
                     
                     // --- KOLOM UNTUK FOREIGN KEY ---

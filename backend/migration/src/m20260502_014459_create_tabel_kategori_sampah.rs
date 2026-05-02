@@ -15,7 +15,7 @@ impl MigrationTrait for Migration {
                     // Nama kategori wajib diisi dan tidak boleh kembar
                     .col(string(KategoriSampah::NamaKategori).unique_key()) 
                     // Harga konversi per kilogram (menggunakan tipe float/desimal)
-                    .col(float(KategoriSampah::HargaPerKg)) 
+                    .col(integer(KategoriSampah::HargaPerKg)) 
                     .to_owned(),
             )
             .await

@@ -13,7 +13,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(pk_auto(TabunganSampah::Id))
                     // Saldo otomatis mulai dari 0.0
-                    .col(float(TabunganSampah::Saldo).default(0.0)) 
+                    .col(integer(TabunganSampah::Saldo).default(0.0)) 
                     .col(string(TabunganSampah::Status))
                     
                     // --- RELASI 1-TO-1 KE WILAYAH ---

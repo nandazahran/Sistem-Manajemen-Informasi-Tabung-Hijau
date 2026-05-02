@@ -5,7 +5,7 @@ use tower_http::cors::{CorsLayer, Any};
 use axum::http::{Method, header};
 
 mod handlers;
-mod entity;
+mod entities;
 
 #[tokio::main]
 async fn main() {
@@ -30,10 +30,16 @@ async fn main() {
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE]);
     
     // 2. Buat wilayah khusus yang DIJAGA SATPAM
-    let rute_setoran = Router::new()
-        .route("/", get(handlers::ambil_semua_setoran).post(handlers::terima_setoran))
-        .route("/{id_target}", delete(handlers::hapus_setoran).put(handlers::update_setoran))
+    let rute_wilayah = Router::new()
+        //.route("/", get(handlers::ambil_semua_setoran).post(handlers::terima_setoran))
+        //.route("/{id_target}", delete(handlers::hapus_setoran).put(handlers::update_setoran))
         // Pasang satpam di sini! Semua rute di dalam blok ini akan diperiksa.
+        .route("/", get(handlers::lihat_wilayah).post(handlers::tambah_wilayah))
+        .route_layer(middleware::from_fn(handlers::satpam_jwt));
+
+    // 2. Rute Kategori (BARU)
+    let rute_kategori = Router::new()
+        .route("/", get(handlers::lihat_kategori).post(handlers::tambah_kategori))
         .route_layer(middleware::from_fn(handlers::satpam_jwt));
 
     // 4. Titipkan kunci brankas (db) ke dalam aplikasi (State)
@@ -41,7 +47,8 @@ async fn main() {
         .route("/", get(|| async { "Halo Tim! Backend SIM-TH sudah menyala!" }))
         .route("/api/register", post(handlers::register))// Rute untuk registrasi user baru
         .route("/api/login", post(handlers::login)) // Rute untuk login
-        .nest("/api/setoran", rute_setoran)
+        .nest("/api/wilayah", rute_wilayah)
+        .nest("/api/kategori", rute_kategori)
         .with_state(db) // <-- Kunci dititipkan di sini
         .layer(jembatan_cors); 
 
