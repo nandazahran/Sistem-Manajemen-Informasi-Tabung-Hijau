@@ -42,6 +42,10 @@ async fn main() {
         .route("/", get(handlers::lihat_kategori).post(handlers::tambah_kategori))
         .route_layer(middleware::from_fn(handlers::satpam_jwt));
 
+    let rute_transaksi = Router::new()
+        .route("/", get(handlers::lihat_transaksi).post(handlers::tambah_transaksi))
+        .route_layer(middleware::from_fn(handlers::satpam_jwt));
+
     // 4. Titipkan kunci brankas (db) ke dalam aplikasi (State)
     let app = Router::new()
         .route("/", get(|| async { "Halo Tim! Backend SIM-TH sudah menyala!" }))
@@ -49,6 +53,7 @@ async fn main() {
         .route("/api/login", post(handlers::login)) // Rute untuk login
         .nest("/api/wilayah", rute_wilayah)
         .nest("/api/kategori", rute_kategori)
+        .nest("/api/transaksi", rute_transaksi)
         .with_state(db) // <-- Kunci dititipkan di sini
         .layer(jembatan_cors); 
 

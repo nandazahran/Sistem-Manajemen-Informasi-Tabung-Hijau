@@ -2,7 +2,7 @@ use axum::extract::{Path, State, Query};
 use axum::Json;
 use axum::{
     extract::Request,
-    http::{header, StatusCode},
+    http::{header, StatusCode, HeaderMap},
     middleware::Next,
     response::Response,
 };
@@ -12,7 +12,7 @@ use bcrypt::{hash, verify, DEFAULT_COST}; // Tambahkan alat bcrypt
 use jsonwebtoken::{encode, EncodingKey, Header, decode, DecodingKey, Validation}; // Alat pembuat JWT
 use chrono::{Utc, Duration}; // Jam digital untuk masa berlaku token
 
-use crate::entities::{user,wilayah,kategori_sampah};
+use crate::entities::{user,wilayah,kategori_sampah, transaksi_sampah};
 
 #[derive(Deserialize)]
 pub struct InputSetoran {
@@ -85,6 +85,14 @@ pub struct ResponLogin {
 pub struct InputKategori {
     pub nama_kategori: String,
     pub harga_per_kg: i32, 
+}
+
+// 2. Struct untuk menerima input (Perhatikan kita pakai berat_gram)
+#[derive(Deserialize)]
+pub struct InputTransaksi {
+    pub kategori_id: i32,
+    pub wilayah_id: i32,
+    pub berat_gram: i32, 
 }
 
 // 3. Fungsi Register yang sudah di-upgrade
@@ -333,6 +341,97 @@ pub async fn lihat_kategori(
         Err(_) => Json(serde_json::json!({
             "status": "error",
             "pesan": "Gagal mengambil data kategori"
+        })),
+    }
+}
+
+// 3. Fungsi Tambah Transaksi
+pub async fn tambah_transaksi(
+    State(db): State<DatabaseConnection>,
+    headers: HeaderMap, // Tangkap header untuk membaca JWT
+    Json(payload): Json<InputTransaksi>,
+) -> Json<ResponPesan> {
+    
+    // --- TAHAP 1: BACA IDENTITAS PETUGAS DARI JWT ---
+    let token_lengkap = headers.get("Authorization").unwrap().to_str().unwrap();
+    let token_asli = &token_lengkap[7..];
+    let kunci_rahasia = b"kunci_rahasia_sim_th_super_aman"; 
+    
+    let data_ktp = decode::<KlaimToken>(
+        token_asli, 
+        &DecodingKey::from_secret(kunci_rahasia), 
+        &Validation::default()
+    ).unwrap();
+
+    let pencarian_petugas = user::Entity::find()
+        .filter(user::Column::Username.eq(data_ktp.claims.sub))
+        .one(&db)
+        .await;
+    
+    // Cari ID User di database berdasarkan username di dalam JWT
+    let petugas = match pencarian_petugas {
+        Ok(Some(p)) => p, // Kalau ketemu, simpan ke variabel 'petugas'
+        _ => return Json(ResponPesan {
+            status: "gagal".to_string(),
+            pesan: "Akses ditolak! Akun di token JWT ini sudah tidak ada di database. Silakan login ulang.".to_string(),
+        }), // Kalau tidak ketemu (None), tolak dengan sopan tanpa bikin server crash
+    };
+
+    // --- TAHAP 2: AMBIL HARGA KATEGORI ---
+    let pencarian_kategori = kategori_sampah::Entity::find_by_id(payload.kategori_id).one(&db).await;
+    let kategori = match pencarian_kategori {
+        Ok(Some(k)) => k,
+        _ => return Json(ResponPesan {
+            status: "gagal".to_string(),
+            pesan: "Kategori sampah tidak ditemukan di sistem!".to_string(),
+        }),
+    };
+
+    // --- TAHAP 3: KALKULASI INTEGER MURNI ---
+    // Contoh: (1500 gram * Rp 4000) / 1000 = Rp 6000
+    let kalkulasi_total_nilai = (payload.berat_gram * kategori.harga_per_kg) / 1000;
+
+    // --- TAHAP 4: SIMPAN KE BRANKAS ---
+    let transaksi_baru = transaksi_sampah::ActiveModel {
+        berat: Set(payload.berat_gram),
+        total_nilai: Set(kalkulasi_total_nilai),
+        status: Set("Selesai".to_string()),
+        kategori_id: Set(payload.kategori_id),
+        wilayah_id: Set(payload.wilayah_id),
+        input_by: Set(petugas.id), // Diambil otomatis, tidak perlu dikirim frontend!
+        ..Default::default()
+    };
+
+    match transaksi_baru.insert(&db).await {
+        Ok(_) => Json(ResponPesan {
+            status: "sukses".to_string(),
+            pesan: format!(
+                "Mantap! Setoran seberat {} gram setara dengan Rp {} berhasil dicatat oleh {}.", 
+                payload.berat_gram, kalkulasi_total_nilai, petugas.nama
+            ),
+        }),
+        Err(e) => Json(ResponPesan {
+            status: "gagal".to_string(),
+            pesan: format!("Gagal mencatat transaksi. Pastikan ID Wilayah benar. Error: {}", e),
+        }),
+    }
+}
+
+// 4. Fungsi Lihat Transaksi
+pub async fn lihat_transaksi(
+    State(db): State<DatabaseConnection>,
+) -> Json<serde_json::Value> {
+    
+    let daftar_transaksi = transaksi_sampah::Entity::find().all(&db).await;
+
+    match daftar_transaksi {
+        Ok(data) => Json(serde_json::json!({
+            "status": "sukses",
+            "data": data
+        })),
+        Err(_) => Json(serde_json::json!({
+            "status": "error",
+            "pesan": "Gagal mengambil data transaksi"
         })),
     }
 }
