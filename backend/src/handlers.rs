@@ -427,7 +427,7 @@ pub async fn update_wilayah(
             match data_aktif.update(&db).await {
                 Ok(_) => Json(ResponPesan {
                     status: "sukses".to_string(),
-                    pesan: format!("Wilayah ID {} berhasil diupdate menjadi '{}'.", wilayah_id, payload.nama),
+                    pesan: format!("Wilayah ID {} berhasil diupdate. Nama: '{}', Status: '{}'.", wilayah_id, payload.nama, payload.status),
                 }),
                 Err(e) => Json(ResponPesan {
                     status: "gagal".to_string(),
@@ -894,6 +894,29 @@ pub async fn lihat_dashboard(
         Err(e) => Json(serde_json::json!({
             "status": "error",
             "pesan": format!("Gagal menghitung rekap: {}", e)
+        })),
+    }
+}
+
+// Fungsi khusus mengambil Wilayah yang statusnya HANYA "Aktif"
+pub async fn lihat_wilayah_aktif(
+    State(db): State<DatabaseConnection>,
+) -> Json<serde_json::Value> {
+    
+    // Perhatikan bagian .filter ini!
+    let pencarian = wilayah::Entity::find()
+        .filter(wilayah::Column::Status.eq("Aktif"))
+        .all(&db)
+        .await;
+
+    match pencarian {
+        Ok(data) => Json(serde_json::json!({
+            "status": "sukses",
+            "data": data
+        })),
+        Err(e) => Json(serde_json::json!({
+            "status": "error",
+            "pesan": format!("Gagal mengambil data wilayah aktif: {}", e)
         })),
     }
 }

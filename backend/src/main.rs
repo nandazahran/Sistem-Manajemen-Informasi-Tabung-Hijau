@@ -33,6 +33,7 @@ async fn main() {
     let rute_wilayah = Router::new()
         // Pasang satpam di sini! Semua rute di dalam blok ini akan diperiksa.
         .route("/", get(handlers::lihat_wilayah).post(handlers::tambah_wilayah))
+        .route("/aktif", get(handlers::lihat_wilayah_aktif))
         .route("/{id}", put(handlers::update_wilayah).delete(handlers::hapus_wilayah))
         .route_layer(middleware::from_fn(handlers::satpam_jwt));
 
