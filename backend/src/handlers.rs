@@ -1,6 +1,5 @@
-use axum::extract::{Path, State, Query,Json};
 use axum::{
-    extract::Request,
+    extract::{Path, State, Query,Json,Request},
     http::{header, StatusCode, HeaderMap},
     middleware::Next,
     response::Response,
@@ -603,14 +602,33 @@ pub async fn tambah_transaksi(
         .one(&db)
         .await;
     
-    // Cari ID User di database berdasarkan username di dalam JWT
     let petugas = match pencarian_petugas {
-        Ok(Some(p)) => p, // Kalau ketemu, simpan ke variabel 'petugas'
+        Ok(Some(p)) => p, 
         _ => return Json(ResponPesan {
             status: "gagal".to_string(),
             pesan: "Akses ditolak! Akun di token JWT ini sudah tidak ada di database. Silakan login ulang.".to_string(),
-        }), // Kalau tidak ketemu (None), tolak dengan sopan tanpa bikin server crash
+        }),
     };
+
+    // --- TAHAP 1.5: GEMBOK KEAMANAN (CEK STATUS WILAYAH) ---
+    let pencarian_wilayah = wilayah::Entity::find_by_id(payload.wilayah_id).one(&db).await;
+    match pencarian_wilayah {
+        Ok(Some(w)) => {
+            // Kalau ketemu, tapi statusnya bukan Aktif, tolak setorannya!
+            if w.status != "Aktif" {
+                return Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: format!("Setoran ditolak! Wilayah '{}' saat ini berstatus Nonaktif.", w.nama),
+                });
+            }
+        },
+        Ok(None) => return Json(ResponPesan {
+            status: "gagal".to_string(),
+            pesan: format!("Wilayah ID {} tidak ditemukan di sistem!", payload.wilayah_id),
+        }),
+        Err(e) => return Json(ResponPesan { status: "error".to_string(), pesan: e.to_string() }),
+    };
+
 
     // --- TAHAP 2: AMBIL HARGA KATEGORI ---
     let pencarian_kategori = kategori_sampah::Entity::find_by_id(payload.kategori_id).one(&db).await;
@@ -623,7 +641,6 @@ pub async fn tambah_transaksi(
     };
 
     // --- TAHAP 3: KALKULASI INTEGER MURNI ---
-    // Contoh: (1500 gram * Rp 4000) / 1000 = Rp 6000
     let kalkulasi_total_nilai = (payload.berat_gram * kategori.harga_per_kg) / 1000;
 
     // --- TAHAP 4: SIMPAN KE BRANKAS ---
@@ -633,14 +650,13 @@ pub async fn tambah_transaksi(
         status: Set("Selesai".to_string()),
         kategori_id: Set(payload.kategori_id),
         wilayah_id: Set(payload.wilayah_id),
-        input_by: Set(petugas.id), // Diambil otomatis, tidak perlu dikirim frontend!
+        input_by: Set(petugas.id), 
         ..Default::default()
     };
 
     match transaksi_baru.insert(&db).await {
     Ok(_) => {
         // --- TAHAP 5: OTOMATISASI SALDO TABUNGAN WILAYAH ---
-        // 1. Cek apakah wilayah ini sudah punya dompet?
         let pencarian_dompet = tabungan_sampah::Entity::find()
             .filter(tabungan_sampah::Column::WilayahId.eq(payload.wilayah_id))
             .one(&db)
@@ -649,16 +665,13 @@ pub async fn tambah_transaksi(
 
         match pencarian_dompet {
             Some(dompet_lama) => {
-                // 2. Kalau dompetnya sudah ada, Trik Sulap: Tambah saldonya!
                 let mut dompet_aktif: tabungan_sampah::ActiveModel = dompet_lama.into();
-                // Ambil saldo yang sekarang (karena ini asalnya dari database, pakai unwrap aman)
                 let saldo_sekarang = dompet_aktif.saldo.clone().unwrap(); 
                 
                 dompet_aktif.saldo = Set(saldo_sekarang + kalkulasi_total_nilai);
                 let _ = dompet_aktif.update(&db).await; 
             },
             None => {
-                // 3. Kalau wilayahnya baru pertama kali menyetor, buatkan dompet baru
                 let dompet_baru = tabungan_sampah::ActiveModel {
                     saldo: Set(kalkulasi_total_nilai),
                     status: Set("Aktif".to_string()),
@@ -681,7 +694,7 @@ pub async fn tambah_transaksi(
         status: "gagal".to_string(),
         pesan: format!("Gagal mencatat transaksi. Error: {}", e),
     }),
-}
+    }
 }
 
 // 1. Fungsi Lihat Transaksi (Membaca 4 Tabel Sekaligus!)
