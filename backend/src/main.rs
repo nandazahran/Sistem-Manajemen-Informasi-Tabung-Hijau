@@ -31,16 +31,15 @@ async fn main() {
     
     // 2. Buat wilayah khusus yang DIJAGA SATPAM
     let rute_wilayah = Router::new()
-        //.route("/", get(handlers::ambil_semua_setoran).post(handlers::terima_setoran))
-        //.route("/{id_target}", delete(handlers::hapus_setoran).put(handlers::update_setoran))
         // Pasang satpam di sini! Semua rute di dalam blok ini akan diperiksa.
         .route("/", get(handlers::lihat_wilayah).post(handlers::tambah_wilayah))
+        .route("/{id}", put(handlers::update_wilayah).delete(handlers::hapus_wilayah))
         .route_layer(middleware::from_fn(handlers::satpam_jwt));
 
     // 2. Rute Kategori
     let rute_kategori = Router::new()
         .route("/", get(handlers::lihat_kategori).post(handlers::tambah_kategori))
-        .route("/{id}", put(handlers::update_kategori))
+        .route("/{id}", put(handlers::update_kategori).delete(handlers::hapus_kategori))
         .route_layer(middleware::from_fn(handlers::satpam_jwt));
 
     let rute_transaksi = Router::new()

@@ -333,6 +333,61 @@ pub async fn lihat_wilayah(
     }
 }
 
+// 1. Fungsi Update Wilayah (PUT)
+pub async fn update_wilayah(
+    State(db): State<DatabaseConnection>,
+    Path(wilayah_id): Path<i32>,
+    Json(payload): Json<InputWilayah>,
+) -> Json<ResponPesan> {
+    let pencarian = wilayah::Entity::find_by_id(wilayah_id).one(&db).await;
+
+    match pencarian {
+        Ok(Some(data_lama)) => {
+            let mut data_aktif: wilayah::ActiveModel = data_lama.into();
+            data_aktif.nama = Set(payload.nama.clone());
+            data_aktif.status = Set(payload.status.clone());
+
+            match data_aktif.update(&db).await {
+                Ok(_) => Json(ResponPesan {
+                    status: "sukses".to_string(),
+                    pesan: format!("Wilayah ID {} berhasil diupdate menjadi '{}'.", wilayah_id, payload.nama),
+                }),
+                Err(e) => Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: format!("Gagal mengupdate wilayah: {}", e),
+                })
+            }
+        },
+        Ok(None) => Json(ResponPesan { status: "gagal".to_string(), pesan: "Wilayah tidak ditemukan.".to_string() }),
+        Err(e) => Json(ResponPesan { status: "error".to_string(), pesan: e.to_string() }),
+    }
+}
+
+// 2. Fungsi Hapus Wilayah (DELETE)
+pub async fn hapus_wilayah(
+    State(db): State<DatabaseConnection>,
+    Path(wilayah_id): Path<i32>,
+) -> Json<ResponPesan> {
+    let pencarian = wilayah::Entity::find_by_id(wilayah_id).one(&db).await;
+
+    match pencarian {
+        Ok(Some(data)) => {
+            match data.delete(&db).await {
+                Ok(_) => Json(ResponPesan {
+                    status: "sukses".to_string(),
+                    pesan: format!("Wilayah ID {} berhasil dihapus dari sistem.", wilayah_id),
+                }),
+                Err(_) => Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: "Gagal menghapus! Wilayah ini tidak bisa dihapus karena sudah memiliki riwayat tabungan atau transaksi. Ubah statusnya menjadi 'Nonaktif' saja.".to_string(),
+                })
+            }
+        },
+        Ok(None) => Json(ResponPesan { status: "gagal".to_string(), pesan: "Wilayah tidak ditemukan.".to_string() }),
+        Err(e) => Json(ResponPesan { status: "error".to_string(), pesan: e.to_string() }),
+    }
+}
+
 // 1. Fungsi Tambah Kategori
 pub async fn tambah_kategori(
     State(db): State<DatabaseConnection>,
@@ -418,6 +473,31 @@ pub async fn update_kategori(
             status: "error".to_string(),
             pesan: format!("Terjadi kesalahan sistem: {}", e),
         })
+    }
+}
+
+// 3. Fungsi Hapus Kategori (DELETE)
+pub async fn hapus_kategori(
+    State(db): State<DatabaseConnection>,
+    Path(kategori_id): Path<i32>,
+) -> Json<ResponPesan> {
+    let pencarian = kategori_sampah::Entity::find_by_id(kategori_id).one(&db).await;
+
+    match pencarian {
+        Ok(Some(data)) => {
+            match data.delete(&db).await {
+                Ok(_) => Json(ResponPesan {
+                    status: "sukses".to_string(),
+                    pesan: format!("Kategori ID {} berhasil dihapus dari sistem.", kategori_id),
+                }),
+                Err(_) => Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: "Gagal menghapus! Kategori ini kemungkinan sudah dipakai di dalam riwayat transaksi. Harap biarkan untuk menjaga integritas data sejarah.".to_string(),
+                })
+            }
+        },
+        Ok(None) => Json(ResponPesan { status: "gagal".to_string(), pesan: "Kategori tidak ditemukan.".to_string() }),
+        Err(e) => Json(ResponPesan { status: "error".to_string(), pesan: e.to_string() }),
     }
 }
 
