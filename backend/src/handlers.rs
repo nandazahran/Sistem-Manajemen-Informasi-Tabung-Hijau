@@ -6,7 +6,7 @@ use axum::{
     middleware::Next,
     response::Response,
 };
-use sea_orm::{DatabaseConnection, ActiveModelTrait, EntityTrait, Set, QueryFilter, ColumnTrait}; // Tambahkan Set & ActiveModelTrait
+use sea_orm::{DatabaseConnection, ActiveModelTrait, EntityTrait, Set, QueryFilter, ColumnTrait, FromQueryResult, JoinType, QuerySelect, RelationTrait};
 use serde::{Deserialize, Serialize};
 use bcrypt::{hash, verify, DEFAULT_COST}; // Tambahkan alat bcrypt
 use jsonwebtoken::{encode, EncodingKey, Header, decode, DecodingKey, Validation}; // Alat pembuat JWT
@@ -93,6 +93,27 @@ pub struct InputTransaksi {
     pub kategori_id: i32,
     pub wilayah_id: i32,
     pub berat_gram: i32, 
+}
+
+// Cetakan untuk data Transaksi yang sudah digabung
+#[derive(FromQueryResult, Serialize)]
+pub struct TransaksiLengkap {
+    pub id: i32,
+    pub berat: i32,
+    pub total_nilai: i32,
+    pub status: String,
+    pub nama_kategori: String, // Diambil dari tabel kategori
+    pub nama_wilayah: String,  // Diambil dari tabel wilayah
+    pub nama_petugas: String,  // Diambil dari tabel user
+}
+
+// Cetakan untuk data Tabungan yang sudah digabung
+#[derive(FromQueryResult, Serialize)]
+pub struct TabunganLengkap {
+    pub id: i32,
+    pub saldo: i32,
+    pub status: String,
+    pub nama_wilayah: String, // Diambil dari tabel wilayah
 }
 
 // 3. Fungsi Register yang sudah di-upgrade
@@ -449,40 +470,57 @@ pub async fn tambah_transaksi(
 }
 }
 
-// 4. Fungsi Lihat Transaksi
+// 1. Fungsi Lihat Transaksi (Membaca 4 Tabel Sekaligus!)
 pub async fn lihat_transaksi(
     State(db): State<DatabaseConnection>,
 ) -> Json<serde_json::Value> {
     
-    let daftar_transaksi = transaksi_sampah::Entity::find().all(&db).await;
+    let query_transaksi = transaksi_sampah::Entity::find()
+        // Pilih kolom tambahan yang mau dicomot dari tabel tetangga
+        .column_as(kategori_sampah::Column::NamaKategori, "nama_kategori")
+        .column_as(wilayah::Column::Nama, "nama_wilayah")
+        .column_as(user::Column::Nama, "nama_petugas")
+        // Lakukan penggabungan (Inner Join) berdasarkan Foreign Key
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::KategoriSampah.def())
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::Wilayah.def())
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::User.def())
+        // Tuangkan hasilnya ke dalam cetakan JSON yang kita buat tadi
+        .into_model::<TransaksiLengkap>()
+        .all(&db)
+        .await;
 
-    match daftar_transaksi {
+    match query_transaksi {
         Ok(data) => Json(serde_json::json!({
             "status": "sukses",
             "data": data
         })),
-        Err(_) => Json(serde_json::json!({
+        Err(e) => Json(serde_json::json!({
             "status": "error",
-            "pesan": "Gagal mengambil data transaksi"
+            "pesan": format!("Gagal mengambil data transaksi: {}", e)
         })),
     }
 }
 
-// Fungsi Lihat Tabungan
+// 2. Fungsi Lihat Tabungan (Membaca 2 Tabel)
 pub async fn lihat_tabungan(
     State(db): State<DatabaseConnection>,
 ) -> Json<serde_json::Value> {
     
-    let daftar_tabungan = tabungan_sampah::Entity::find().all(&db).await;
+    let query_tabungan = tabungan_sampah::Entity::find()
+        .column_as(wilayah::Column::Nama, "nama_wilayah")
+        .join(JoinType::InnerJoin, tabungan_sampah::Relation::Wilayah.def())
+        .into_model::<TabunganLengkap>()
+        .all(&db)
+        .await;
 
-    match daftar_tabungan {
+    match query_tabungan {
         Ok(data) => Json(serde_json::json!({
             "status": "sukses",
             "data": data
         })),
-        Err(_) => Json(serde_json::json!({
+        Err(e) => Json(serde_json::json!({
             "status": "error",
-            "pesan": "Gagal mengambil data tabungan"
+            "pesan": format!("Gagal mengambil data tabungan: {}", e)
         })),
     }
 }
