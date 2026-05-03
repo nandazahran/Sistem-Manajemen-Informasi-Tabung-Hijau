@@ -37,13 +37,15 @@ async fn main() {
         .route("/", get(handlers::lihat_wilayah).post(handlers::tambah_wilayah))
         .route_layer(middleware::from_fn(handlers::satpam_jwt));
 
-    // 2. Rute Kategori (BARU)
+    // 2. Rute Kategori
     let rute_kategori = Router::new()
         .route("/", get(handlers::lihat_kategori).post(handlers::tambah_kategori))
+        .route("/{id}", put(handlers::update_kategori))
         .route_layer(middleware::from_fn(handlers::satpam_jwt));
 
     let rute_transaksi = Router::new()
         .route("/", get(handlers::lihat_transaksi).post(handlers::tambah_transaksi))
+        .route("/{id}", delete(handlers::hapus_transaksi))
         .route_layer(middleware::from_fn(handlers::satpam_jwt));
 
     let rute_tabungan = Router::new()

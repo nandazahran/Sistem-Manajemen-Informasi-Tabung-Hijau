@@ -1,12 +1,11 @@
-use axum::extract::{Path, State, Query};
-use axum::Json;
+use axum::extract::{Path, State, Query,Json};
 use axum::{
     extract::Request,
     http::{header, StatusCode, HeaderMap},
     middleware::Next,
     response::Response,
 };
-use sea_orm::{DatabaseConnection, ActiveModelTrait, EntityTrait, Set, QueryFilter, ColumnTrait, FromQueryResult, JoinType, QuerySelect, RelationTrait};
+use sea_orm::{DatabaseConnection, ActiveModelTrait, EntityTrait, Set, QueryFilter, ColumnTrait, FromQueryResult, JoinType, QuerySelect, RelationTrait, ModelTrait};
 use serde::{Deserialize, Serialize};
 use bcrypt::{hash, verify, DEFAULT_COST}; // Tambahkan alat bcrypt
 use jsonwebtoken::{encode, EncodingKey, Header, decode, DecodingKey, Validation}; // Alat pembuat JWT
@@ -370,6 +369,51 @@ pub async fn lihat_kategori(
     }
 }
 
+// Fungsi Update Kategori Sampah (Misal untuk mengubah harga)
+pub async fn update_kategori(
+    State(db): State<DatabaseConnection>,
+    Path(kategori_id): Path<i32>,
+    Json(payload): Json<InputKategori>,
+) -> Json<ResponPesan> {
+    
+    // 1. Cari kategori berdasarkan ID di URL
+    let pencarian_kategori = kategori_sampah::Entity::find_by_id(kategori_id).one(&db).await;
+
+    match pencarian_kategori {
+        Ok(Some(kategori_lama)) => {
+            // 2. Ubah data lamanya menjadi ActiveModel agar bisa diedit
+            let mut kategori_aktif: kategori_sampah::ActiveModel = kategori_lama.into();
+            
+            // 3. Timpa dengan data baru dari payload
+            kategori_aktif.nama_kategori = Set(payload.nama_kategori.clone());
+            kategori_aktif.harga_per_kg = Set(payload.harga_per_kg);
+
+            // 4. Simpan pembaruan ke database
+            match kategori_aktif.update(&db).await {
+                Ok(_) => Json(ResponPesan {
+                    status: "sukses".to_string(),
+                    pesan: format!(
+                        "Kategori ID {} berhasil diupdate menjadi '{}' dengan harga Rp {}/kg.", 
+                        kategori_id, payload.nama_kategori, payload.harga_per_kg
+                    ),
+                }),
+                Err(e) => Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: format!("Gagal mengupdate kategori: {}", e),
+                })
+            }
+        },
+        Ok(None) => Json(ResponPesan {
+            status: "gagal".to_string(),
+            pesan: format!("Kategori dengan ID {} tidak ditemukan.", kategori_id),
+        }),
+        Err(e) => Json(ResponPesan {
+            status: "error".to_string(),
+            pesan: format!("Terjadi kesalahan sistem: {}", e),
+        })
+    }
+}
+
 // 3. Fungsi Tambah Transaksi
 pub async fn tambah_transaksi(
     State(db): State<DatabaseConnection>,
@@ -528,5 +572,64 @@ pub async fn lihat_tabungan(
             "status": "error",
             "pesan": format!("Gagal mengambil data tabungan: {}", e)
         })),
+    }
+}
+
+// Fungsi Hapus Transaksi (Dilengkapi dengan Auto-Kurang Saldo)
+pub async fn hapus_transaksi(
+    State(db): State<DatabaseConnection>,
+    Path(transaksi_id): Path<i32>, // Mengambil ID dari URL
+) -> Json<ResponPesan> {
+    
+    // 1. Cari data transaksi yang mau dihapus
+    let pencarian_transaksi = transaksi_sampah::Entity::find_by_id(transaksi_id).one(&db).await;
+
+    match pencarian_transaksi {
+        Ok(Some(data_trx)) => {
+            // Ambil informasi nilai dan wilayah sebelum transaksinya dimusnahkan
+            let nilai_yang_dihapus = data_trx.total_nilai;
+            let id_wilayah = data_trx.wilayah_id;
+
+            // 2. Cari dompet tabungan wilayah tersebut
+            let pencarian_dompet = tabungan_sampah::Entity::find()
+                .filter(tabungan_sampah::Column::WilayahId.eq(id_wilayah))
+                .one(&db)
+                .await
+                .unwrap();
+
+            // 3. Tarik kembali saldonya (kalau dompetnya ada)
+            if let Some(dompet_lama) = pencarian_dompet {
+                let mut dompet_aktif: tabungan_sampah::ActiveModel = dompet_lama.into();
+                let saldo_sekarang = dompet_aktif.saldo.clone().unwrap();
+                
+                // Kurangi saldo saat ini dengan nilai transaksi yang salah tadi
+                dompet_aktif.saldo = Set(saldo_sekarang - nilai_yang_dihapus);
+                let _ = dompet_aktif.update(&db).await;
+            }
+
+            // 4. Terakhir, hapus data transaksinya secara permanen dari brankas
+            match data_trx.delete(&db).await {
+                Ok(_) => Json(ResponPesan {
+                    status: "sukses".to_string(),
+                    pesan: format!("Transaksi ID {} berhasil dihapus dan saldo tabungan otomatis ditarik kembali sebesar Rp {}.", transaksi_id, nilai_yang_dihapus),
+                }),
+                Err(e) => Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: format!("Gagal menghapus transaksi dari database: {}", e),
+                })
+            }
+        },
+        Ok(None) => {
+            Json(ResponPesan {
+                status: "gagal".to_string(),
+                pesan: format!("Transaksi dengan ID {} tidak ditemukan.", transaksi_id),
+            })
+        },
+        Err(e) => {
+            Json(ResponPesan {
+                status: "error".to_string(),
+                pesan: format!("Terjadi kesalahan sistem saat mencari transaksi: {}", e),
+            })
+        }
     }
 }
