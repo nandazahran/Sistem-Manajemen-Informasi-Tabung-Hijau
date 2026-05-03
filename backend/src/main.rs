@@ -49,7 +49,8 @@ async fn main() {
         .route_layer(middleware::from_fn(handlers::satpam_jwt));
 
     let rute_tabungan = Router::new()
-        .route("/", get(handlers::lihat_tabungan)) // Cukup GET saja, karena tabungan diisi otomatis!
+        .route("/", get(handlers::lihat_tabungan))
+        .route("/tarik", post(handlers::tarik_saldo)) // Cukup GET saja, karena tabungan diisi otomatis!
         .route_layer(middleware::from_fn(handlers::satpam_jwt));
 
     // 4. Titipkan kunci brankas (db) ke dalam aplikasi (State)

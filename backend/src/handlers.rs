@@ -94,6 +94,13 @@ pub struct InputTransaksi {
     pub berat_gram: i32, 
 }
 
+// Struct untuk menerima request penarikan saldo
+#[derive(Deserialize)]
+pub struct InputTarik {
+    pub wilayah_id: i32,
+    pub nominal: i32,
+}
+
 // Cetakan untuk data Transaksi yang sudah digabung
 #[derive(FromQueryResult, Serialize)]
 pub struct TransaksiLengkap {
@@ -631,5 +638,62 @@ pub async fn hapus_transaksi(
                 pesan: format!("Terjadi kesalahan sistem saat mencari transaksi: {}", e),
             })
         }
+    }
+}
+
+// Fungsi Tarik Saldo (Hanya mengubah Tabungan, TIDAK menyentuh Transaksi)
+pub async fn tarik_saldo(
+    State(db): State<DatabaseConnection>,
+    Json(payload): Json<InputTarik>,
+) -> Json<ResponPesan> {
+    
+    // 1. Cari dompet tabungan wilayah tersebut
+    let pencarian_dompet = tabungan_sampah::Entity::find()
+        .filter(tabungan_sampah::Column::WilayahId.eq(payload.wilayah_id))
+        .one(&db)
+        .await;
+
+    match pencarian_dompet {
+        Ok(Some(dompet_lama)) => {
+            let mut dompet_aktif: tabungan_sampah::ActiveModel = dompet_lama.into();
+            let saldo_sekarang = dompet_aktif.saldo.clone().unwrap();
+
+            // 2. CEK PENGAMAN: Apakah saldonya cukup?
+            if saldo_sekarang < payload.nominal {
+                return Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: format!(
+                        "Penarikan ditolak! Saldo BEM ini hanya Rp {}, sedangkan nominal tarikan Rp {}.", 
+                        saldo_sekarang, payload.nominal
+                    ),
+                });
+            }
+
+            // 3. EKSEKUSI: Kurangi saldo saat ini
+            let saldo_baru = saldo_sekarang - payload.nominal;
+            dompet_aktif.saldo = Set(saldo_baru);
+            
+            match dompet_aktif.update(&db).await {
+                Ok(_) => Json(ResponPesan {
+                    status: "sukses".to_string(),
+                    pesan: format!(
+                        "Pencairan dana Rp {} berhasil. Sisa saldo tabungan saat ini: Rp {}.", 
+                        payload.nominal, saldo_baru
+                    ),
+                }),
+                Err(e) => Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: format!("Gagal memproses penarikan di database: {}", e),
+                }),
+            }
+        },
+        Ok(None) => Json(ResponPesan {
+            status: "gagal".to_string(),
+            pesan: "Wilayah ini belum memiliki catatan tabungan (saldo masih Rp 0).".to_string(),
+        }),
+        Err(e) => Json(ResponPesan {
+            status: "error".to_string(),
+            pesan: format!("Terjadi kesalahan sistem: {}", e),
+        }),
     }
 }
