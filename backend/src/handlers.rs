@@ -182,12 +182,14 @@ pub async fn login(
                     exp: waktu_hangus,
                 };
 
-                let kunci_rahasia = b"kunci_rahasia_sim_th_super_aman"; 
+                let kunci_rahasia = std::env::var("JWT_SECRET")
+                    .expect("Waduh, JWT_SECRET belum diatur di file .env!")
+                    .into_bytes();
 
                 let token_jwt = encode(
                     &Header::default(),
                     &klaim,
-                    &EncodingKey::from_secret(kunci_rahasia),
+                    &EncodingKey::from_secret(&kunci_rahasia),
                 ).unwrap();
 
                 Json(ResponLogin {
@@ -255,12 +257,14 @@ pub async fn satpam_jwt(
     let token_asli = &token_lengkap[7..];
     
     // Harus sama persis dengan kunci saat login tadi!
-    let kunci_rahasia = b"kunci_rahasia_sim_th_super_aman"; 
+    let kunci_rahasia = std::env::var("JWT_SECRET")
+        .expect("Waduh, JWT_SECRET belum diatur di file .env!")
+        .into_bytes();
 
     // 4. Alat Scanner: Periksa keaslian KTP menggunakan kunci rahasia
     match decode::<KlaimToken>(
         token_asli,
-        &DecodingKey::from_secret(kunci_rahasia),
+        &DecodingKey::from_secret(&kunci_rahasia),
         &Validation::default(),
     ) {
         Ok(_data_ktp) => {
@@ -376,11 +380,13 @@ pub async fn tambah_transaksi(
     // --- TAHAP 1: BACA IDENTITAS PETUGAS DARI JWT ---
     let token_lengkap = headers.get("Authorization").unwrap().to_str().unwrap();
     let token_asli = &token_lengkap[7..];
-    let kunci_rahasia = b"kunci_rahasia_sim_th_super_aman"; 
+    let kunci_rahasia = std::env::var("JWT_SECRET")
+        .expect("Waduh, JWT_SECRET belum diatur di file .env!")
+        .into_bytes();
     
     let data_ktp = decode::<KlaimToken>(
         token_asli, 
-        &DecodingKey::from_secret(kunci_rahasia), 
+        &DecodingKey::from_secret(&kunci_rahasia), 
         &Validation::default()
     ).unwrap();
 
