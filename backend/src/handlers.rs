@@ -13,26 +13,6 @@ use chrono::{Utc, Duration}; // Jam digital untuk masa berlaku token
 
 use crate::entities::{user,wilayah,kategori_sampah, transaksi_sampah, tabungan_sampah};
 
-#[derive(Deserialize)]
-pub struct InputSetoran {
-    pub id_wilayah: String,
-    pub kategori: String,
-    pub berat_kg: f32,
-}
-
-#[derive(Deserialize)]
-pub struct FilterSetoran {
-    pub id_wilayah: Option<String>,
-    pub kategori: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct ResponSetoran {
-    pub status: String,
-    pub pesan: String,
-    pub estimasi_harga: f32,
-}
-
 // 1. Struct khusus untuk menerima data Register
 #[derive(Deserialize)]
 pub struct InputRegister {
@@ -77,6 +57,11 @@ pub struct ResponLogin {
     pub status: String,
     pub pesan: String,
     pub token: Option<String>, // Option karena kalau gagal login, token-nya kosong (None)
+}
+
+#[derive(Deserialize)]
+pub struct InputUpdateUser {
+    pub nama: String,
 }
 
 // Struct untuk menerima data dari frontend
@@ -165,6 +150,90 @@ pub async fn register(
             status: "gagal".to_string(),
             pesan: format!("Gagal mendaftar: Email atau Username mungkin sudah dipakai. Detail: {}", e),
         }),
+    }
+}
+
+// 1. Fungsi Lihat Semua User (READ)
+pub async fn lihat_user(
+    State(db): State<DatabaseConnection>,
+) -> Json<serde_json::Value> {
+    let pencarian = user::Entity::find().all(&db).await;
+
+    match pencarian {
+        Ok(daftar_user) => {
+            // Kita saring datanya agar kolom 'password' TIDAK ikut terkirim ke frontend!
+            let data_aman: Vec<_> = daftar_user.into_iter().map(|u| {
+                serde_json::json!({
+                    "id": u.id,
+                    "username": u.username,
+                    "nama": u.nama
+                })
+            }).collect();
+
+            Json(serde_json::json!({
+                "status": "sukses",
+                "data": data_aman
+            }))
+        },
+        Err(e) => Json(serde_json::json!({
+            "status": "error",
+            "pesan": format!("Gagal mengambil data user: {}", e)
+        })),
+    }
+}
+
+// 2. Fungsi Update User (PUT)
+pub async fn update_user(
+    State(db): State<DatabaseConnection>,
+    Path(user_id): Path<i32>,
+    Json(payload): Json<InputUpdateUser>,
+) -> Json<ResponPesan> {
+    let pencarian = user::Entity::find_by_id(user_id).one(&db).await;
+
+    match pencarian {
+        Ok(Some(data_lama)) => {
+            let mut data_aktif: user::ActiveModel = data_lama.into();
+            data_aktif.nama = Set(payload.nama.clone()); // Cukup nama yang diizinkan diubah
+
+            match data_aktif.update(&db).await {
+                Ok(_) => Json(ResponPesan {
+                    status: "sukses".to_string(),
+                    pesan: format!("Data admin ID {} berhasil diupdate menjadi '{}'.", user_id, payload.nama),
+                }),
+                Err(e) => Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: format!("Gagal mengupdate user: {}", e),
+                })
+            }
+        },
+        Ok(None) => Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string() }),
+        Err(e) => Json(ResponPesan { status: "error".to_string(), pesan: e.to_string() }),
+    }
+}
+
+// 3. Fungsi Hapus User (DELETE)
+pub async fn hapus_user(
+    State(db): State<DatabaseConnection>,
+    Path(user_id): Path<i32>,
+) -> Json<ResponPesan> {
+    let pencarian = user::Entity::find_by_id(user_id).one(&db).await;
+
+    match pencarian {
+        Ok(Some(data)) => {
+            let username_dihapus = data.username.clone();
+            match data.delete(&db).await {
+                Ok(_) => Json(ResponPesan {
+                    status: "sukses".to_string(),
+                    pesan: format!("Akses admin untuk '{}' berhasil dicabut (dihapus).", username_dihapus),
+                }),
+                Err(_) => Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: "Gagal! User ini tidak bisa dihapus karena sudah pernah mencatat transaksi. Aksesnya harus dibiarkan untuk jejak audit.".to_string(),
+                })
+            }
+        },
+        Ok(None) => Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string() }),
+        Err(e) => Json(ResponPesan { status: "error".to_string(), pesan: e.to_string() }),
     }
 }
 
