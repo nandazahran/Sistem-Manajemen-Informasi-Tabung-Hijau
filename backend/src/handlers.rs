@@ -61,6 +61,7 @@ pub struct ResponLogin {
 #[derive(Deserialize)]
 pub struct InputUpdateUser {
     pub nama: String,
+    pub status: String,
 }
 
 // Struct untuk menerima data dari frontend
@@ -181,7 +182,7 @@ pub async fn lihat_user(
     }
 }
 
-// 2. Fungsi Update User (PUT)
+// Fungsi Update User (Ganti Nama & Status)
 pub async fn update_user(
     State(db): State<DatabaseConnection>,
     Path(user_id): Path<i32>,
@@ -192,12 +193,18 @@ pub async fn update_user(
     match pencarian {
         Ok(Some(data_lama)) => {
             let mut data_aktif: user::ActiveModel = data_lama.into();
-            data_aktif.nama = Set(payload.nama.clone()); // Cukup nama yang diizinkan diubah
+            
+            // Update nama dan status
+            data_aktif.nama = Set(payload.nama.clone()); 
+            data_aktif.status = Set(payload.status.clone()); 
 
             match data_aktif.update(&db).await {
                 Ok(_) => Json(ResponPesan {
                     status: "sukses".to_string(),
-                    pesan: format!("Data admin ID {} berhasil diupdate menjadi '{}'.", user_id, payload.nama),
+                    pesan: format!(
+                        "Data admin ID {} berhasil diupdate. Nama: '{}', Status: '{}'.", 
+                        user_id, payload.nama, payload.status
+                    ),
                 }),
                 Err(e) => Json(ResponPesan {
                     status: "gagal".to_string(),
@@ -239,10 +246,9 @@ pub async fn hapus_user(
 // 4. Fungsi Login yang sudah di-upgrade
 pub async fn login(
     State(db): State<DatabaseConnection>,
-    Json(payload): Json<InputLogin>, // Gunakan InputLogin
+    Json(payload): Json<InputLogin>, 
 ) -> Json<ResponLogin> {
 
-    // Gunakan user::Entity dari folder entities yang baru
     let pencarian_user = user::Entity::find()
         .filter(user::Column::Username.eq(payload.username.clone()))
         .one(&db)
@@ -250,10 +256,20 @@ pub async fn login(
 
     match pencarian_user {
         Ok(Some(data_user)) => {
+            // --- PENGECEKAN STATUS ---
+            // Cek apakah status user "Aktif". Jika tidak, langsung tolak login.
+            if data_user.status != "Aktif" {
+                return Json(ResponLogin {
+                    status: "gagal".to_string(),
+                    pesan: "Akses ditolak! Akun Anda sudah tidak aktif atau berstatus demisioner.".to_string(),
+                    token: None,
+                });
+            }
+
+            // Jika aktif, baru lanjut ke verifikasi password
             let password_cocok = verify(&payload.password, &data_user.password).unwrap_or(false);
 
             if password_cocok {
-                // --- PROSES JWT TETAP SAMA ---
                 let waktu_hangus = Utc::now()
                     .checked_add_signed(Duration::hours(24))
                     .expect("Gagal menghitung waktu")
@@ -276,7 +292,7 @@ pub async fn login(
 
                 Json(ResponLogin {
                     status: "sukses".to_string(),
-                    pesan: format!("Selamat datang, {}!", payload.username),
+                    pesan: format!("Selamat datang, {}!", data_user.nama),
                     token: Some(token_jwt),
                 })
             } else {
