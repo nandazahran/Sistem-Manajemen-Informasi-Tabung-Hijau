@@ -52,6 +52,11 @@ async fn main() {
         .route("/tarik", post(handlers::tarik_saldo)) // Cukup GET saja, karena tabungan diisi otomatis!
         .route_layer(middleware::from_fn(handlers::satpam_jwt));
 
+    // 5. Rute Dashboard
+    let rute_dashboard = Router::new()
+        .route("/", get(handlers::lihat_dashboard))
+        .route_layer(middleware::from_fn(handlers::satpam_jwt));
+
     // 4. Titipkan kunci brankas (db) ke dalam aplikasi (State)
     let app = Router::new()
         .route("/", get(|| async { "Halo Tim! Backend SIM-TH sudah menyala!" }))
@@ -61,6 +66,7 @@ async fn main() {
         .nest("/api/kategori", rute_kategori)
         .nest("/api/transaksi", rute_transaksi)
         .nest("/api/tabungan", rute_tabungan)
+        .nest("/api/dashboard", rute_dashboard)
         .with_state(db) // <-- Kunci dititipkan di sini
         .layer(jembatan_cors); 
 

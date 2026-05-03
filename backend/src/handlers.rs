@@ -113,6 +113,14 @@ pub struct TransaksiLengkap {
     pub nama_petugas: String,  // Diambil dari tabel user
 }
 
+// Ganti tipe data i32 menjadi Option<i64> dan i64
+#[derive(FromQueryResult, Serialize)]
+pub struct RekapDashboard {
+    pub total_berat_gram: Option<i64>, // Pakai Option karena SUM bisa NULL kalau tabel kosong
+    pub total_rupiah: Option<i64>,     // Postgres mengembalikan INT8 (i64) untuk SUM
+    pub jumlah_transaksi: i64,         // Postgres mengembalikan INT8 (i64) untuk COUNT
+}
+
 // Cetakan untuk data Tabungan yang sudah digabung
 #[derive(FromQueryResult, Serialize)]
 pub struct TabunganLengkap {
@@ -775,5 +783,48 @@ pub async fn tarik_saldo(
             status: "error".to_string(),
             pesan: format!("Terjadi kesalahan sistem: {}", e),
         }),
+    }
+}
+
+pub async fn lihat_dashboard(
+    State(db): State<DatabaseConnection>,
+) -> Json<serde_json::Value> {
+
+    let query = transaksi_sampah::Entity::find()
+        .select_only()
+        .column_as(transaksi_sampah::Column::Berat.sum(), "total_berat_gram")
+        .column_as(transaksi_sampah::Column::TotalNilai.sum(), "total_rupiah")
+        .column_as(transaksi_sampah::Column::Id.count(), "jumlah_transaksi")
+        .into_model::<RekapDashboard>()
+        .one(&db)
+        .await;
+
+    match query {
+        Ok(Some(data)) => {
+            // Kita buka bungkus Option-nya. Kalau NULL, ubah jadi 0.
+            let berat = data.total_berat_gram.unwrap_or(0);
+            let rupiah = data.total_rupiah.unwrap_or(0);
+
+            Json(serde_json::json!({
+                "status": "sukses",
+                "rekap_seluruh_ipb": {
+                    "total_berat_gram": berat,
+                    "total_rupiah": rupiah,
+                    "jumlah_transaksi": data.jumlah_transaksi
+                }
+            }))
+        },
+        Ok(None) => Json(serde_json::json!({
+            "status": "sukses",
+            "rekap_seluruh_ipb": {
+                "total_berat_gram": 0,
+                "total_rupiah": 0,
+                "jumlah_transaksi": 0
+            }
+        })),
+        Err(e) => Json(serde_json::json!({
+            "status": "error",
+            "pesan": format!("Gagal menghitung rekap: {}", e)
+        })),
     }
 }
