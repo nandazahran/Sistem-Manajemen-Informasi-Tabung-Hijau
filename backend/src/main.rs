@@ -71,6 +71,8 @@ async fn main() {
         .route("/", get(|| async { "Halo Tim! Backend SIM-TH sudah menyala!" }))
         .route("/api/register", post(handlers::register))// Rute untuk registrasi user baru
         .route("/api/login", post(handlers::login)) // Rute untuk login
+        .route("/api/lupa-password", post(handlers::minta_otp_email))
+        .route("/api/reset-password", post(handlers::reset_password_email))
         .nest("/api/wilayah", rute_wilayah)
         .nest("/api/kategori", rute_kategori)
         .nest("/api/transaksi", rute_transaksi)

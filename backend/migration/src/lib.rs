@@ -7,6 +7,7 @@ mod m20260502_015120_create_tabel_user;
 mod m20260502_022617_create_tabel_transaksi_sampah;
 mod m20260502_023012_create_tabel_tabungan_sampah;
 mod m20260504_110625_tambah_kolom_totp_user;
+mod m20260504_131630_tambah_kolom_otp_reset;
 
 
 pub struct Migrator;
@@ -21,6 +22,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260502_022617_create_tabel_transaksi_sampah::Migration),
             Box::new(m20260502_023012_create_tabel_tabungan_sampah::Migration),
             Box::new(m20260504_110625_tambah_kolom_totp_user::Migration),
+            Box::new(m20260504_131630_tambah_kolom_otp_reset::Migration),
         ]
     }
 }

@@ -19,6 +19,8 @@ pub struct Model {
     pub wilayah_id: Option<i32>,
     pub totp_secret: Option<String>,
     pub totp_aktif: bool,
+    pub otp_reset: Option<String>,
+    pub otp_kadaluarsa: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

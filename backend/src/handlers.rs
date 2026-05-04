@@ -10,6 +10,10 @@ use bcrypt::{hash, verify, DEFAULT_COST}; // Tambahkan alat bcrypt
 use jsonwebtoken::{encode, EncodingKey, Header, decode, DecodingKey, Validation}; // Alat pembuat JWT
 use chrono::{Utc, Duration}; // Jam digital untuk masa berlaku token
 use totp_rs::{Algorithm, Secret, TOTP};
+use lettre::{Message, AsyncTransport, AsyncSmtpTransport, Tokio1Executor};
+use lettre::message::header::ContentType;
+use lettre::transport::smtp::authentication::Credentials;
+use rand::{Rng, RngExt};
 
 use crate::entities::{user,wilayah,kategori_sampah, transaksi_sampah, tabungan_sampah};
 
@@ -60,6 +64,18 @@ pub struct ResponLogin {
     pub token: Option<String>, // Option karena kalau gagal login, token-nya kosong (None)
 }
 
+// Struct Input
+#[derive(Deserialize)]
+pub struct InputLupaPassword {
+    pub email: String, 
+}
+
+#[derive(Deserialize)]
+pub struct InputResetPasswordEmail {
+    pub email: String,
+    pub otp: String,
+    pub password_baru: String,
+}
 
 #[derive(Deserialize)]
 pub struct InputUpdateUser {
@@ -1094,5 +1110,121 @@ pub async fn lihat_dashboard_wilayah(
             "status": "error",
             "pesan": format!("Gagal menghitung rekap wilayah: {}", e)
         })),
+    }
+}
+
+// 1. Fungsi Request OTP via Email
+pub async fn minta_otp_email(
+    State(db): State<DatabaseConnection>,
+    Json(payload): Json<InputLupaPassword>,
+) -> Json<ResponPesan> {
+    
+    // Cari user berdasarkan Email
+    let pencarian = user::Entity::find()
+        .filter(user::Column::Email.eq(payload.email.clone()))
+        .one(&db)
+        .await;
+
+    match pencarian {
+        Ok(Some(data_user)) => {
+            if data_user.status != "Aktif" {
+                return Json(ResponPesan { status: "gagal".to_string(), pesan: "Akun ini nonaktif.".to_string() });
+            }
+
+            // Generate 6 Digit Angka
+            let otp_string = {
+                let mut rng = rand::rng();
+                let kode_otp: u32 = rng.random_range(100000..999999);
+                kode_otp.to_string()
+            };
+
+            let waktu_kadaluarsa = Utc::now().checked_add_signed(Duration::minutes(15)).unwrap().timestamp();
+
+            // Simpan ke database
+            let mut data_aktif: user::ActiveModel = data_user.clone().into();
+            data_aktif.otp_reset = Set(Some(otp_string.clone()));
+            data_aktif.otp_kadaluarsa = Set(Some(waktu_kadaluarsa));
+            let _ = data_aktif.update(&db).await;
+
+            // --- PROSES KIRIM EMAIL ---
+            let smtp_host = std::env::var("SMTP_HOST").expect("SMTP_HOST belum diset");
+            let smtp_email = std::env::var("SMTP_EMAIL").expect("SMTP_EMAIL belum diset");
+            let smtp_password = std::env::var("SMTP_PASSWORD").expect("SMTP_PASSWORD belum diset");
+
+            let email_pengirim = format!("Tabung Hijau IPB <{}>", smtp_email);
+            
+            let email_msg = Message::builder()
+                .from(email_pengirim.parse().unwrap())
+                .to(data_user.email.parse().unwrap())
+                .subject("Kode OTP Reset Password - Tabung Hijau")
+                .header(ContentType::TEXT_HTML)
+                .body(format!(
+                    "<h2>Halo, {}!</h2>
+                    <p>Seseorang meminta reset password untuk akunmu.</p>
+                    <p>Masukkan kode OTP berikut untuk melanjutkan:</p>
+                    <h1 style='color: #2e7d32; letter-spacing: 5px;'>{}</h1>
+                    <p>Kode ini hanya berlaku 15 menit. Jika kamu tidak memintanya, abaikan email ini.</p>",
+                    data_user.nama, otp_string
+                ))
+                .unwrap();
+
+            let creds = Credentials::new(smtp_email, smtp_password);
+            let mailer: AsyncSmtpTransport<Tokio1Executor> = AsyncSmtpTransport::<Tokio1Executor>::relay(&smtp_host)
+                .unwrap()
+                .credentials(creds)
+                .build();
+
+            // Kirim secara Asynchronous
+            match mailer.send(email_msg).await {
+                Ok(_) => Json(ResponPesan {
+                    status: "sukses".to_string(),
+                    pesan: "Kode OTP berhasil dikirim ke email kamu! Silakan cek kotak masuk atau folder spam.".to_string(),
+                }),
+                Err(e) => Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: format!("Gagal mengirim email: {}", e),
+                }),
+            }
+        },
+        Ok(None) => Json(ResponPesan { status: "gagal".to_string(), pesan: "Email tidak terdaftar di sistem!".to_string() }),
+        Err(_) => Json(ResponPesan { status: "error".to_string(), pesan: "Terjadi kesalahan sistem.".to_string() }),
+    }
+}
+
+// 2. Fungsi Reset Password
+pub async fn reset_password_email(
+    State(db): State<DatabaseConnection>,
+    Json(payload): Json<InputResetPasswordEmail>,
+) -> Json<ResponPesan> {
+    
+    let pencarian = user::Entity::find().filter(user::Column::Email.eq(payload.email.clone())).one(&db).await;
+
+    match pencarian {
+        Ok(Some(data_user)) => {
+            let waktu_sekarang = Utc::now().timestamp();
+
+            if let (Some(otp_db), Some(kadaluarsa_db)) = (&data_user.otp_reset, data_user.otp_kadaluarsa) {
+                if kadaluarsa_db < waktu_sekarang {
+                    return Json(ResponPesan { status: "gagal".to_string(), pesan: "Kode OTP sudah kadaluarsa (lewat 15 menit).".to_string() });
+                }
+
+                if otp_db != &payload.otp {
+                    return Json(ResponPesan { status: "gagal".to_string(), pesan: "Kode OTP salah!".to_string() });
+                }
+
+                // Ganti password dan hanguskan OTP
+                let hash_password = hash(&payload.password_baru, DEFAULT_COST).unwrap();
+                let mut data_aktif: user::ActiveModel = data_user.into();
+                data_aktif.password = Set(hash_password);
+                data_aktif.otp_reset = Set(None);
+                data_aktif.otp_kadaluarsa = Set(None);
+                let _ = data_aktif.update(&db).await;
+
+                Json(ResponPesan { status: "sukses".to_string(), pesan: "Password berhasil di-reset! Silakan login.".to_string() })
+            } else {
+                Json(ResponPesan { status: "gagal".to_string(), pesan: "Kamu belum melakukan request OTP!".to_string() })
+            }
+        },
+        _ => Json(ResponPesan { status: "gagal".to_string(), pesan: "Email tidak ditemukan.".to_string() }),
     }
 }
