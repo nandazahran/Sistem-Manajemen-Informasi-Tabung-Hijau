@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State, Query,Json,Request},
+    extract::{Path, State,Json,Request},
     http::{header, StatusCode, HeaderMap},
     middleware::Next,
     response::Response,
@@ -12,7 +12,7 @@ use chrono::{Utc, Duration}; // Jam digital untuk masa berlaku token
 
 use crate::entities::{user,wilayah,kategori_sampah, transaksi_sampah, tabungan_sampah};
 
-// 1. Struct khusus untuk menerima data Register
+// Struct khusus untuk menerima data Register
 #[derive(Deserialize)]
 pub struct InputRegister {
     pub username: String,
@@ -23,7 +23,7 @@ pub struct InputRegister {
     pub wilayah_id: Option<i32>, // Pakai Option karena Admin/DUI tidak punya wilayah
 }
 
-// 2. Struct khusus untuk menerima data Login
+// Struct khusus untuk menerima data Login
 #[derive(Deserialize)]
 pub struct InputLogin {
     pub username: String,
@@ -71,7 +71,7 @@ pub struct InputKategori {
     pub harga_per_kg: i32, 
 }
 
-// 2. Struct untuk menerima input (Perhatikan kita pakai berat_gram)
+// Struct untuk menerima input (Perhatikan kita pakai berat_gram)
 #[derive(Deserialize)]
 pub struct InputTransaksi {
     pub kategori_id: i32,
@@ -115,7 +115,7 @@ pub struct TabunganLengkap {
     pub nama_wilayah: String, // Diambil dari tabel wilayah
 }
 
-// 3. Fungsi Register yang sudah di-upgrade
+// Fungsi Register yang sudah di-upgrade
 pub async fn register(
     State(db): State<DatabaseConnection>,
     Json(payload): Json<InputRegister>, // Gunakan InputRegister
@@ -153,7 +153,7 @@ pub async fn register(
     }
 }
 
-// 1. Fungsi Lihat Semua User (READ)
+// Fungsi Lihat Semua User (READ)
 pub async fn lihat_user(
     State(db): State<DatabaseConnection>,
 ) -> Json<serde_json::Value> {
@@ -217,7 +217,7 @@ pub async fn update_user(
     }
 }
 
-// 3. Fungsi Hapus User (DELETE)
+// Fungsi Hapus User (DELETE)
 pub async fn hapus_user(
     State(db): State<DatabaseConnection>,
     Path(user_id): Path<i32>,
@@ -243,7 +243,7 @@ pub async fn hapus_user(
     }
 }
 
-// 4. Fungsi Login yang sudah di-upgrade
+// Fungsi Login yang sudah di-upgrade
 pub async fn login(
     State(db): State<DatabaseConnection>,
     Json(payload): Json<InputLogin>, 
@@ -326,7 +326,7 @@ pub async fn satpam_jwt(
     next: Next,   // Pintu menuju fungsi CRUD
 ) -> Result<Response, (StatusCode, Json<ResponPesan>)> {
     
-    // 1. Cek apakah tamu tersebut menempelkan KTP-nya di kepala (Header) suratnya
+    // Cek apakah tamu tersebut menempelkan KTP-nya di kepala (Header) suratnya
     let header_auth = req.headers().get(header::AUTHORIZATION).and_then(|h| h.to_str().ok());
 
     let token_lengkap = match header_auth {
@@ -340,7 +340,7 @@ pub async fn satpam_jwt(
         )),
     };
 
-    // 2. Sesuai standar API, token harus diawali dengan kata "Bearer "
+    // Sesuai standar API, token harus diawali dengan kata "Bearer "
     if !token_lengkap.starts_with("Bearer ") {
         return Err((
             StatusCode::UNAUTHORIZED,
@@ -351,7 +351,7 @@ pub async fn satpam_jwt(
         ));
     }
 
-    // 3. Potong 7 huruf pertama ("Bearer ") untuk mengambil kode acaknya saja
+    // Potong 7 huruf pertama ("Bearer ") untuk mengambil kode acaknya saja
     let token_asli = &token_lengkap[7..];
     
     // Harus sama persis dengan kunci saat login tadi!
@@ -382,7 +382,7 @@ pub async fn satpam_jwt(
     }
 }
 
-// 1. Fungsi Tambah Wilayah
+// Fungsi Tambah Wilayah
 pub async fn tambah_wilayah(
     State(db): State<DatabaseConnection>,
     Json(payload): Json<InputWilayah>,
@@ -406,7 +406,7 @@ pub async fn tambah_wilayah(
     }
 }
 
-// 2. Fungsi Lihat Semua Wilayah
+// Fungsi Lihat Semua Wilayah
 pub async fn lihat_wilayah(
     State(db): State<DatabaseConnection>,
 ) -> Json<serde_json::Value> {
@@ -425,7 +425,7 @@ pub async fn lihat_wilayah(
     }
 }
 
-// 1. Fungsi Update Wilayah (PUT)
+// Fungsi Update Wilayah (PUT)
 pub async fn update_wilayah(
     State(db): State<DatabaseConnection>,
     Path(wilayah_id): Path<i32>,
@@ -480,7 +480,7 @@ pub async fn hapus_wilayah(
     }
 }
 
-// 1. Fungsi Tambah Kategori
+// Fungsi Tambah Kategori
 pub async fn tambah_kategori(
     State(db): State<DatabaseConnection>,
     Json(payload): Json<InputKategori>,
