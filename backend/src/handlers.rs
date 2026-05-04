@@ -29,6 +29,7 @@ pub struct InputRegister {
 pub struct InputLogin {
     pub username: String,
     pub password: String,
+    pub kode_totp: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -59,13 +60,6 @@ pub struct ResponLogin {
     pub token: Option<String>, // Option karena kalau gagal login, token-nya kosong (None)
 }
 
-// Struct untuk Input Reset Password TOTP
-#[derive(Deserialize)]
-pub struct InputResetTotp {
-    pub username: String,
-    pub kode_totp: String,
-    pub password_baru: String,
-}
 
 #[derive(Deserialize)]
 pub struct InputUpdateUser {
@@ -266,7 +260,6 @@ pub async fn login(
     match pencarian_user {
         Ok(Some(data_user)) => {
             // --- PENGECEKAN STATUS ---
-            // Cek apakah status user "Aktif". Jika tidak, langsung tolak login.
             if data_user.status != "Aktif" {
                 return Json(ResponLogin {
                     status: "gagal".to_string(),
@@ -279,6 +272,40 @@ pub async fn login(
             let password_cocok = verify(&payload.password, &data_user.password).unwrap_or(false);
 
             if password_cocok {
+
+                // --- AWAL LOGIKA 2FA (TOTP) ---
+                // Cek apakah user ini menyalakan fitur 2FA Authenticator
+                if data_user.totp_aktif {
+                    match &payload.kode_totp {
+                        Some(kode) => {
+                            // User mengirim kode 2FA, mari kita verifikasi!
+                            let secret_base32 = data_user.totp_secret.clone().unwrap();
+                            let secret_bytes = Secret::Encoded(secret_base32).to_bytes().unwrap();
+                            
+                            let totp = TOTP::new(Algorithm::SHA1, 6, 1, 60, secret_bytes, Some("Tabung Hijau IPB".to_string()), payload.username.clone(),).unwrap();
+
+                            if !totp.check_current(kode).unwrap_or(false) {
+                                return Json(ResponLogin {
+                                    status: "gagal".to_string(),
+                                    pesan: "Kode Authenticator salah atau sudah kadaluarsa!".to_string(),
+                                    token: None,
+                                });
+                            }
+                            // Kalau kode BENAR, biarkan sistem lanjut mencetak JWT di bawah
+                        },
+                        None => {
+                            // User baru ngasih password, belum masukin OTP. Tahan JWT-nya!
+                            return Json(ResponLogin {
+                                status: "butuh_otp".to_string(), 
+                                pesan: "Akun ini dilindungi 2FA. Silakan masukkan 6 digit kode dari aplikasi Authenticator Anda.".to_string(),
+                                token: None,
+                            });
+                        }
+                    }
+                }
+                // --- AKHIR LOGIKA 2FA ---
+
+                // --- PROSES PEMBUATAN JWT (Jalan kalau non-2FA, atau 2FA lolos) ---
                 let waktu_hangus = Utc::now()
                     .checked_add_signed(Duration::hours(24))
                     .expect("Gagal menghitung waktu")
@@ -436,49 +463,6 @@ pub async fn setup_totp(
             }))
         },
         _ => Json(serde_json::json!({ "status": "gagal", "pesan": "User tidak ditemukan" })),
-    }
-}
-
-pub async fn reset_password_totp(
-    State(db): State<DatabaseConnection>,
-    Json(payload): Json<InputResetTotp>,
-) -> Json<ResponPesan> {
-    
-    let pencarian = user::Entity::find().filter(user::Column::Username.eq(payload.username.clone())).one(&db).await;
-
-    match pencarian {
-        Ok(Some(data_user)) => {
-            if !data_user.totp_aktif || data_user.totp_secret.is_none() {
-                return Json(ResponPesan { status: "gagal".to_string(), pesan: "Akun ini belum mengaktifkan fitur Authenticator.".to_string() });
-            }
-
-            let secret_base32 = data_user.totp_secret.clone().unwrap();
-            let secret_bytes = Secret::Encoded(secret_base32).to_bytes().unwrap();
-            
-            // KITA KEMBALIKAN JADI 7 ARGUMEN DI SINI JUGA
-            let totp = TOTP::new(
-                Algorithm::SHA1, 
-                6, 
-                1, 
-                30, 
-                secret_bytes,
-                Some("Tabung Hijau IPB".to_string()), // Diisi nama aplikasinya
-                payload.username.clone()              // Diisi username dari request user
-            ).unwrap();
-
-            if totp.check_current(&payload.kode_totp).unwrap_or(false) {
-                let hash_password = hash(&payload.password_baru, DEFAULT_COST).unwrap();
-                let mut data_aktif: user::ActiveModel = data_user.into();
-                data_aktif.password = Set(hash_password);
-                let _ = data_aktif.update(&db).await;
-
-                Json(ResponPesan { status: "sukses".to_string(), pesan: "Password berhasil di-reset via Authenticator! Silakan login.".to_string() })
-            } else {
-                Json(ResponPesan { status: "gagal".to_string(), pesan: "Kode Authenticator salah atau sudah kadaluarsa (lewat 30 detik).".to_string() })
-            }
-        },
-        Ok(None) => Json(ResponPesan { status: "gagal".to_string(), pesan: "Username tidak ditemukan.".to_string() }),
-        Err(_) => Json(ResponPesan { status: "error".to_string(), pesan: "Terjadi kesalahan sistem.".to_string() }),
     }
 }
 
