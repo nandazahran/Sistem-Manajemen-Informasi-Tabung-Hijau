@@ -17,6 +17,8 @@ pub struct Model {
     pub role: String,
     pub status: String,
     pub wilayah_id: Option<i32>,
+    pub totp_secret: Option<String>,
+    pub totp_aktif: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

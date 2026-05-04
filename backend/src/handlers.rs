@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use bcrypt::{hash, verify, DEFAULT_COST}; // Tambahkan alat bcrypt
 use jsonwebtoken::{encode, EncodingKey, Header, decode, DecodingKey, Validation}; // Alat pembuat JWT
 use chrono::{Utc, Duration}; // Jam digital untuk masa berlaku token
+use totp_rs::{Algorithm, Secret, TOTP};
 
 use crate::entities::{user,wilayah,kategori_sampah, transaksi_sampah, tabungan_sampah};
 
@@ -56,6 +57,14 @@ pub struct ResponLogin {
     pub status: String,
     pub pesan: String,
     pub token: Option<String>, // Option karena kalau gagal login, token-nya kosong (None)
+}
+
+// Struct untuk Input Reset Password TOTP
+#[derive(Deserialize)]
+pub struct InputResetTotp {
+    pub username: String,
+    pub kode_totp: String,
+    pub password_baru: String,
 }
 
 #[derive(Deserialize)]
@@ -379,6 +388,97 @@ pub async fn satpam_jwt(
                 })
             ))
         }
+    }
+}
+
+pub async fn setup_totp(
+    State(db): State<DatabaseConnection>,
+    headers: HeaderMap,
+) -> Json<serde_json::Value> {
+    
+    let token_lengkap = headers.get("Authorization").unwrap().to_str().unwrap();
+    let token_asli = &token_lengkap[7..];
+    let kunci_rahasia = std::env::var("JWT_SECRET").unwrap().into_bytes();
+    let data_ktp = decode::<KlaimToken>(token_asli, &DecodingKey::from_secret(&kunci_rahasia), &Validation::default()).unwrap();
+    let username_jwt = data_ktp.claims.sub;
+
+    let pencarian = user::Entity::find().filter(user::Column::Username.eq(username_jwt.clone())).one(&db).await;
+
+    match pencarian {
+        Ok(Some(data_user)) => {
+            let secret = Secret::generate_secret();
+            let secret_bytes = secret.to_bytes().unwrap();
+            
+            // KITA KEMBALIKAN JADI 7 ARGUMEN DI SINI
+            let totp = TOTP::new(
+                Algorithm::SHA1,
+                6, 
+                1, 
+                30, 
+                secret_bytes,
+                Some("Tabung Hijau IPB".to_string()), // Argumen ke-6 (Issuer)
+                username_jwt.clone(),                 // Argumen ke-7 (Account Name)
+            ).unwrap();
+
+            let secret_base32 = totp.get_secret_base32();
+            let url_otpauth = totp.get_url(); 
+
+            let mut data_aktif: user::ActiveModel = data_user.into();
+            data_aktif.totp_secret = Set(Some(secret_base32.clone()));
+            data_aktif.totp_aktif = Set(true);
+            let _ = data_aktif.update(&db).await;
+
+            Json(serde_json::json!({
+                "status": "sukses",
+                "pesan": "Berhasil membuat secret TOTP. Silakan masukkan kunci ini ke aplikasi Authenticator Anda.",
+                "secret_key": secret_base32,
+                "url_qr_code": url_otpauth
+            }))
+        },
+        _ => Json(serde_json::json!({ "status": "gagal", "pesan": "User tidak ditemukan" })),
+    }
+}
+
+pub async fn reset_password_totp(
+    State(db): State<DatabaseConnection>,
+    Json(payload): Json<InputResetTotp>,
+) -> Json<ResponPesan> {
+    
+    let pencarian = user::Entity::find().filter(user::Column::Username.eq(payload.username.clone())).one(&db).await;
+
+    match pencarian {
+        Ok(Some(data_user)) => {
+            if !data_user.totp_aktif || data_user.totp_secret.is_none() {
+                return Json(ResponPesan { status: "gagal".to_string(), pesan: "Akun ini belum mengaktifkan fitur Authenticator.".to_string() });
+            }
+
+            let secret_base32 = data_user.totp_secret.clone().unwrap();
+            let secret_bytes = Secret::Encoded(secret_base32).to_bytes().unwrap();
+            
+            // KITA KEMBALIKAN JADI 7 ARGUMEN DI SINI JUGA
+            let totp = TOTP::new(
+                Algorithm::SHA1, 
+                6, 
+                1, 
+                30, 
+                secret_bytes,
+                Some("Tabung Hijau IPB".to_string()), // Diisi nama aplikasinya
+                payload.username.clone()              // Diisi username dari request user
+            ).unwrap();
+
+            if totp.check_current(&payload.kode_totp).unwrap_or(false) {
+                let hash_password = hash(&payload.password_baru, DEFAULT_COST).unwrap();
+                let mut data_aktif: user::ActiveModel = data_user.into();
+                data_aktif.password = Set(hash_password);
+                let _ = data_aktif.update(&db).await;
+
+                Json(ResponPesan { status: "sukses".to_string(), pesan: "Password berhasil di-reset via Authenticator! Silakan login.".to_string() })
+            } else {
+                Json(ResponPesan { status: "gagal".to_string(), pesan: "Kode Authenticator salah atau sudah kadaluarsa (lewat 30 detik).".to_string() })
+            }
+        },
+        Ok(None) => Json(ResponPesan { status: "gagal".to_string(), pesan: "Username tidak ditemukan.".to_string() }),
+        Err(_) => Json(ResponPesan { status: "error".to_string(), pesan: "Terjadi kesalahan sistem.".to_string() }),
     }
 }
 

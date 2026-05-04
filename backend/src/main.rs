@@ -63,6 +63,7 @@ async fn main() {
     let rute_user = Router::new()
         .route("/", get(handlers::lihat_user))
         .route("/{id}", put(handlers::update_user).delete(handlers::hapus_user))
+        .route("/setup-totp", post(handlers::setup_totp))
         .route_layer(middleware::from_fn(handlers::satpam_jwt));
 
     // Titipkan kunci brankas (db) ke dalam aplikasi (State)
@@ -70,6 +71,7 @@ async fn main() {
         .route("/", get(|| async { "Halo Tim! Backend SIM-TH sudah menyala!" }))
         .route("/api/register", post(handlers::register))// Rute untuk registrasi user baru
         .route("/api/login", post(handlers::login)) // Rute untuk login
+        .route("/api/reset-password", post(handlers::reset_password_totp)) // TAMBAH INI
         .nest("/api/wilayah", rute_wilayah)
         .nest("/api/kategori", rute_kategori)
         .nest("/api/transaksi", rute_transaksi)
