@@ -949,3 +949,66 @@ pub async fn lihat_wilayah_aktif(
         })),
     }
 }
+
+// Dashboard Spesifik per Wilayah
+pub async fn lihat_dashboard_wilayah(
+    State(db): State<DatabaseConnection>,
+    Path(wilayah_id): Path<i32>,
+) -> Json<serde_json::Value> {
+    
+    // 1. Cek dulu apakah wilayahnya ada, sekalian ambil namanya untuk ditampilkan
+    let pencarian_wilayah = wilayah::Entity::find_by_id(wilayah_id).one(&db).await;
+    let nama_wilayah = match pencarian_wilayah {
+        Ok(Some(w)) => w.nama,
+        Ok(None) => return Json(serde_json::json!({
+            "status": "gagal",
+            "pesan": format!("Wilayah dengan ID {} tidak ditemukan.", wilayah_id)
+        })),
+        Err(e) => return Json(serde_json::json!({
+            "status": "error",
+            "pesan": e.to_string()
+        })),
+    };
+
+    // 2. Hitung agregasi KHUSUS untuk wilayah ini saja
+    let query = transaksi_sampah::Entity::find()
+        .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id)) // INI KUNCI FILTERNYA!
+        .select_only()
+        .column_as(transaksi_sampah::Column::Berat.sum(), "total_berat_gram")
+        .column_as(transaksi_sampah::Column::TotalNilai.sum(), "total_rupiah")
+        .column_as(transaksi_sampah::Column::Id.count(), "jumlah_transaksi")
+        .into_model::<RekapDashboard>() // Kita reuse struct yang lama
+        .one(&db)
+        .await;
+
+    match query {
+        Ok(Some(data)) => {
+            // Buka bungkus Option, kalau wilayahnya belum pernah setor, jadikan 0
+            let berat = data.total_berat_gram.unwrap_or(0);
+            let rupiah = data.total_rupiah.unwrap_or(0);
+
+            Json(serde_json::json!({
+                "status": "sukses",
+                "nama_wilayah": nama_wilayah,
+                "rekap_wilayah": {
+                    "total_berat_gram": berat,
+                    "total_rupiah": rupiah,
+                    "jumlah_transaksi": data.jumlah_transaksi
+                }
+            }))
+        },
+        Ok(None) => Json(serde_json::json!({
+            "status": "sukses",
+            "nama_wilayah": nama_wilayah,
+            "rekap_wilayah": {
+                "total_berat_gram": 0,
+                "total_rupiah": 0,
+                "jumlah_transaksi": 0
+            }
+        })),
+        Err(e) => Json(serde_json::json!({
+            "status": "error",
+            "pesan": format!("Gagal menghitung rekap wilayah: {}", e)
+        })),
+    }
+}

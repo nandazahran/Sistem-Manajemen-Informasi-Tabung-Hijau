@@ -56,6 +56,7 @@ async fn main() {
     // 5. Rute Dashboard
     let rute_dashboard = Router::new()
         .route("/", get(handlers::lihat_dashboard))
+        .route("/{id}", get(handlers::lihat_dashboard_wilayah))
         .route_layer(middleware::from_fn(handlers::satpam_jwt));
 
     // 6. Rute Manajemen User (BARU)
