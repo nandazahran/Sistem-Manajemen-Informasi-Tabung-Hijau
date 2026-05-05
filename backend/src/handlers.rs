@@ -4,6 +4,7 @@ use axum::{
     middleware::Next,
     response::Response,
 };
+use axum::Extension;
 use sea_orm::{DatabaseConnection, ActiveModelTrait, EntityTrait, Set, QueryFilter, ColumnTrait, FromQueryResult, JoinType, QuerySelect, RelationTrait, ModelTrait};
 use serde::{Deserialize, Serialize};
 use bcrypt::{hash, verify, DEFAULT_COST}; // Tambahkan alat bcrypt
@@ -33,7 +34,27 @@ pub struct InputRegister {
 pub struct InputLogin {
     pub username: String,
     pub password: String,
-    pub kode_totp: Option<String>,
+}
+#[derive(Deserialize)]
+pub struct InputAktifkanTOTP {
+    pub username: String,
+    pub kode_totp: String,
+}
+
+// 2. Buat Input untuk Endpoint 2FA baru
+#[derive(Deserialize)]
+pub struct InputVerify2FA {
+    pub username: String,
+    pub pre_auth_token: String,
+    pub kode_totp: String,
+}
+
+// 3. Buat Struct khusus untuk JWT Sementara (Pre-Auth)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct KlaimPreAuth {
+    pub sub: String,
+    pub exp: usize,
+    pub is_pre_auth: bool, // Penanda agar token ini tidak bisa dipakai untuk akses hal lain
 }
 
 #[derive(Serialize)]
@@ -268,79 +289,45 @@ pub async fn login(
     Json(payload): Json<InputLogin>, 
 ) -> Json<ResponLogin> {
 
-    let pencarian_user = user::Entity::find()
-        .filter(user::Column::Username.eq(payload.username.clone()))
-        .one(&db)
-        .await;
+    let pencarian_user = user::Entity::find().filter(user::Column::Username.eq(payload.username.clone())).one(&db).await;
 
     match pencarian_user {
         Ok(Some(data_user)) => {
-            // --- PENGECEKAN STATUS ---
             if data_user.status != "Aktif" {
-                return Json(ResponLogin {
-                    status: "gagal".to_string(),
-                    pesan: "Akses ditolak! Akun Anda sudah tidak aktif atau berstatus demisioner.".to_string(),
-                    token: None,
-                });
+                return Json(ResponLogin { status: "gagal".to_string(), pesan: "Akun nonaktif.".to_string(), token: None });
             }
 
-            // Jika aktif, baru lanjut ke verifikasi password
             let password_cocok = verify(&payload.password, &data_user.password).unwrap_or(false);
 
             if password_cocok {
+                let kunci_rahasia = std::env::var("JWT_SECRET").expect("JWT_SECRET belum diatur").into_bytes();
 
-                // --- AWAL LOGIKA 2FA (TOTP) ---
-                // Cek apakah user ini menyalakan fitur 2FA Authenticator
+                // JIKA 2FA AKTIF: Berikan Token Pre-Auth
                 if data_user.totp_aktif {
-                    match &payload.kode_totp {
-                        Some(kode) => {
-                            // User mengirim kode 2FA, mari kita verifikasi!
-                            let secret_base32 = data_user.totp_secret.clone().unwrap();
-                            let secret_bytes = Secret::Encoded(secret_base32).to_bytes().unwrap();
-                            
-                            let totp = TOTP::new(Algorithm::SHA1, 6, 1, 60, secret_bytes, Some("Tabung Hijau IPB".to_string()), payload.username.clone(),).unwrap();
+                    let waktu_hangus_pre = Utc::now().checked_add_signed(Duration::minutes(5)).unwrap().timestamp() as usize;
+                    let klaim_pre = KlaimPreAuth {
+                        sub: data_user.username.clone(),
+                        exp: waktu_hangus_pre,
+                        is_pre_auth: true,
+                    };
+                    
+                    let token_sementara = encode(&Header::default(), &klaim_pre, &EncodingKey::from_secret(&kunci_rahasia)).unwrap();
 
-                            if !totp.check_current(kode).unwrap_or(false) {
-                                return Json(ResponLogin {
-                                    status: "gagal".to_string(),
-                                    pesan: "Kode Authenticator salah atau sudah kadaluarsa!".to_string(),
-                                    token: None,
-                                });
-                            }
-                            // Kalau kode BENAR, biarkan sistem lanjut mencetak JWT di bawah
-                        },
-                        None => {
-                            // User baru ngasih password, belum masukin OTP. Tahan JWT-nya!
-                            return Json(ResponLogin {
-                                status: "butuh_otp".to_string(), 
-                                pesan: "Akun ini dilindungi 2FA. Silakan masukkan 6 digit kode dari aplikasi Authenticator Anda.".to_string(),
-                                token: None,
-                            });
-                        }
-                    }
+                    return Json(ResponLogin {
+                        status: "butuh_otp".to_string(),
+                        pesan: "Silakan masukkan 6 digit kode dari Authenticator Anda.".to_string(),
+                        token: Some(token_sementara),
+                    });
                 }
-                // --- AKHIR LOGIKA 2FA ---
 
-                // --- PROSES PEMBUATAN JWT (Jalan kalau non-2FA, atau 2FA lolos) ---
-                let waktu_hangus = Utc::now()
-                    .checked_add_signed(Duration::hours(24))
-                    .expect("Gagal menghitung waktu")
-                    .timestamp() as usize;
-
+                // JIKA 2FA TIDAK AKTIF: Langsung berikan Token Akses Asli
+                let waktu_hangus = Utc::now().checked_add_signed(Duration::hours(24)).unwrap().timestamp() as usize;
                 let klaim = KlaimToken {
                     sub: data_user.username.clone(),
                     exp: waktu_hangus,
                 };
 
-                let kunci_rahasia = std::env::var("JWT_SECRET")
-                    .expect("Waduh, JWT_SECRET belum diatur di file .env!")
-                    .into_bytes();
-
-                let token_jwt = encode(
-                    &Header::default(),
-                    &klaim,
-                    &EncodingKey::from_secret(&kunci_rahasia),
-                ).unwrap();
+                let token_jwt = encode(&Header::default(), &klaim, &EncodingKey::from_secret(&kunci_rahasia)).unwrap();
 
                 Json(ResponLogin {
                     status: "sukses".to_string(),
@@ -348,33 +335,72 @@ pub async fn login(
                     token: Some(token_jwt),
                 })
             } else {
-                Json(ResponLogin {
-                    status: "gagal".to_string(),
-                    pesan: "Waduh, password yang kamu masukkan salah.".to_string(),
-                    token: None,
-                })
+                Json(ResponLogin { status: "gagal".to_string(), pesan: "Password salah.".to_string(), token: None })
             }
         },
-        Ok(None) => {
+        _ => Json(ResponLogin { status: "gagal".to_string(), pesan: "Akun tidak ditemukan.".to_string(), token: None })
+    }
+}
+
+pub async fn verify_2fa(
+    State(db): State<DatabaseConnection>,
+    Json(payload): Json<InputVerify2FA>,
+) -> Json<ResponLogin> {
+    
+    let kunci_rahasia = std::env::var("JWT_SECRET").expect("JWT_SECRET belum diatur").into_bytes();
+
+    // 1. Bongkar dan Validasi Token Sementara
+    let token_data = match decode::<KlaimPreAuth>(
+        &payload.pre_auth_token,
+        &DecodingKey::from_secret(&kunci_rahasia),
+        &Validation::default(),
+    ) {
+        Ok(data) => data,
+        Err(_) => return Json(ResponLogin { status: "gagal".to_string(), pesan: "Sesi login kadaluarsa (lewat 5 menit). Silakan login ulang.".to_string(), token: None }),
+    };
+
+    // Pastikan ini memang token pre-auth, bukan token akses bodong
+    if !token_data.claims.is_pre_auth {
+        return Json(ResponLogin { status: "gagal".to_string(), pesan: "Token tidak valid.".to_string(), token: None });
+    }
+
+    // 2. Cari User
+    let username = token_data.claims.sub;
+    let pencarian_user = user::Entity::find().filter(user::Column::Username.eq(username)).one(&db).await;
+
+    match pencarian_user {
+        Ok(Some(data_user)) => {
+            // 3. Verifikasi 6 Digit OTP
+            let secret_base32 = data_user.totp_secret.clone().unwrap();
+            let secret_bytes = Secret::Encoded(secret_base32).to_bytes().unwrap();
+            let totp = TOTP::new(Algorithm::SHA1, 6, 1, 30, secret_bytes ,Some("Tabung Hijau IPB".to_string()), payload.username.clone(),).unwrap();
+
+            if !totp.check_current(&payload.kode_totp).unwrap_or(false) {
+                return Json(ResponLogin { status: "gagal".to_string(), pesan: "Kode OTP salah!".to_string(), token: None });
+            }
+
+            // 4. Lolos Semua! Berikan Token Akses Asli (24 Jam)
+            let waktu_hangus = Utc::now().checked_add_signed(Duration::hours(24)).unwrap().timestamp() as usize;
+            let klaim = KlaimToken {
+                sub: data_user.username.clone(),
+                exp: waktu_hangus,
+            };
+
+            let token_jwt = encode(&Header::default(), &klaim, &EncodingKey::from_secret(&kunci_rahasia)).unwrap();
+
             Json(ResponLogin {
-                status: "gagal".to_string(),
-                pesan: "Akun tidak ditemukan. Silakan daftar terlebih dahulu.".to_string(),
-                token: None,
+                status: "sukses".to_string(),
+                pesan: "Autentikasi 2FA Berhasil!".to_string(),
+                token: Some(token_jwt),
             })
         },
-        Err(_) => {
-            Json(ResponLogin {
-                status: "error".to_string(),
-                pesan: "Sistem bermasalah saat mencari data user.".to_string(),
-                token: None,
-            })
-        }
+        _ => Json(ResponLogin { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string(), token: None })
     }
 }
 
 // Fungsi Satpam Penjaga Pintu (Middleware)
 pub async fn satpam_jwt(
-    req: Request, // Tangkap tamu yang datang
+    mut req: Request, // Tangkap tamu yang datang
     next: Next,   // Pintu menuju fungsi CRUD
 ) -> Result<Response, (StatusCode, Json<ResponPesan>)> {
     
@@ -417,7 +443,9 @@ pub async fn satpam_jwt(
         &DecodingKey::from_secret(&kunci_rahasia),
         &Validation::default(),
     ) {
-        Ok(_data_ktp) => {
+        Ok(data_ktp) => {
+            // 3. Ambil 'sub' (username) dari KTP, dan masukkan ke dalam kantong Ekstensi Axum
+            req.extensions_mut().insert(data_ktp.claims.sub);
             // Kalau KTP asli dan belum hangus (expired), bukakan pintu!
             Ok(next.run(req).await)
         }
@@ -434,33 +462,31 @@ pub async fn satpam_jwt(
     }
 }
 
+// Hapus parameter HeaderMap, ganti pakai Extension dari Satpam
 pub async fn setup_totp(
     State(db): State<DatabaseConnection>,
-    headers: HeaderMap,
+    Extension(username_jwt): Extension<String>, 
 ) -> Json<serde_json::Value> {
     
-    let token_lengkap = headers.get("Authorization").unwrap().to_str().unwrap();
-    let token_asli = &token_lengkap[7..];
-    let kunci_rahasia = std::env::var("JWT_SECRET").unwrap().into_bytes();
-    let data_ktp = decode::<KlaimToken>(token_asli, &DecodingKey::from_secret(&kunci_rahasia), &Validation::default()).unwrap();
-    let username_jwt = data_ktp.claims.sub;
-
-    let pencarian = user::Entity::find().filter(user::Column::Username.eq(username_jwt.clone())).one(&db).await;
+    // Langsung pakai username_jwt dari Extension! Sangat bersih!
+    let pencarian = user::Entity::find()
+        .filter(user::Column::Username.eq(username_jwt.clone()))
+        .one(&db)
+        .await;
 
     match pencarian {
         Ok(Some(data_user)) => {
             let secret = Secret::generate_secret();
             let secret_bytes = secret.to_bytes().unwrap();
             
-            // KITA KEMBALIKAN JADI 7 ARGUMEN DI SINI
             let totp = TOTP::new(
                 Algorithm::SHA1,
                 6, 
                 1, 
                 30, 
                 secret_bytes,
-                Some("Tabung Hijau IPB".to_string()), // Argumen ke-6 (Issuer)
-                username_jwt.clone(),                 // Argumen ke-7 (Account Name)
+                Some("Tabung Hijau IPB".to_string()),
+                username_jwt.clone(),                 
             ).unwrap();
 
             let secret_base32 = totp.get_secret_base32();
@@ -468,17 +494,70 @@ pub async fn setup_totp(
 
             let mut data_aktif: user::ActiveModel = data_user.into();
             data_aktif.totp_secret = Set(Some(secret_base32.clone()));
-            data_aktif.totp_aktif = Set(true);
+            
+            // PENTING: Status aktif kita set FALSE. 
+            // Nanti diubah jadi TRUE oleh fungsi 'aktifkan_totp'
+            data_aktif.totp_aktif = Set(false); 
+            
             let _ = data_aktif.update(&db).await;
 
             Json(serde_json::json!({
                 "status": "sukses",
-                "pesan": "Berhasil membuat secret TOTP. Silakan masukkan kunci ini ke aplikasi Authenticator Anda.",
+                "pesan": "Berhasil membuat secret TOTP. Silakan masukkan kunci ini ke aplikasi Authenticator Anda, lalu verifikasi di menu Aktifkan TOTP.",
                 "secret_key": secret_base32,
                 "url_qr_code": url_otpauth
             }))
         },
         _ => Json(serde_json::json!({ "status": "gagal", "pesan": "User tidak ditemukan" })),
+    }
+}
+
+pub async fn aktifkan_totp(
+    State(db): State<DatabaseConnection>,
+    Extension(username_jwt): Extension<String>, // Asumsi: Kamu punya middleware yang mengekstrak username dari JWT
+    Json(payload): Json<InputAktifkanTOTP>,
+) -> Json<ResponPesan> {
+
+    // Cari user yang sedang login
+    let pencarian_user = user::Entity::find()
+        .filter(user::Column::Username.eq(username_jwt.clone()))
+        .one(&db)
+        .await;
+
+    match pencarian_user {
+        Ok(Some(data_user)) => {
+            // Cek apakah user sudah punya secret key (sudah klik setup sebelumnya)
+            if let Some(secret_base32) = &data_user.totp_secret {
+                
+                let secret_bytes = Secret::Encoded(secret_base32.clone()).to_bytes().unwrap();
+                let totp = TOTP::new(Algorithm::SHA1, 6, 1, 30, secret_bytes, Some("Tabung Hijau IPB".to_string()),username_jwt.clone(),  ).unwrap();
+
+                // Verifikasi 6 digit angka dari HP
+                if totp.check_current(&payload.kode_totp).unwrap_or(false) {
+                    
+                    // Kalau benar, BARU kita ubah statusnya jadi AKTIF!
+                    let mut data_aktif: user::ActiveModel = data_user.into();
+                    data_aktif.totp_aktif = Set(true);
+                    let _ = data_aktif.update(&db).await;
+
+                    Json(ResponPesan {
+                        status: "sukses".to_string(),
+                        pesan: "Autentikasi 2FA berhasil diaktifkan!".to_string(),
+                    })
+                } else {
+                    Json(ResponPesan {
+                        status: "gagal".to_string(),
+                        pesan: "Kode Authenticator salah! Gagal mengaktifkan 2FA.".to_string(),
+                    })
+                }
+            } else {
+                Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: "Anda belum melakukan Setup TOTP (belum minta kunci rahasia).".to_string(),
+                })
+            }
+        },
+        _ => Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak valid.".to_string() })
     }
 }
 

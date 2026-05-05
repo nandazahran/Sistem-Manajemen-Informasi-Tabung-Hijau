@@ -64,6 +64,7 @@ async fn main() {
         .route("/", get(handlers::lihat_user))
         .route("/{id}", put(handlers::update_user).delete(handlers::hapus_user))
         .route("/setup-totp", post(handlers::setup_totp))
+        .route("/aktifkan-totp", post(handlers::aktifkan_totp))
         .route_layer(middleware::from_fn(handlers::satpam_jwt));
 
     // Titipkan kunci brankas (db) ke dalam aplikasi (State)
@@ -73,6 +74,7 @@ async fn main() {
         .route("/api/login", post(handlers::login)) // Rute untuk login
         .route("/api/lupa-password", post(handlers::minta_otp_email))
         .route("/api/reset-password", post(handlers::reset_password_email))
+        .route("/api/verify-2fa", post(handlers::verify_2fa))
         .nest("/api/wilayah", rute_wilayah)
         .nest("/api/kategori", rute_kategori)
         .nest("/api/transaksi", rute_transaksi)
