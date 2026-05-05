@@ -7,7 +7,7 @@ function App() {
       {/* Card Utama */}
       <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-8 border-[#2D5A27] mx-4">
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-extrabold text-[#2D5A27]">GreenPoint</h1>
+          <h1 className="text-3xl font-extrabold text-[#2D5A27]">SIM-TH</h1>
           <p className="text-gray-400 mt-2">Sistem Manajemen Tabung Hijau</p>
         </div>
 
