@@ -14,12 +14,13 @@ use totp_rs::{Algorithm, Secret, TOTP};
 use lettre::{Message, AsyncTransport, AsyncSmtpTransport, Tokio1Executor};
 use lettre::message::header::ContentType;
 use lettre::transport::smtp::authentication::Credentials;
-use rand::{Rng, RngExt};
+use rand::RngExt;
+use utoipa::ToSchema;
 
 use crate::entities::{user,wilayah,kategori_sampah, transaksi_sampah, tabungan_sampah};
 
 // Struct khusus untuk menerima data Register
-#[derive(Deserialize)]
+#[derive(Deserialize,ToSchema)]
 pub struct InputRegister {
     pub username: String,
     pub password: String,
@@ -30,19 +31,19 @@ pub struct InputRegister {
 }
 
 // Struct khusus untuk menerima data Login
-#[derive(Deserialize)]
+#[derive(Deserialize,ToSchema)]
 pub struct InputLogin {
     pub username: String,
     pub password: String,
 }
-#[derive(Deserialize)]
+#[derive(Deserialize,ToSchema)]
 pub struct InputAktifkanTOTP {
     pub username: String,
     pub kode_totp: String,
 }
 
 // 2. Buat Input untuk Endpoint 2FA baru
-#[derive(Deserialize)]
+#[derive(Deserialize,ToSchema)]
 pub struct InputVerify2FA {
     pub username: String,
     pub pre_auth_token: String,
@@ -57,14 +58,14 @@ pub struct KlaimPreAuth {
     pub is_pre_auth: bool, // Penanda agar token ini tidak bisa dipakai untuk akses hal lain
 }
 
-#[derive(Serialize)]
+#[derive(Serialize,ToSchema)]
 pub struct ResponPesan {
     pub status: String,
     pub pesan: String,
 }
 
 // Struct untuk menerima data dari frontend
-#[derive(Deserialize)]
+#[derive(Deserialize,ToSchema)]
 pub struct InputWilayah {
     pub nama: String,
     pub status: String,
@@ -78,7 +79,7 @@ pub struct KlaimToken {
 }
 
 // Balasan khusus untuk fitur Login
-#[derive(Serialize)]
+#[derive(Serialize,ToSchema)]
 pub struct ResponLogin {
     pub status: String,
     pub pesan: String,
@@ -86,33 +87,33 @@ pub struct ResponLogin {
 }
 
 // Struct Input
-#[derive(Deserialize)]
+#[derive(Deserialize,ToSchema)]
 pub struct InputLupaPassword {
     pub email: String, 
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize,ToSchema)]
 pub struct InputResetPasswordEmail {
     pub email: String,
     pub otp: String,
     pub password_baru: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize,ToSchema)]
 pub struct InputUpdateUser {
     pub nama: String,
     pub status: String,
 }
 
 // Struct untuk menerima data dari frontend
-#[derive(Deserialize)]
+#[derive(Deserialize,ToSchema)]
 pub struct InputKategori {
     pub nama_kategori: String,
     pub harga_per_kg: i32, 
 }
 
 // Struct untuk menerima input (Perhatikan kita pakai berat_gram)
-#[derive(Deserialize)]
+#[derive(Deserialize,ToSchema)]
 pub struct InputTransaksi {
     pub kategori_id: i32,
     pub wilayah_id: i32,
@@ -120,14 +121,14 @@ pub struct InputTransaksi {
 }
 
 // Struct untuk menerima request penarikan saldo
-#[derive(Deserialize)]
+#[derive(Deserialize,ToSchema)]
 pub struct InputTarik {
     pub wilayah_id: i32,
     pub nominal: i32,
 }
 
 // Cetakan untuk data Transaksi yang sudah digabung
-#[derive(FromQueryResult, Serialize)]
+#[derive(FromQueryResult, Serialize,ToSchema)]
 pub struct TransaksiLengkap {
     pub id: i32,
     pub berat: i32,
@@ -139,7 +140,7 @@ pub struct TransaksiLengkap {
 }
 
 // Ganti tipe data i32 menjadi Option<i64> dan i64
-#[derive(FromQueryResult, Serialize)]
+#[derive(FromQueryResult, Serialize,ToSchema)]
 pub struct RekapDashboard {
     pub total_berat_gram: Option<i64>, // Pakai Option karena SUM bisa NULL kalau tabel kosong
     pub total_rupiah: Option<i64>,     // Postgres mengembalikan INT8 (i64) untuk SUM
@@ -147,7 +148,7 @@ pub struct RekapDashboard {
 }
 
 // Cetakan untuk data Tabungan yang sudah digabung
-#[derive(FromQueryResult, Serialize)]
+#[derive(FromQueryResult, Serialize,ToSchema)]
 pub struct TabunganLengkap {
     pub id: i32,
     pub saldo: i32,
@@ -156,17 +157,31 @@ pub struct TabunganLengkap {
 }
 
 // Fungsi Register yang sudah di-upgrade
+#[utoipa::path(
+    post,
+    path = "/api/register",
+    request_body = InputRegister,
+    responses(
+        (status = 201, description = "Berhasil mendaftarkan akun baru", body = ResponPesan),
+        (status = 409, description = "Gagal mendaftar: Email atau Username sudah dipakai (Konflik Data)", body = ResponPesan),
+        (status = 500, description = "Sistem bermasalah saat melakukan hashing password", body = ResponPesan)
+    ),
+    tag = "Auth"
+)]
 pub async fn register(
     State(db): State<DatabaseConnection>,
-    Json(payload): Json<InputRegister>, // Gunakan InputRegister
-) -> Json<ResponPesan> {
+    Json(payload): Json<InputRegister>,
+) -> (StatusCode, Json<ResponPesan>) { // <-- Tipe kembalian diubah agar bisa bawa Status Code
 
     let password_acak = match hash(&payload.password, DEFAULT_COST) {
         Ok(hasil_hash) => hasil_hash,
-        Err(_) => return Json(ResponPesan {
-            status: "error".to_string(),
-            pesan: "Sistem bermasalah saat mengamankan password.".to_string(),
-        }),
+        Err(_) => return (
+            StatusCode::INTERNAL_SERVER_ERROR, // Beri kode 500 (Error dari server)
+            Json(ResponPesan {
+                status: "error".to_string(),
+                pesan: "Sistem bermasalah saat mengamankan password.".to_string(),
+            })
+        ),
     };
 
     // Bungkus data menggunakan user::ActiveModel yang baru
@@ -182,14 +197,20 @@ pub async fn register(
     };
 
     match user_baru.insert(&db).await {
-        Ok(_) => Json(ResponPesan {
-            status: "sukses".to_string(),
-            pesan: format!("Beres! Akun '{}' berhasil didaftarkan sebagai {}.", payload.username, payload.role),
-        }),
-        Err(e) => Json(ResponPesan {
-            status: "gagal".to_string(),
-            pesan: format!("Gagal mendaftar: Email atau Username mungkin sudah dipakai. Detail: {}", e),
-        }),
+        Ok(_) => (
+            StatusCode::CREATED, // Beri kode 201 (Data berhasil dibuat)
+            Json(ResponPesan {
+                status: "sukses".to_string(),
+                pesan: format!("Beres! Akun '{}' berhasil didaftarkan sebagai {}.", payload.username, payload.role),
+            })
+        ),
+        Err(e) => (
+            StatusCode::CONFLICT, // Beri kode 409 (Konflik/Duplikat data di database)
+            Json(ResponPesan {
+                status: "gagal".to_string(),
+                pesan: format!("Gagal mendaftar: Email atau Username mungkin sudah dipakai. Detail: {}", e),
+            })
+        ),
     }
 }
 
@@ -284,17 +305,32 @@ pub async fn hapus_user(
 }
 
 // Fungsi Login yang sudah di-upgrade
+#[utoipa::path(
+    post,
+    path = "/api/login",
+    request_body = InputLogin,
+    responses(
+        (status = 200, description = "Login sukses (mendapat token JWT) atau Butuh Verifikasi OTP", body = ResponLogin),
+        (status = 401, description = "Gagal login: Password salah", body = ResponLogin),
+        (status = 403, description = "Gagal login: Akun dalam status Nonaktif", body = ResponLogin),
+        (status = 404, description = "Gagal login: Username tidak ditemukan", body = ResponLogin)
+    ),
+    tag = "Auth"
+)]
 pub async fn login(
     State(db): State<DatabaseConnection>,
     Json(payload): Json<InputLogin>, 
-) -> Json<ResponLogin> {
+) -> (StatusCode, Json<ResponLogin>) { // <-- Tipe kembalian diubah untuk menyertakan StatusCode
 
     let pencarian_user = user::Entity::find().filter(user::Column::Username.eq(payload.username.clone())).one(&db).await;
 
     match pencarian_user {
         Ok(Some(data_user)) => {
             if data_user.status != "Aktif" {
-                return Json(ResponLogin { status: "gagal".to_string(), pesan: "Akun nonaktif.".to_string(), token: None });
+                return (
+                    StatusCode::FORBIDDEN, // 403: Dilarang masuk
+                    Json(ResponLogin { status: "gagal".to_string(), pesan: "Akun nonaktif.".to_string(), token: None })
+                );
             }
 
             let password_cocok = verify(&payload.password, &data_user.password).unwrap_or(false);
@@ -313,11 +349,14 @@ pub async fn login(
                     
                     let token_sementara = encode(&Header::default(), &klaim_pre, &EncodingKey::from_secret(&kunci_rahasia)).unwrap();
 
-                    return Json(ResponLogin {
-                        status: "butuh_otp".to_string(),
-                        pesan: "Silakan masukkan 6 digit kode dari Authenticator Anda.".to_string(),
-                        token: Some(token_sementara),
-                    });
+                    return (
+                        StatusCode::OK, // 200: Sukses tahap 1
+                        Json(ResponLogin {
+                            status: "butuh_otp".to_string(),
+                            pesan: "Silakan masukkan 6 digit kode dari Authenticator Anda.".to_string(),
+                            token: Some(token_sementara),
+                        })
+                    );
                 }
 
                 // JIKA 2FA TIDAK AKTIF: Langsung berikan Token Akses Asli
@@ -329,23 +368,43 @@ pub async fn login(
 
                 let token_jwt = encode(&Header::default(), &klaim, &EncodingKey::from_secret(&kunci_rahasia)).unwrap();
 
-                Json(ResponLogin {
-                    status: "sukses".to_string(),
-                    pesan: format!("Selamat datang, {}!", data_user.nama),
-                    token: Some(token_jwt),
-                })
+                (
+                    StatusCode::OK, // 200: Sukses login penuh
+                    Json(ResponLogin {
+                        status: "sukses".to_string(),
+                        pesan: format!("Selamat datang, {}!", data_user.nama),
+                        token: Some(token_jwt),
+                    })
+                )
             } else {
-                Json(ResponLogin { status: "gagal".to_string(), pesan: "Password salah.".to_string(), token: None })
+                (
+                    StatusCode::UNAUTHORIZED, // 401: Password salah
+                    Json(ResponLogin { status: "gagal".to_string(), pesan: "Password salah.".to_string(), token: None })
+                )
             }
         },
-        _ => Json(ResponLogin { status: "gagal".to_string(), pesan: "Akun tidak ditemukan.".to_string(), token: None })
+        _ => (
+            StatusCode::NOT_FOUND, // 404: Username tidak ada
+            Json(ResponLogin { status: "gagal".to_string(), pesan: "Akun tidak ditemukan.".to_string(), token: None })
+        )
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/verify-2fa",
+    request_body = InputVerify2FA,
+    responses(
+        (status = 200, description = "Verifikasi berhasil, mendapatkan Token Akses JWT (24 Jam)", body = ResponLogin),
+        (status = 401, description = "Akses ditolak: Token sementara kadaluarsa, tidak valid, atau kode OTP salah", body = ResponLogin),
+        (status = 404, description = "Gagal: User yang bersangkutan tidak ditemukan", body = ResponLogin)
+    ),
+    tag = "Auth"
+)]
 pub async fn verify_2fa(
     State(db): State<DatabaseConnection>,
     Json(payload): Json<InputVerify2FA>,
-) -> Json<ResponLogin> {
+) -> (StatusCode, Json<ResponLogin>) { // <-- Tipe kembalian diubah
     
     let kunci_rahasia = std::env::var("JWT_SECRET").expect("JWT_SECRET belum diatur").into_bytes();
 
@@ -356,12 +415,18 @@ pub async fn verify_2fa(
         &Validation::default(),
     ) {
         Ok(data) => data,
-        Err(_) => return Json(ResponLogin { status: "gagal".to_string(), pesan: "Sesi login kadaluarsa (lewat 5 menit). Silakan login ulang.".to_string(), token: None }),
+        Err(_) => return (
+            StatusCode::UNAUTHORIZED, // 401: Token kadaluarsa
+            Json(ResponLogin { status: "gagal".to_string(), pesan: "Sesi login kadaluarsa (lewat 5 menit). Silakan login ulang.".to_string(), token: None })
+        ),
     };
 
     // Pastikan ini memang token pre-auth, bukan token akses bodong
     if !token_data.claims.is_pre_auth {
-        return Json(ResponLogin { status: "gagal".to_string(), pesan: "Token tidak valid.".to_string(), token: None });
+        return (
+            StatusCode::UNAUTHORIZED, // 401: Token salah jenis
+            Json(ResponLogin { status: "gagal".to_string(), pesan: "Token tidak valid.".to_string(), token: None })
+        );
     }
 
     // 2. Cari User
@@ -373,10 +438,21 @@ pub async fn verify_2fa(
             // 3. Verifikasi 6 Digit OTP
             let secret_base32 = data_user.totp_secret.clone().unwrap();
             let secret_bytes = Secret::Encoded(secret_base32).to_bytes().unwrap();
-            let totp = TOTP::new(Algorithm::SHA1, 6, 1, 30, secret_bytes ,Some("Tabung Hijau IPB".to_string()), payload.username.clone(),).unwrap();
+            let totp = TOTP::new(
+                Algorithm::SHA1, 
+                6, 
+                1, 
+                30, 
+                secret_bytes, 
+                Some("Tabung Hijau IPB".to_string()), 
+                payload.username.clone()
+            ).unwrap();
 
             if !totp.check_current(&payload.kode_totp).unwrap_or(false) {
-                return Json(ResponLogin { status: "gagal".to_string(), pesan: "Kode OTP salah!".to_string(), token: None });
+                return (
+                    StatusCode::UNAUTHORIZED, // 401: Kode OTP salah
+                    Json(ResponLogin { status: "gagal".to_string(), pesan: "Kode OTP salah!".to_string(), token: None })
+                );
             }
 
             // 4. Lolos Semua! Berikan Token Akses Asli (24 Jam)
@@ -388,23 +464,29 @@ pub async fn verify_2fa(
 
             let token_jwt = encode(&Header::default(), &klaim, &EncodingKey::from_secret(&kunci_rahasia)).unwrap();
 
-            Json(ResponLogin {
-                status: "sukses".to_string(),
-                pesan: "Autentikasi 2FA Berhasil!".to_string(),
-                token: Some(token_jwt),
-            })
+            (
+                StatusCode::OK, // 200: Semuanya sukses!
+                Json(ResponLogin {
+                    status: "sukses".to_string(),
+                    pesan: "Autentikasi 2FA Berhasil!".to_string(),
+                    token: Some(token_jwt),
+                })
+            )
         },
-        _ => Json(ResponLogin { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string(), token: None })
+        _ => (
+            StatusCode::NOT_FOUND, // 404: Data user tidak ada
+            Json(ResponLogin { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string(), token: None })
+        )
     }
 }
 
-// Fungsi Satpam Penjaga Pintu (Middleware)
-pub async fn satpam_jwt(
-    mut req: Request, // Tangkap tamu yang datang
-    next: Next,   // Pintu menuju fungsi CRUD
+// Fungsi Token Penjaga Pintu (Middleware)
+pub async fn token_jwt(
+    mut req: Request, // Tangkap request yang masuk
+    next: Next,       // Lanjutkan ke handler utama
 ) -> Result<Response, (StatusCode, Json<ResponPesan>)> {
     
-    // Cek apakah tamu tersebut menempelkan KTP-nya di kepala (Header) suratnya
+    // Cek apakah request menyertakan ID (Token) di Header Authorization
     let header_auth = req.headers().get(header::AUTHORIZATION).and_then(|h| h.to_str().ok());
 
     let token_lengkap = match header_auth {
@@ -413,7 +495,7 @@ pub async fn satpam_jwt(
             StatusCode::UNAUTHORIZED, // Kode 401: Tidak punya izin
             Json(ResponPesan { 
                 status: "gagal".to_string(), 
-                pesan: "Akses ditolak! Kamu tidak membawa KTP Digital (Token JWT).".to_string() 
+                pesan: "Akses ditolak! Anda tidak membawa Token JWT.".to_string() 
             })
         )),
     };
@@ -429,40 +511,53 @@ pub async fn satpam_jwt(
         ));
     }
 
-    // Potong 7 huruf pertama ("Bearer ") untuk mengambil kode acaknya saja
+    // Potong 7 huruf pertama ("Bearer ") untuk mengambil token aslinya saja
     let token_asli = &token_lengkap[7..];
     
-    // Harus sama persis dengan kunci saat login tadi!
+    // Harus sama persis dengan kunci saat login
     let kunci_rahasia = std::env::var("JWT_SECRET")
-        .expect("Waduh, JWT_SECRET belum diatur di file .env!")
+        .expect("JWT_SECRET belum diatur di file .env!")
         .into_bytes();
 
-    // 4. Alat Scanner: Periksa keaslian KTP menggunakan kunci rahasia
+    // Verifikasi keaslian Token menggunakan kunci rahasia
     match decode::<KlaimToken>(
         token_asli,
         &DecodingKey::from_secret(&kunci_rahasia),
         &Validation::default(),
     ) {
-        Ok(data_ktp) => {
-            // 3. Ambil 'sub' (username) dari KTP, dan masukkan ke dalam kantong Ekstensi Axum
-            req.extensions_mut().insert(data_ktp.claims.sub);
-            // Kalau KTP asli dan belum hangus (expired), bukakan pintu!
+        Ok(data_token) => {
+            // Ambil 'sub' (username) dari Token, dan masukkan ke dalam Ekstensi Axum
+            req.extensions_mut().insert(data_token.claims.sub);
+            
+            // Token valid, lanjutkan eksekusi ke endpoint tujuan
             Ok(next.run(req).await)
         }
         Err(_) => {
-            // Kalau KTP palsu hasil editan orang iseng, atau waktunya sudah habis
+            // Jika token palsu, dimanipulasi, atau sudah kadaluarsa
             Err((
                 StatusCode::UNAUTHORIZED,
                 Json(ResponPesan { 
                     status: "gagal".to_string(), 
-                    pesan: "Token JWT palsu atau sudah kadaluarsa! Silakan login ulang.".to_string() 
+                    pesan: "Token JWT tidak valid atau sudah kadaluarsa! Silakan login ulang.".to_string() 
                 })
             ))
         }
     }
 }
 
-// Hapus parameter HeaderMap, ganti pakai Extension dari Satpam
+#[utoipa::path(
+    post,
+    path = "/api/users/setup-totp",
+    responses(
+        (status = 200, description = "Berhasil membuat Secret Key dan URL QR Code untuk TOTP", body = serde_json::Value),
+        (status = 401, description = "Akses ditolak: Kamu tidak membawa Token JWT yang valid", body = ResponPesan),
+        (status = 404, description = "Gagal: User dari token tersebut tidak ditemukan di database", body = serde_json::Value)
+    ),
+    tag = "Manajemen User",
+    security(
+        ("jwt_auth" = []) // <-- INI PENTING! Penanda rute ini butuh Token JWT
+    )
+)]
 pub async fn setup_totp(
     State(db): State<DatabaseConnection>,
     Extension(username_jwt): Extension<String>, 
@@ -512,11 +607,26 @@ pub async fn setup_totp(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/users/aktifkan-totp",
+    request_body = InputAktifkanTOTP,
+    responses(
+        (status = 200, description = "Verifikasi sukses! Gembok 2FA resmi diaktifkan untuk akun ini", body = ResponPesan),
+        (status = 400, description = "Gagal: User belum melakukan Setup TOTP (belum punya secret key)", body = ResponPesan),
+        (status = 401, description = "Gagal: Kode OTP dari aplikasi Authenticator salah", body = ResponPesan),
+        (status = 404, description = "Gagal: Data user dari token tidak ditemukan", body = ResponPesan)
+    ),
+    tag = "Manajemen User",
+    security(
+        ("jwt_auth" = []) // <-- Penanda rute privat
+    )
+)]
 pub async fn aktifkan_totp(
     State(db): State<DatabaseConnection>,
-    Extension(username_jwt): Extension<String>, // Asumsi: Kamu punya middleware yang mengekstrak username dari JWT
+    Extension(username_jwt): Extension<String>, 
     Json(payload): Json<InputAktifkanTOTP>,
-) -> Json<ResponPesan> {
+) -> (StatusCode, Json<ResponPesan>) { // <-- Tipe kembalian diubah
 
     // Cari user yang sedang login
     let pencarian_user = user::Entity::find()
@@ -530,7 +640,15 @@ pub async fn aktifkan_totp(
             if let Some(secret_base32) = &data_user.totp_secret {
                 
                 let secret_bytes = Secret::Encoded(secret_base32.clone()).to_bytes().unwrap();
-                let totp = TOTP::new(Algorithm::SHA1, 6, 1, 30, secret_bytes, Some("Tabung Hijau IPB".to_string()),username_jwt.clone(),  ).unwrap();
+                let totp = TOTP::new(
+                    Algorithm::SHA1, 
+                    6, 
+                    1, 
+                    30, 
+                    secret_bytes, 
+                    Some("Tabung Hijau IPB".to_string()),
+                    username_jwt.clone(),  
+                ).unwrap();
 
                 // Verifikasi 6 digit angka dari HP
                 if totp.check_current(&payload.kode_totp).unwrap_or(false) {
@@ -540,27 +658,38 @@ pub async fn aktifkan_totp(
                     data_aktif.totp_aktif = Set(true);
                     let _ = data_aktif.update(&db).await;
 
-                    Json(ResponPesan {
-                        status: "sukses".to_string(),
-                        pesan: "Autentikasi 2FA berhasil diaktifkan!".to_string(),
-                    })
+                    (
+                        StatusCode::OK, // 200: Sukses mengaktifkan
+                        Json(ResponPesan {
+                            status: "sukses".to_string(),
+                            pesan: "Autentikasi 2FA berhasil diaktifkan!".to_string(),
+                        })
+                    )
                 } else {
-                    Json(ResponPesan {
-                        status: "gagal".to_string(),
-                        pesan: "Kode Authenticator salah! Gagal mengaktifkan 2FA.".to_string(),
-                    })
+                    (
+                        StatusCode::UNAUTHORIZED, // 401: OTP salah
+                        Json(ResponPesan {
+                            status: "gagal".to_string(),
+                            pesan: "Kode Authenticator salah! Gagal mengaktifkan 2FA.".to_string(),
+                        })
+                    )
                 }
             } else {
-                Json(ResponPesan {
-                    status: "gagal".to_string(),
-                    pesan: "Anda belum melakukan Setup TOTP (belum minta kunci rahasia).".to_string(),
-                })
+                (
+                    StatusCode::BAD_REQUEST, // 400: Belum setup
+                    Json(ResponPesan {
+                        status: "gagal".to_string(),
+                        pesan: "Anda belum melakukan Setup TOTP (belum minta kunci rahasia).".to_string(),
+                    })
+                )
             }
         },
-        _ => Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak valid.".to_string() })
+        _ => (
+            StatusCode::NOT_FOUND, // 404: User tidak valid
+            Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak valid.".to_string() })
+        )
     }
 }
-
 // Fungsi Tambah Wilayah
 pub async fn tambah_wilayah(
     State(db): State<DatabaseConnection>,
@@ -1193,10 +1322,22 @@ pub async fn lihat_dashboard_wilayah(
 }
 
 // 1. Fungsi Request OTP via Email
+#[utoipa::path(
+    post,
+    path = "/api/lupa-password",
+    request_body = InputLupaPassword,
+    responses(
+        (status = 200, description = "OTP berhasil dibuat dan dikirim ke email", body = ResponPesan),
+        (status = 403, description = "Akses ditolak: Akun dalam status nonaktif", body = ResponPesan),
+        (status = 404, description = "Gagal: Email tidak terdaftar", body = ResponPesan),
+        (status = 500, description = "Terjadi kesalahan sistem atau gagal mengirim email", body = ResponPesan)
+    ),
+    tag = "Auth"
+)]
 pub async fn minta_otp_email(
     State(db): State<DatabaseConnection>,
     Json(payload): Json<InputLupaPassword>,
-) -> Json<ResponPesan> {
+) -> (StatusCode, Json<ResponPesan>) { // <-- Tipe kembalian ditingkatkan
     
     // Cari user berdasarkan Email
     let pencarian = user::Entity::find()
@@ -1207,7 +1348,10 @@ pub async fn minta_otp_email(
     match pencarian {
         Ok(Some(data_user)) => {
             if data_user.status != "Aktif" {
-                return Json(ResponPesan { status: "gagal".to_string(), pesan: "Akun ini nonaktif.".to_string() });
+                return (
+                    StatusCode::FORBIDDEN, // 403: Akun dilarang melakukan aksi
+                    Json(ResponPesan { status: "gagal".to_string(), pesan: "Akun ini nonaktif.".to_string() })
+                );
             }
 
             // Generate 6 Digit Angka
@@ -1255,26 +1399,50 @@ pub async fn minta_otp_email(
 
             // Kirim secara Asynchronous
             match mailer.send(email_msg).await {
-                Ok(_) => Json(ResponPesan {
-                    status: "sukses".to_string(),
-                    pesan: "Kode OTP berhasil dikirim ke email kamu! Silakan cek kotak masuk atau folder spam.".to_string(),
-                }),
-                Err(e) => Json(ResponPesan {
-                    status: "gagal".to_string(),
-                    pesan: format!("Gagal mengirim email: {}", e),
-                }),
+                Ok(_) => (
+                    StatusCode::OK, // 200: Semuanya lancar
+                    Json(ResponPesan {
+                        status: "sukses".to_string(),
+                        pesan: "Kode OTP berhasil dikirim ke email kamu! Silakan cek kotak masuk atau folder spam.".to_string(),
+                    })
+                ),
+                Err(e) => (
+                    StatusCode::INTERNAL_SERVER_ERROR, // 500: Server gagal kirim email
+                    Json(ResponPesan {
+                        status: "gagal".to_string(),
+                        pesan: format!("Gagal mengirim email: {}", e),
+                    })
+                ),
             }
         },
-        Ok(None) => Json(ResponPesan { status: "gagal".to_string(), pesan: "Email tidak terdaftar di sistem!".to_string() }),
-        Err(_) => Json(ResponPesan { status: "error".to_string(), pesan: "Terjadi kesalahan sistem.".to_string() }),
+        Ok(None) => (
+            StatusCode::NOT_FOUND, // 404: Email tidak ketemu
+            Json(ResponPesan { status: "gagal".to_string(), pesan: "Email tidak terdaftar di sistem!".to_string() })
+        ),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR, // 500: Error database
+            Json(ResponPesan { status: "error".to_string(), pesan: "Terjadi kesalahan sistem.".to_string() })
+        ),
     }
 }
 
 // 2. Fungsi Reset Password
+#[utoipa::path(
+    post,
+    path = "/api/reset-password",
+    request_body = InputResetPasswordEmail,
+    responses(
+        (status = 200, description = "Password berhasil di-reset", body = ResponPesan),
+        (status = 400, description = "Kode OTP kadaluarsa atau belum melakukan request OTP", body = ResponPesan),
+        (status = 401, description = "Kode OTP salah", body = ResponPesan),
+        (status = 404, description = "Email tidak ditemukan", body = ResponPesan)
+    ),
+    tag = "Auth"
+)]
 pub async fn reset_password_email(
     State(db): State<DatabaseConnection>,
     Json(payload): Json<InputResetPasswordEmail>,
-) -> Json<ResponPesan> {
+) -> (StatusCode, Json<ResponPesan>) { // <-- Tipe kembalian ditingkatkan
     
     let pencarian = user::Entity::find().filter(user::Column::Email.eq(payload.email.clone())).one(&db).await;
 
@@ -1284,11 +1452,17 @@ pub async fn reset_password_email(
 
             if let (Some(otp_db), Some(kadaluarsa_db)) = (&data_user.otp_reset, data_user.otp_kadaluarsa) {
                 if kadaluarsa_db < waktu_sekarang {
-                    return Json(ResponPesan { status: "gagal".to_string(), pesan: "Kode OTP sudah kadaluarsa (lewat 15 menit).".to_string() });
+                    return (
+                        StatusCode::BAD_REQUEST, // 400: OTP Kadaluarsa
+                        Json(ResponPesan { status: "gagal".to_string(), pesan: "Kode OTP sudah kadaluarsa (lewat 15 menit).".to_string() })
+                    );
                 }
 
                 if otp_db != &payload.otp {
-                    return Json(ResponPesan { status: "gagal".to_string(), pesan: "Kode OTP salah!".to_string() });
+                    return (
+                        StatusCode::UNAUTHORIZED, // 401: Kredensial (OTP) Salah
+                        Json(ResponPesan { status: "gagal".to_string(), pesan: "Kode OTP salah!".to_string() })
+                    );
                 }
 
                 // Ganti password dan hanguskan OTP
@@ -1299,11 +1473,20 @@ pub async fn reset_password_email(
                 data_aktif.otp_kadaluarsa = Set(None);
                 let _ = data_aktif.update(&db).await;
 
-                Json(ResponPesan { status: "sukses".to_string(), pesan: "Password berhasil di-reset! Silakan login.".to_string() })
+                (
+                    StatusCode::OK, // 200: Berhasil
+                    Json(ResponPesan { status: "sukses".to_string(), pesan: "Password berhasil di-reset! Silakan login.".to_string() })
+                )
             } else {
-                Json(ResponPesan { status: "gagal".to_string(), pesan: "Kamu belum melakukan request OTP!".to_string() })
+                (
+                    StatusCode::BAD_REQUEST, // 400: Belum minta OTP
+                    Json(ResponPesan { status: "gagal".to_string(), pesan: "Kamu belum melakukan request OTP!".to_string() })
+                )
             }
         },
-        _ => Json(ResponPesan { status: "gagal".to_string(), pesan: "Email tidak ditemukan.".to_string() }),
+        _ => (
+            StatusCode::NOT_FOUND, // 404: Email tidak ada
+            Json(ResponPesan { status: "gagal".to_string(), pesan: "Email tidak ditemukan.".to_string() })
+        ),
     }
 }
