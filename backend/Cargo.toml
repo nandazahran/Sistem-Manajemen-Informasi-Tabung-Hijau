@@ -9,6 +9,7 @@ bcrypt = "0.19.0"
 chrono = "0.4.44"
 dotenvy = "0.15.7"
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
+lettre = { version = "0.11.21", features = ["tokio1", "tokio1-native-tls", "builder"] }
 rand = "0.10.1"
 sea-orm = { version = "1.1.20", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros"]}
 serde = { version = "1.0.228", features = ["derive"] }
