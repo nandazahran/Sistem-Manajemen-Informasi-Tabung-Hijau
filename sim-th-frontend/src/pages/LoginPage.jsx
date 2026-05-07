@@ -21,7 +21,7 @@ function LoginPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        username: email, // Nanda minta username, tapi kita isi input email user
+        username: email.split('@')[0], // Nanda minta username, tapi kita isi input email user
         password: password
       })
     });
