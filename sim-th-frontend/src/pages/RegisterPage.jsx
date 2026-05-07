@@ -2,33 +2,52 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 
+// Daftar Lengkap BEM + 2 Tambahan Baru
+const ROLES_DATA = [
+  { id: 'bem_km', label: 'BEM KM IPB' },
+  { id: 'bem_faperta', label: 'BEM FAPERTA' },
+  { id: 'bem_skhb', label: 'BEM SKHB' },
+  { id: 'bem_fpik', label: 'BEM FPIK' },
+  { id: 'bem_fapet', label: 'BEM FAPET' },
+  { id: 'bem_fahutan', label: 'BEM FAHUTAN' },
+  { id: 'bem_fateta', label: 'BEM FATETA' },
+  { id: 'bem_fmipa', label: 'BEM FMIPA' },
+  { id: 'bem_fem', label: 'BEM FEM' },
+  { id: 'bem_fema', label: 'BEM FEMA' },
+  { id: 'bem_vokasi', label: 'BEM VOKASI' },
+  { id: 'bem_sb', label: 'BEM SB' },
+  { id: 'bem_fk', label: 'BEM FK' },
+  { id: 'bem_ssmi', label: 'BEM SSMI' },
+  { id: 'ormawa_ppku', label: 'Ormawa Eksekutif PPKU' },
+  { id: 'dui', label: 'DUI' },
+]
+
 function RegisterPage() {
-  // 1. Siapin State untuk semua inputan form
   const [nama, setNama] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [konfirmPassword, setKonfirmPassword] = useState('')
-  const [role, setRole] = useState('') // State untuk nyimpen pilihan BEM
+  
+  // State buat Fitur Mata
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+
+  // State buat Custom Searchable Dropdown
+  const [roleID, setRoleID] = useState('') // Yang dikirim ke BE
+  const [searchRole, setSearchRole] = useState('') // Yang ditampilin di layar
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   const [isLoading, setIsLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const navigate = useNavigate()
 
-  // 2. Fungsi hit API Register ke Backend Nanda
+  // Filter daftar role berdasarkan ketikan user
+  const filteredRoles = ROLES_DATA.filter(r => r.label.toLowerCase().includes(searchRole.toLowerCase()))
+
   const handleRegister = async (e) => {
     e.preventDefault()
-    
-    // Pengecekan sebelum dikirim: Pastikan password konfirmasi sama
-    if (password !== konfirmPassword) {
-      setErrorMsg('Password dan Konfirmasi Password tidak cocok!')
-      return
-    }
-    
-    // Pastikan user milih role, bukan ngebiarin kosong
-    if (!role) {
-      setErrorMsg('Pilih wilayah BEM terlebih dahulu!')
-      return
-    }
+    if (password !== konfirmPassword) return setErrorMsg('Password dan Konfirmasi Password tidak cocok!')
+    if (!roleID) return setErrorMsg('Pilih wilayah/organisasi terlebih dahulu!')
 
     setIsLoading(true)
     setErrorMsg('')
@@ -38,24 +57,16 @@ function RegisterPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nama: nama,
-          email: email,
-          // Bikin username otomatis ngambil dari kata di depan @ email
-          username: email.split('@')[0], 
-          password: password,
-          role: role,
-          wilayah_id: null // Opsional dari BE, kita set null dulu
+          nama: nama, email: email, username: email.split('@')[0], password: password, role: roleID, wilayah_id: null
         })
       })
 
       const data = await response.json()
-
-      // 201 artinya data berhasil "Diciptakan" di database
       if (response.status === 201) {
-        alert("Pendaftaran berhasil! Silakan login dengan akun Anda.")
-        navigate('/login') // Lempar user ke halaman login
+        alert("Pendaftaran berhasil! Silakan login.")
+        navigate('/login')
       } else {
-        setErrorMsg(data.pesan || "Pendaftaran gagal. Email mungkin sudah terdaftar.")
+        setErrorMsg(data.pesan || "Pendaftaran gagal.")
       }
     } catch (error) {
       setErrorMsg("Koneksi gagal. Pastikan backend sudah menyala.")
@@ -64,98 +75,86 @@ function RegisterPage() {
     }
   }
 
+  // Komponen Ikon Mata biar rapi
+  const EyeIcon = ({ isOpen, toggle }) => (
+    <button type="button" onClick={toggle} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-[#0A391D]">
+      {isOpen ? (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" /></svg>
+      ) : (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" /><path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" /></svg>
+      )}
+    </button>
+  )
+
   return (
     <AuthLayout title="Daftar Akun" subtitle="Buat akun baru untuk memulai">
       <form onSubmit={handleRegister} className="flex flex-col gap-4">
+        {errorMsg && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl text-sm">{errorMsg}</div>}
+
+        <div><label className="block text-sm font-bold text-gray-700 mb-1">Nama Lengkap</label><input type="text" value={nama} onChange={(e) => setNama(e.target.value)} required className="w-full bg-[#F5F5F5] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm" placeholder="Nama lengkap" /></div>
         
-        {/* Kotak Pesan Error */}
-        {errorMsg && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl text-sm">
-            {errorMsg}
-          </div>
-        )}
-
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-1">Nama Lengkap</label>
-          <input 
-            type="text" 
-            value={nama} 
-            onChange={(e) => setNama(e.target.value)} 
-            required 
-            className="w-full bg-[#F5F5F5] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm" 
-            placeholder="Masukkan nama lengkap" 
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-1">Email IPB</label>
-          <input 
-            type="email" 
-            value={email} 
-            onChange={(e) => setEmail(e.target.value)} 
-            required 
-            className="w-full bg-[#F5F5F5] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm" 
-            placeholder="nama@apps.ipb.ac.id" 
-          />
-        </div>
+        <div><label className="block text-sm font-bold text-gray-700 mb-1">Email IPB</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full bg-[#F5F5F5] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm" placeholder="nama@apps.ipb.ac.id" /></div>
 
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-1">Password</label>
-          <input 
-            type="password" 
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)} 
-            required 
-            className="w-full bg-[#F5F5F5] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm" 
-            placeholder="Masukkan password" 
-          />
+          <div className="relative">
+            <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full bg-[#F5F5F5] px-4 py-3 pr-12 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm" placeholder="Masukkan password" />
+            <EyeIcon isOpen={showPassword} toggle={() => setShowPassword(!showPassword)} />
+          </div>
         </div>
 
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-1">Konfirmasi Password</label>
+          <div className="relative">
+            <input type={showConfirm ? "text" : "password"} value={konfirmPassword} onChange={(e) => setKonfirmPassword(e.target.value)} required className="w-full bg-[#F5F5F5] px-4 py-3 pr-12 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm" placeholder="Konfirmasi password" />
+            <EyeIcon isOpen={showConfirm} toggle={() => setShowConfirm(!showConfirm)} />
+          </div>
+        </div>
+
+        {/* CUSTOM SEARCHABLE DROPDOWN */}
+        <div className="relative">
+          <label className="block text-sm font-bold text-gray-700 mb-1">Role / Organisasi</label>
           <input 
-            type="password" 
-            value={konfirmPassword} 
-            onChange={(e) => setKonfirmPassword(e.target.value)} 
-            required 
-            className="w-full bg-[#F5F5F5] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm" 
-            placeholder="Konfirmasi password" 
+            type="text" 
+            value={searchRole}
+            onChange={(e) => {
+              setSearchRole(e.target.value)
+              setRoleID('') // Reset ID kalau user ngetik ulang
+              setIsDropdownOpen(true)
+            }}
+            onFocus={() => setIsDropdownOpen(true)}
+            onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)} // Delay biar list bisa di-klik
+            required={!roleID}
+            className="w-full bg-white border border-gray-300 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm"
+            placeholder="Ketik untuk mencari wilayah/organisasi..." 
           />
+          
+          {/* List yang muncul cuma kalau di-klik/ketik (Tinggi dibatasi untuk 3-4 item pakai max-h-40) */}
+          {isDropdownOpen && (
+            <ul className="absolute z-50 w-full bg-white mt-1 rounded-xl shadow-xl max-h-40 overflow-y-auto border border-gray-100">
+              {filteredRoles.length > 0 ? (
+                filteredRoles.map(role => (
+                  <li 
+                    key={role.id}
+                    onClick={() => {
+                      setRoleID(role.id)
+                      setSearchRole(role.label)
+                      setIsDropdownOpen(false)
+                    }}
+                    className="px-4 py-3 text-sm cursor-pointer hover:bg-[#F2EDE4] hover:text-[#0A391D] transition-colors"
+                  >
+                    {role.label}
+                  </li>
+                ))
+              ) : (
+                <li className="px-4 py-3 text-sm text-gray-400">Tidak ditemukan</li>
+              )}
+            </ul>
+          )}
         </div>
 
-        {/* Dropdown Role BEM yang udah disamain dengan halaman Login */}
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-1">Role</label>
-          <select 
-            value={role} 
-            onChange={(e) => setRole(e.target.value)} 
-            required 
-            className="w-full bg-white border border-gray-300 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm cursor-pointer"
-          >
-            <option value="" disabled>Pilih Wilayah BEM</option>
-            <option value="bem_km">BEM KM IPB</option>
-            <option value="bem_faperta">BEM FAPERTA</option>
-            <option value="bem_skhb">BEM SKHB</option>
-            <option value="bem_fpik">BEM FPIK</option>
-            <option value="bem_fapet">BEM FAPET</option>
-            <option value="bem_fahutan">BEM FAHUTAN</option>
-            <option value="bem_fateta">BEM FATETA</option>
-            <option value="bem_fmipa">BEM FMIPA</option>
-            <option value="bem_fem">BEM FEM</option>
-            <option value="bem_fema">BEM FEMA</option>
-            <option value="bem_vokasi">BEM VOKASI</option>
-            <option value="bem_sb">BEM SB</option>
-            <option value="bem_fk">BEM FK</option>
-            <option value="bem_ssmi">BEM SSMI</option>
-          </select>
-        </div>
-
-        <button 
-          type="submit" 
-          disabled={isLoading} 
-          className={`w-full text-white py-3.5 rounded-xl font-bold transition-all shadow-md mt-4 ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#0A391D] hover:bg-[#072a15]'}`}
-        >
-          {isLoading ? 'Memproses...' : 'Daftar'}
+        <button type="submit" disabled={isLoading} className={`w-full text-white py-3.5 rounded-xl font-bold transition-all shadow-md mt-4 ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#0A391D] hover:bg-[#072a15]'}`}>
+          {isLoading ? 'Memproses...' : 'Daftar Sekarang'}
         </button>
       </form>
 
