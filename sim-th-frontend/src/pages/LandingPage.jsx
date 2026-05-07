@@ -149,7 +149,7 @@ function LandingPage() {
               </div>
               <div>
                 <p className="text-xs text-gray-500 font-bold uppercase">Email</p>
-                <p className="text-[#0A391D] font-semibold text-lg">simth@kampus.ac.id</p>
+                <p className="text-[#0A391D] font-semibold text-lg">simth@ipb.apps.ac.id</p>
               </div>
             </div>
             <h3 className="text-lg font-extrabold text-[#0A391D] mb-4">Social Media</h3>
