@@ -17,7 +17,7 @@ use lettre::transport::smtp::authentication::Credentials;
 use rand::RngExt;
 use utoipa::ToSchema;
 
-use crate::entities::{user,wilayah,kategori_sampah, transaksi_sampah, tabungan_sampah};
+use crate::entities::{user,wilayah,kategori_sampah, transaksi_sampah, tabungan_sampah, kontak};
 
 // Struct khusus untuk menerima data Register
 #[derive(Deserialize,ToSchema)]
@@ -155,6 +155,13 @@ pub struct TabunganLengkap {
     pub nama_wilayah: String, // Diambil dari tabel wilayah
 }
 
+#[derive(Deserialize, ToSchema)]
+pub struct InputKontak {
+    pub nama: String,
+    pub email: String,
+    pub pesan: String,
+}
+
 // Fungsi Register yang sudah di-upgrade
 #[utoipa::path(
     post,
@@ -170,12 +177,57 @@ pub struct TabunganLengkap {
 pub async fn register(
     State(db): State<DatabaseConnection>,
     Json(payload): Json<InputRegister>,
-) -> (StatusCode, Json<ResponPesan>) { // <-- Tipe kembalian diubah agar bisa bawa Status Code
+) -> (StatusCode, Json<ResponPesan>) {
+    
+    // 1. VALIDASI WILAYAH: Pastikan wilayah_id valid dan ada di database
+    // Khusus bem_km, wilayah_id boleh kosong (None). 
+    // Selain itu, wajib isi dan wajib ada di tabel wilayah.
+    if payload.role != "bem_km" {
+        match payload.wilayah_id {
+            Some(id) => {
+                // Cek ke tabel wilayah apakah ID tersebut eksis
+                let cek_wilayah = wilayah::Entity::find_by_id(id).one(&db).await;
+                
+                match cek_wilayah {
+                    Ok(None) => {
+                        return (
+                            StatusCode::BAD_REQUEST,
+                            Json(ResponPesan {
+                                status: "gagal".to_string(),
+                                pesan: format!("ID Wilayah {} tidak ditemukan di sistem!", id),
+                            })
+                        );
+                    }
+                    Err(_) => {
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(ResponPesan {
+                                status: "error".to_string(),
+                                pesan: "Terjadi kesalahan saat memvalidasi wilayah.".to_string(),
+                            })
+                        );
+                    }
+                    _ => {} // Wilayah ditemukan, lanjut proses
+                }
+            },
+            None => {
+                // Jika role fakultas tapi tidak kirim wilayah_id
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(ResponPesan {
+                        status: "gagal".to_string(),
+                        pesan: format!("Role '{}' wajib menyertakan ID Wilayah.", payload.role),
+                    })
+                );
+            }
+        }
+    }
 
+    // 2. PROSES HASHING PASSWORD
     let password_acak = match hash(&payload.password, DEFAULT_COST) {
         Ok(hasil_hash) => hasil_hash,
         Err(_) => return (
-            StatusCode::INTERNAL_SERVER_ERROR, // Beri kode 500 (Error dari server)
+            StatusCode::INTERNAL_SERVER_ERROR,
             Json(ResponPesan {
                 status: "error".to_string(),
                 pesan: "Sistem bermasalah saat mengamankan password.".to_string(),
@@ -183,31 +235,32 @@ pub async fn register(
         ),
     };
 
-    // Bungkus data menggunakan user::ActiveModel yang baru
+    // 3. SIAPKAN MODEL DATA
     let user_baru = user::ActiveModel {
         username: Set(payload.username.clone()),
         email: Set(payload.email.clone()),
         password: Set(password_acak),
         nama: Set(payload.nama.clone()),
         role: Set(payload.role.clone()),
-        status: Set("Aktif".to_string()), // Otomatis aktif saat mendaftar
+        status: Set("Aktif".to_string()),
         wilayah_id: Set(payload.wilayah_id),
         ..Default::default()
     };
 
+    // 4. SIMPAN KE DATABASE
     match user_baru.insert(&db).await {
         Ok(_) => (
-            StatusCode::CREATED, // Beri kode 201 (Data berhasil dibuat)
+            StatusCode::CREATED,
             Json(ResponPesan {
                 status: "sukses".to_string(),
                 pesan: format!("Beres! Akun '{}' berhasil didaftarkan sebagai {}.", payload.username, payload.role),
             })
         ),
-        Err(e) => (
-            StatusCode::CONFLICT, // Beri kode 409 (Konflik/Duplikat data di database)
+        Err(_) => (
+            StatusCode::CONFLICT,
             Json(ResponPesan {
                 status: "gagal".to_string(),
-                pesan: format!("Gagal mendaftar: Email atau Username mungkin sudah dipakai. Detail: {}", e),
+                pesan: format!("Gagal mendaftar: Email atau Username mungkin sudah dipakai."),
             })
         ),
     }
@@ -795,21 +848,50 @@ pub async fn tambah_wilayah(
 }
 
 // Fungsi Lihat Semua Wilayah
+#[utoipa::path(
+    get,
+    path = "/api/wilayah",
+    responses(
+        (status = 200, description = "Berhasil mengambil data wilayah sesuai hak akses", body = serde_json::Value),
+        (status = 401, description = "Akses ditolak: Token tidak valid", body = ResponPesan),
+        (status = 500, description = "Terjadi kesalahan pada database", body = ResponPesan)
+    ),
+    tag = "Wilayah",
+    security(("jwt_auth" = []))
+)]
 pub async fn lihat_wilayah(
     State(db): State<DatabaseConnection>,
-) -> Json<serde_json::Value> {
+    // Extension ini berisi data dari Token JWT yang sudah dibongkar Satpam
+    Extension(role_user): Extension<String>, 
+    Extension(id_wilayah_user): Extension<Option<i32>>,
+) -> (StatusCode, Json<serde_json::Value>) {
     
-    let daftar_wilayah = wilayah::Entity::find().all(&db).await;
+    // LOGIKA FILTER:
+    // 1. Jika bem_km -> Ambil semua baris di tabel wilayah
+    // 2. Jika bukan -> Ambil yang ID-nya cocok dengan wilayah si user
+    
+    let query = if role_user == "bem_km" {
+        wilayah::Entity::find()
+    } else {
+        wilayah::Entity::find().filter(wilayah::Column::Id.eq(id_wilayah_user))
+    };
 
-    match daftar_wilayah {
-        Ok(data) => Json(serde_json::json!({
-            "status": "sukses",
-            "data": data
-        })),
-        Err(_) => Json(serde_json::json!({
-            "status": "error",
-            "pesan": "Gagal mengambil data wilayah"
-        })),
+    match query.all(&db).await {
+        Ok(data) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "status": "sukses",
+                "role_pengakses": role_user,
+                "data": data
+            }))
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "status": "error",
+                "pesan": format!("Gagal mengambil data wilayah: {}", e)
+            }))
+        ),
     }
 }
 
@@ -1567,6 +1649,49 @@ pub async fn reset_password_email(
         _ => (
             StatusCode::NOT_FOUND, // 404: Email tidak ada
             Json(ResponPesan { status: "gagal".to_string(), pesan: "Email tidak ditemukan.".to_string() })
+        ),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/kontak",
+    request_body = InputKontak,
+    responses(
+        (status = 201, description = "Pesan berhasil terkirim dan disimpan", body = ResponPesan),
+        (status = 400, description = "Data yang dikirim tidak lengkap", body = ResponPesan),
+        (status = 500, description = "Gagal menyimpan pesan ke database", body = ResponPesan)
+    ),
+    tag = "Public"
+)]
+pub async fn simpan_kontak(
+    State(db): State<DatabaseConnection>,
+    Json(payload): Json<InputKontak>,
+) -> (StatusCode, Json<ResponPesan>) {
+    
+    // Siapkan model untuk disimpan
+    let pesan_baru = kontak::ActiveModel {
+        nama: Set(payload.nama),
+        email: Set(payload.email),
+        pesan: Set(payload.pesan),
+        waktu_kirim: Set(Utc::now().naive_utc()), // Ambil waktu saat ini
+        ..Default::default()
+    };
+
+    match pesan_baru.insert(&db).await {
+        Ok(_) => (
+            StatusCode::CREATED,
+            Json(ResponPesan {
+                status: "sukses".to_string(),
+                pesan: "Terima kasih! Pesan Anda telah kami terima dan akan segera diproses.".to_string(),
+            })
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ResponPesan {
+                status: "error".to_string(),
+                pesan: format!("Gagal mengirim pesan: {}", e),
+            })
         ),
     }
 }
