@@ -16,22 +16,33 @@ mod entities;
 #[derive(OpenApi)]
 #[openapi(
     paths(
+        // Modul Auth
         handlers::register,
         handlers::login,
         handlers::verify_2fa,
         handlers::minta_otp_email,
         handlers::reset_password_email,
+        // Modul Manajemen User
         handlers::setup_totp,
-        handlers::aktifkan_totp
+        handlers::aktifkan_totp,
+        handlers::lihat_user,    
+        handlers::update_user,   
+        handlers::hapus_user
     ),
     components(
         schemas(
+            // Struct Untuk Auth
             handlers::InputRegister,
             handlers::InputLogin,
             handlers::InputVerify2FA,
             handlers::InputLupaPassword,
             handlers::InputResetPasswordEmail,
             handlers::InputAktifkanTOTP,
+            handlers::ResponPesan,
+            handlers::ResponLogin,
+            // Struct Untuk Manajemen User
+            handlers::InputUpdateUser,
+            // Struct Respon Umum
             handlers::ResponPesan,
             handlers::ResponLogin
         )

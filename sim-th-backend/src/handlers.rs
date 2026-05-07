@@ -38,7 +38,6 @@ pub struct InputLogin {
 }
 #[derive(Deserialize,ToSchema)]
 pub struct InputAktifkanTOTP {
-    pub username: String,
     pub kode_totp: String,
 }
 
@@ -215,9 +214,22 @@ pub async fn register(
 }
 
 // Fungsi Lihat Semua User (READ)
+#[utoipa::path(
+    get,
+    path = "/api/users",
+    responses(
+        (status = 200, description = "Berhasil mengambil daftar semua user (Password disembunyikan)", body = serde_json::Value),
+        (status = 401, description = "Akses ditolak: Kamu tidak membawa Token JWT yang valid", body = ResponPesan),
+        (status = 500, description = "Terjadi kesalahan pada sistem/database", body = serde_json::Value)
+    ),
+    tag = "Manajemen User",
+    security(
+        ("jwt_auth" = []) // <-- Jangan lupa, ini butuh ID (Token) untuk masuk
+    )
+)]
 pub async fn lihat_user(
     State(db): State<DatabaseConnection>,
-) -> Json<serde_json::Value> {
+) -> (StatusCode, Json<serde_json::Value>) { // <-- Tipe kembalian ditingkatkan dengan StatusCode
     let pencarian = user::Entity::find().all(&db).await;
 
     match pencarian {
@@ -231,24 +243,50 @@ pub async fn lihat_user(
                 })
             }).collect();
 
-            Json(serde_json::json!({
-                "status": "sukses",
-                "data": data_aman
-            }))
+            (
+                StatusCode::OK, // 200: Sukses mengambil data
+                Json(serde_json::json!({
+                    "status": "sukses",
+                    "data": data_aman
+                }))
+            )
         },
-        Err(e) => Json(serde_json::json!({
-            "status": "error",
-            "pesan": format!("Gagal mengambil data user: {}", e)
-        })),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR, // 500: Server error
+            Json(serde_json::json!({
+                "status": "error",
+                "pesan": format!("Gagal mengambil data user: {}", e)
+            }))
+        ),
     }
 }
 
 // Fungsi Update User (Ganti Nama & Status)
+#[utoipa::path(
+    put,
+    path = "/api/users/{id}", // {id} ini mewakili angka ID user di URL
+    request_body = InputUpdateUser,
+    params(
+        ("id" = i32, Path, description = "ID User yang ingin diupdate")
+    ),
+    responses(
+        (status = 200, description = "Data user berhasil diupdate", body = ResponPesan),
+        (status = 400, description = "Format data input tidak valid", body = ResponPesan),
+        (status = 401, description = "Akses ditolak: Token JWT tidak ada atau kadaluarsa", body = ResponPesan),
+        (status = 404, description = "Gagal: User dengan ID tersebut tidak ditemukan", body = ResponPesan),
+        (status = 500, description = "Terjadi kesalahan pada server/database", body = ResponPesan)
+    ),
+    tag = "Manajemen User",
+    security(
+        ("jwt_auth" = []) // Rute privat, wajib ada JWT
+    )
+)]
 pub async fn update_user(
     State(db): State<DatabaseConnection>,
     Path(user_id): Path<i32>,
     Json(payload): Json<InputUpdateUser>,
-) -> Json<ResponPesan> {
+) -> (StatusCode, Json<ResponPesan>) { // <-- Tipe kembalian ditingkatkan
+
     let pencarian = user::Entity::find_by_id(user_id).one(&db).await;
 
     match pencarian {
@@ -260,47 +298,89 @@ pub async fn update_user(
             data_aktif.status = Set(payload.status.clone()); 
 
             match data_aktif.update(&db).await {
-                Ok(_) => Json(ResponPesan {
-                    status: "sukses".to_string(),
-                    pesan: format!(
-                        "Data admin ID {} berhasil diupdate. Nama: '{}', Status: '{}'.", 
-                        user_id, payload.nama, payload.status
-                    ),
-                }),
-                Err(e) => Json(ResponPesan {
-                    status: "gagal".to_string(),
-                    pesan: format!("Gagal mengupdate user: {}", e),
-                })
+                Ok(_) => (
+                    StatusCode::OK, // 200: Update sukses
+                    Json(ResponPesan {
+                        status: "sukses".to_string(),
+                        pesan: format!(
+                            "Data admin ID {} berhasil diupdate. Nama: '{}', Status: '{}'.", 
+                            user_id, payload.nama, payload.status
+                        ),
+                    })
+                ),
+                Err(e) => (
+                    StatusCode::INTERNAL_SERVER_ERROR, // 500: Database gagal nge-save
+                    Json(ResponPesan {
+                        status: "gagal".to_string(),
+                        pesan: format!("Gagal mengupdate user: {}", e),
+                    })
+                )
             }
         },
-        Ok(None) => Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string() }),
-        Err(e) => Json(ResponPesan { status: "error".to_string(), pesan: e.to_string() }),
+        Ok(None) => (
+            StatusCode::NOT_FOUND, // 404: ID User tidak ada di database
+            Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string() })
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR, // 500: Error saat nyari data
+            Json(ResponPesan { status: "error".to_string(), pesan: e.to_string() })
+        ),
     }
 }
 
 // Fungsi Hapus User (DELETE)
+#[utoipa::path(
+    delete,
+    path = "/api/users/{id}",
+    params(
+        ("id" = i32, Path, description = "ID User yang ingin dihapus/dicabut aksesnya")
+    ),
+    responses(
+        (status = 200, description = "Akses user berhasil dicabut (dihapus)", body = ResponPesan),
+        (status = 401, description = "Akses ditolak: Token JWT tidak ada atau kadaluarsa", body = ResponPesan),
+        (status = 404, description = "Gagal: User tidak ditemukan", body = ResponPesan),
+        (status = 409, description = "Konflik Data: User tidak bisa dihapus karena sudah memiliki jejak audit/transaksi", body = ResponPesan),
+        (status = 500, description = "Terjadi kesalahan pada sistem/database", body = ResponPesan)
+    ),
+    tag = "Manajemen User",
+    security(
+        ("jwt_auth" = []) // Rute privat
+    )
+)]
 pub async fn hapus_user(
     State(db): State<DatabaseConnection>,
     Path(user_id): Path<i32>,
-) -> Json<ResponPesan> {
+) -> (StatusCode, Json<ResponPesan>) { // <-- Tipe kembalian ditingkatkan
     let pencarian = user::Entity::find_by_id(user_id).one(&db).await;
 
     match pencarian {
         Ok(Some(data)) => {
             let username_dihapus = data.username.clone();
             match data.delete(&db).await {
-                Ok(_) => Json(ResponPesan {
-                    status: "sukses".to_string(),
-                    pesan: format!("Akses admin untuk '{}' berhasil dicabut (dihapus).", username_dihapus),
-                }),
-                Err(_) => Json(ResponPesan {
-                    status: "gagal".to_string(),
-                    pesan: "Gagal! User ini tidak bisa dihapus karena sudah pernah mencatat transaksi. Aksesnya harus dibiarkan untuk jejak audit.".to_string(),
-                })
+                Ok(_) => (
+                    StatusCode::OK, // 200: Sukses hapus
+                    Json(ResponPesan {
+                        status: "sukses".to_string(),
+                        pesan: format!("Akses admin untuk '{}' berhasil dicabut (dihapus).", username_dihapus),
+                    })
+                ),
+                Err(_) => (
+                    StatusCode::CONFLICT, // 409: Bentrok dengan data transaksi (Foreign Key)
+                    Json(ResponPesan {
+                        status: "gagal".to_string(),
+                        pesan: "Gagal! User ini tidak bisa dihapus karena sudah pernah mencatat transaksi. Aksesnya harus dibiarkan untuk jejak audit.".to_string(),
+                    })
+                )
             }
         },
-        Ok(None) => Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string() }),
-        Err(e) => Json(ResponPesan { status: "error".to_string(), pesan: e.to_string() }),
+        Ok(None) => (
+            StatusCode::NOT_FOUND, // 404: User tidak ada
+            Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string() })
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR, // 500: Database error
+            Json(ResponPesan { status: "error".to_string(), pesan: e.to_string() })
+        ),
     }
 }
 
