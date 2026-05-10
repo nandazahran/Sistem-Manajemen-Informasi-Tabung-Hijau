@@ -27,7 +27,8 @@ mod entities;
         handlers::aktifkan_totp,
         handlers::lihat_user,    
         handlers::update_user,   
-        handlers::hapus_user
+        handlers::hapus_user,
+        handlers::simpan_kontak
     ),
     components(
         schemas(
@@ -44,7 +45,8 @@ mod entities;
             handlers::InputUpdateUser,
             // Struct Respon Umum
             handlers::ResponPesan,
-            handlers::ResponLogin
+            handlers::ResponLogin,
+            handlers::InputKontak
         )
     ),
     modifiers(&SecurityAddon),
@@ -136,6 +138,7 @@ async fn main() {
     // Titipkan kunci brankas (db) ke dalam aplikasi (State)
     let app = Router::new()
         .route("/", get(|| async { "Halo Tim! Backend SIM-TH sudah menyala!" }))
+        .route("/api/kontak", post(handlers::simpan_kontak))
         .route("/api/register", post(handlers::register))// Rute untuk registrasi user baru
         .route("/api/login", post(handlers::login)) // Rute untuk login
         .route("/api/lupa-password", post(handlers::minta_otp_email))
