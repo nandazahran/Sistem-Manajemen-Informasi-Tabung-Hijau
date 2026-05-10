@@ -36,7 +36,7 @@ function LoginPage() {
           sessionStorage.setItem('token', data.token); // Hilang pas tab ditutup
         }
         alert("Berhasil masuk ke dashboard!");
-        // navigate('/dashboard');
+        navigate('/dashboard');
       } else {
         setErrorMsg(data.pesan || "Username atau password salah.");
       }

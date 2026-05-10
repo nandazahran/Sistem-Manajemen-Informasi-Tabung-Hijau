@@ -4,53 +4,32 @@ import AOS from 'aos';
 import 'aos/dist/aos.css';
 
 function LandingPage() {
-  // 1. Tambahin State buat nyimpen section apa yang lagi aktif (default: home)
   const [activeSection, setActiveSection] = useState('home');
 
   useEffect(() => {
-    // Inisialisasi efek animasi AOS
-    AOS.init({
-      duration: 800, 
-      once: true,    
-      offset: 100,   
-    });
-
-    // 2. Bikin fungsi "Sensor Scroll" (Scroll Spy)
+    AOS.init({ duration: 800, once: true, offset: 100 });
     const handleScroll = () => {
-      // Daftar semua ID section yang ada di halaman
       const sections = ['home', 'about', 'how-it-works', 'benefits', 'contact'];
       let currentSection = 'home';
-
-      // Cek posisi tiap section dari atas layar
       for (let i = 0; i < sections.length; i++) {
         const section = document.getElementById(sections[i]);
-        if (section) {
-          const sectionTop = section.offsetTop;
-          // Angka 150 ini offset/toleransi biar warnanya ganti sebelum mentok banget di atas
-          if (window.scrollY >= sectionTop - 150) {
-            currentSection = sections[i];
-          }
+        if (section && window.scrollY >= section.offsetTop - 150) {
+          currentSection = sections[i];
         }
       }
-      
-      // Update state dengan section yang lagi dilewatin
       setActiveSection(currentSection);
     };
-
-    // Pasang "CCTV" buat ngintip setiap kali user nge-scroll
     window.addEventListener('scroll', handleScroll);
-    
-    // Bersihin "CCTV" pas user pindah ke halaman lain (kayak halaman login)
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] font-sans scroll-smooth overflow-x-hidden">
+    <div className="min-h-screen bg-[#F5EFE6] font-sans scroll-smooth overflow-x-hidden">
       
       {/* NAVBAR */}
-      <nav className="fixed top-0 left-0 w-full bg-[#0A391D] px-8 py-4 flex justify-between items-center z-100 shadow-lg transition-all duration-300">
+      <nav className="fixed top-0 left-0 w-full bg-[#0B4D1E] px-8 py-4 flex justify-between items-center z-100 shadow-lg transition-all duration-300">
         <div className="flex items-center gap-2 text-white font-bold text-xl cursor-pointer" onClick={() => window.scrollTo(0,0)}>
-          <div className="bg-[#F7941D] p-1.5 rounded-md">
+          <div className="bg-[#F4A300] p-1.5 rounded-md">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
@@ -58,40 +37,39 @@ function LandingPage() {
           SIM-TH
         </div>
         
-        {/* 3. Modifikasi Navigasi biar ganti warna tergantung isi 'activeSection' */}
         <div className="hidden md:flex gap-8 text-sm font-medium text-gray-200">
-          <a href="#home" className={`transition-colors ${activeSection === 'home' ? 'text-[#F7941D] font-bold' : 'hover:text-[#F7941D]'}`}>Home</a>
-          <a href="#about" className={`transition-colors ${activeSection === 'about' ? 'text-[#F7941D] font-bold' : 'hover:text-[#F7941D]'}`}>About</a>
-          <a href="#how-it-works" className={`transition-colors ${activeSection === 'how-it-works' ? 'text-[#F7941D] font-bold' : 'hover:text-[#F7941D]'}`}>How it Works</a>
-          <a href="#benefits" className={`transition-colors ${activeSection === 'benefits' ? 'text-[#F7941D] font-bold' : 'hover:text-[#F7941D]'}`}>Benefits</a>
-          <a href="#contact" className={`transition-colors ${activeSection === 'contact' ? 'text-[#F7941D] font-bold' : 'hover:text-[#F7941D]'}`}>Contact</a>
+          <a href="#home" className={`transition-colors ${activeSection === 'home' ? 'text-[#F4A300] font-bold' : 'hover:text-[#F4A300]'}`}>Home</a>
+          <a href="#about" className={`transition-colors ${activeSection === 'about' ? 'text-[#F4A300] font-bold' : 'hover:text-[#F4A300]'}`}>About</a>
+          <a href="#how-it-works" className={`transition-colors ${activeSection === 'how-it-works' ? 'text-[#F4A300] font-bold' : 'hover:text-[#F4A300]'}`}>How it Works</a>
+          <a href="#benefits" className={`transition-colors ${activeSection === 'benefits' ? 'text-[#F4A300] font-bold' : 'hover:text-[#F4A300]'}`}>Benefits</a>
+          <a href="#contact" className={`transition-colors ${activeSection === 'contact' ? 'text-[#F4A300] font-bold' : 'hover:text-[#F4A300]'}`}>Contact</a>
         </div>
       </nav>
 
       {/* HERO SECTION */}
       <section id="home" className="relative pt-32 pb-32 px-6 flex flex-col items-center text-center">
         <h1 data-aos="zoom-in" className="text-5xl md:text-7xl font-extrabold leading-tight max-w-4xl tracking-tight">
-          <span className="text-[#F7941D]">Clean</span> <span className="text-[#0A391D]">campus &</span> <br />
-          <span className="text-[#F7941D]">green</span> <span className="text-[#0A391D]">future</span>
+          <span className="text-[#F4A300]">Clean</span> <span className="text-[#0B4D1E]">campus &</span> <br />
+          <span className="text-[#F4A300]">green</span> <span className="text-[#0B4D1E]">future</span>
         </h1>
         <p data-aos="fade-up" data-aos-delay="200" className="mt-6 text-gray-600 max-w-2xl text-lg">
           Sistem digital untuk pengelolaan sampah kampus yang terstruktur dan memberikan nilai ekonomi
         </p>
         <div data-aos="fade-up" data-aos-delay="400">
-          <Link to="/login" className="inline-block mt-8 px-8 py-3.5 bg-[#F7941D] text-white font-bold rounded-full shadow-lg hover:bg-[#e0861b] transform hover:scale-105 transition-all">
+          <Link to="/login" className="inline-block mt-8 px-8 py-3.5 bg-[#F4A300] text-white font-bold rounded-full shadow-lg hover:bg-[#d68e00] transform hover:scale-105 transition-all">
             Get Started
           </Link>
         </div>
       </section>
 
       {/* ABOUT SECTION */}
-      <section id="about" className="bg-[#0A391D] text-white py-24 px-8 md:px-20 grid md:grid-cols-2 gap-12 items-center overflow-hidden">
+      <section id="about" className="bg-[#0B4D1E] text-white py-24 px-8 md:px-20 grid md:grid-cols-2 gap-12 items-center overflow-hidden">
         <div data-aos="fade-right">
           <h2 className="text-5xl font-extrabold mb-6 leading-tight">
-            About <span className="text-[#F7941D]">the</span><br/>initiative.
+            About <span className="text-[#F4A300]">the</span><br/>initiative.
           </h2>
           <p className="text-gray-300 leading-relaxed mb-10 text-lg">
-            SIM-TH adalah sistem informasi yang mendukung program <span className="text-[#F7941D] font-semibold">Tabung Hijau</span> dalam pengelolaan sampah berbasis kampus secara digital, terstruktur, dan transparan. <br/><br/>
+            SIM-TH adalah sistem informasi yang mendukung program <span className="text-[#F4A300] font-semibold">Tabung Hijau</span> dalam pengelolaan sampah berbasis kampus secara digital, terstruktur, dan transparan. <br/><br/>
             Dengan teknologi modern, kami membantu kampus mengelola sampah dengan lebih efisien sambil memberikan nilai ekonomi bagi mahasiswa.
           </p>
         </div>
@@ -101,12 +79,11 @@ function LandingPage() {
       </section>
 
       {/* HOW IT WORKS SECTION */}
-      <section id="how-it-works" className="bg-[#F7941D] py-24 px-8 md:px-20 overflow-hidden">
+      <section id="how-it-works" className="bg-[#F4A300] py-24 px-8 md:px-20 overflow-hidden">
         <div data-aos="fade-up" className="mb-16 text-white">
           <h2 className="text-5xl font-extrabold mb-4">How does<br/>it work?</h2>
           <p className="text-lg opacity-90">Proses pengelolaan sampah kampus yang sistematis dan terstruktur</p>
         </div>
-        
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           {[
             { step: '01', title: 'Pengumpulan', desc: 'Mahasiswa mengumpulkan sampah' },
@@ -116,96 +93,61 @@ function LandingPage() {
             { step: '05', title: 'Distribusi', desc: 'Pembagian hasil' },
           ].map((item, index) => (
             <div key={index} data-aos="fade-up" data-aos-delay={index * 100} className="bg-white rounded-3xl p-8 shadow-xl flex flex-col hover:-translate-y-3 transition-transform duration-300">
-              <h3 className="text-5xl font-extrabold text-[#F5E6D3] mb-4">{item.step}</h3>
-              <div className="w-14 h-14 bg-[#0A391D] rounded-xl mb-6"></div>
-              <h4 className="text-xl font-bold text-[#0A391D] mb-2">{item.title}</h4>
+              <h3 className="text-5xl font-extrabold text-[#F5EFE6] mb-4">{item.step}</h3>
+              <div className="w-14 h-14 bg-[#0B4D1E] rounded-xl mb-6"></div>
+              <h4 className="text-xl font-bold text-[#0B4D1E] mb-2">{item.title}</h4>
               <p className="text-sm text-gray-500 leading-relaxed">{item.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* BENEFITS SECTION (Added back from original design) */}
-      <section id="benefits" className="bg-[#FAF8F5] py-24 px-8 md:px-20">
-        <div data-aos="fade-up" className="mb-16">
-          <h2 className="text-5xl font-extrabold text-[#0A391D] mb-4">Benefits<span className="text-[#F7941D]">.</span></h2>
-          <p className="text-gray-600 text-lg">Keuntungan yang didapat dari program Tabung Hijau untuk kampus dan mahasiswa</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div data-aos="fade-up" data-aos-delay="100" className="bg-white border border-[#0A391D] p-10 rounded-[2.5rem] shadow-sm hover:shadow-lg transition-shadow">
-            <div className="w-16 h-16 bg-[#0A391D] rounded-2xl mb-6"></div>
-            <p className="text-xs font-bold tracking-wider text-[#0A391D] mb-2 uppercase">Environmental</p>
-            <h3 className="text-2xl font-extrabold text-[#0A391D] mb-4">Mengurangi sampah</h3>
-            <p className="text-gray-600">Volume sampah kampus berkurang signifikan dengan sistem pemilahan yang terorganisir.</p>
-          </div>
-          <div data-aos="fade-up" data-aos-delay="200" className="bg-white border border-[#F7941D] p-10 rounded-[2.5rem] shadow-sm hover:shadow-lg transition-shadow">
-            <div className="w-16 h-16 bg-[#F7941D] rounded-2xl mb-6"></div>
-            <p className="text-xs font-bold tracking-wider text-[#F7941D] mb-2 uppercase">Economic</p>
-            <h3 className="text-2xl font-extrabold text-[#0A391D] mb-4">Nilai ekonomi</h3>
-            <p className="text-gray-600">Sampah anorganik memiliki nilai jual yang memberikan keuntungan finansial untuk mahasiswa.</p>
-          </div>
-          <div data-aos="fade-up" data-aos-delay="300" className="bg-white border border-[#4CAF50] p-10 rounded-[2.5rem] shadow-sm hover:shadow-lg transition-shadow">
-            <div className="w-16 h-16 bg-[#4CAF50] rounded-2xl mb-6"></div>
-            <p className="text-xs font-bold tracking-wider text-[#4CAF50] mb-2 uppercase">Educational</p>
-            <h3 className="text-2xl font-extrabold text-[#0A391D] mb-4">Kesadaran lingkungan</h3>
-            <p className="text-gray-600">Meningkatkan kepedulian dan edukasi mahasiswa terhadap pengelolaan sampah yang berkelanjutan.</p>
-          </div>
-        </div>
-      </section>
-
       {/* CONTACT US SECTION */}
-      <section id="contact" className="relative pt-24 pb-48 px-8 md:px-20 bg-linear-to-b from-[#FAF8F5] to-[#C9DCD6] overflow-hidden">
-        
-        {/* BACKGROUND GUNUNG & AIR */}
+      <section id="contact" className="relative pt-24 pb-48 px-8 md:px-20 bg-linear-to-b from-[#F5EFE6] to-[#d7e3df] overflow-hidden">
+        {/* Background Gunung & Air */}
         <div className="absolute bottom-0 left-0 w-full z-0 flex flex-col pointer-events-none">
           <svg className="w-full h-auto mb--2px" viewBox="0 0 1440 320" preserveAspectRatio="none">
-            <path fill="#0E3321" fillOpacity="1" d="M0,224L80,192C160,160,320,96,480,106.7C640,117,800,203,960,213.3C1120,224,1280,160,1360,128L1440,96L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z"></path>
+            <path fill="#0B4D1E" fillOpacity="1" d="M0,224L80,192C160,160,320,96,480,106.7C640,117,800,203,960,213.3C1120,224,1280,160,1360,128L1440,96L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z"></path>
           </svg>
           <div className="w-full h-150px bg-[#3A837A] relative">
             <div className="absolute top-4 left-[10%] w-[30%] h-1px bg-white/30 rounded-full"></div>
             <div className="absolute top-8 right-[5%] w-[40%] h-2px bg-white/20 rounded-full"></div>
-            <div className="absolute top-14 left-[40%] w-[20%] h-1.5px bg-white/40 rounded-full"></div>
-            <div className="absolute top-20 left-[5%] w-[15%] h-1px bg-white/20 rounded-full"></div>
+            <div className="absolute top-14 left-[40%] w-[20%] h-[1.5px] bg-white/40 rounded-full"></div>
           </div>
         </div>
 
-        {/* KONTEN CONTACT US */}
         <div className="relative z-10">
           <div data-aos="fade-down" className="text-center mb-12">
-            <h2 className="text-5xl font-extrabold text-[#0A391D] mb-4">Contact <span className="text-[#F7941D]">Us.</span></h2>
+            <h2 className="text-5xl font-extrabold text-[#0B4D1E] mb-4">Contact <span className="text-[#F4A300]">Us.</span></h2>
             <p className="text-gray-600 text-lg">Hubungi kami untuk informasi lebih lanjut tentang SIM-TH</p>
           </div>
 
-          <div data-aos="zoom-in-up" className="max-w-5xl mx-auto bg-[#FAF8F5] rounded-2rem p-10 md:p-14 shadow-2xl flex flex-col md:flex-row gap-16">
-            
-            {/* Kiri: Info */}
+          {/* UDAH DIBIKIN MELENGKUNG (rounded-3xl) dan WARNA KREM */}
+          <div data-aos="zoom-in-up" className="max-w-5xl mx-auto bg-[#F5EFE6] rounded-3xl p-10 md:p-14 shadow-2xl flex flex-col md:flex-row gap-16 border border-white/50">
             <div className="md:w-1/2">
-              <h3 className="text-2xl font-extrabold text-[#0A391D] mb-8">Contact Information</h3>
-              <div className="bg-[#FFFDFB] p-6 rounded-2xl shadow-sm flex items-center gap-4 mb-10 border border-gray-100">
-                <div className="w-12 h-12 bg-[#F7941D] flex items-center justify-center rounded-xl text-white shadow-md">
+              <h3 className="text-2xl font-extrabold text-[#0B4D1E] mb-8">Contact Information</h3>
+              <div className="bg-white p-6 rounded-2xl shadow-sm flex items-center gap-4 mb-10 border border-gray-100">
+                <div className="w-12 h-12 bg-[#F4A300] flex items-center justify-center rounded-xl text-white shadow-md">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Email</p>
-                  <p className="text-[#0A391D] font-bold text-lg">simth@kampus.ac.id</p>
+                  <p className="text-[#0B4D1E] font-bold text-lg">simth@kampus.ac.id</p>
                 </div>
               </div>
-              <h3 className="text-lg font-extrabold text-[#0A391D] mb-4">Social Media</h3>
+              <h3 className="text-lg font-extrabold text-[#0B4D1E] mb-4">Social Media</h3>
               <div className="flex gap-4">
-                <button className="px-6 py-2.5 bg-[#0A391D] text-white font-bold rounded-full text-sm hover:bg-[#072a15] transition-colors">Instagram</button>
-                <button className="px-6 py-2.5 bg-[#0A391D] text-white font-bold rounded-full text-sm hover:bg-[#072a15] transition-colors">Twitter</button>
+                <button className="px-6 py-2.5 bg-[#0B4D1E] text-white font-bold rounded-full text-sm hover:bg-[#083a16] transition-colors">Instagram</button>
+                <button className="px-6 py-2.5 bg-[#0B4D1E] text-white font-bold rounded-full text-sm hover:bg-[#083a16] transition-colors">Twitter</button>
               </div>
             </div>
-
-            {/* Kanan: Form */}
             <div className="md:w-1/2 flex flex-col gap-4">
-              <input type="text" placeholder="Nama Lengkap" className="w-full bg-[#FAF8F5] px-5 py-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0A391D] transition-all" />
-              <input type="email" placeholder="Email" className="w-full bg-[#FAF8F5] px-5 py-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0A391D] transition-all" />
-              <textarea placeholder="Pesan Anda" rows="4" className="w-full bg-[#FAF8F5] px-5 py-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0A391D] resize-none transition-all"></textarea>
-              <button className="w-full bg-[#0A391D] text-white py-4 rounded-xl font-bold hover:bg-[#072a15] hover:shadow-lg transform hover:-translate-y-1 transition-all mt-2">
+              <input type="text" placeholder="Nama Lengkap" className="w-full bg-white px-5 py-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-all" />
+              <input type="email" placeholder="Email" className="w-full bg-white px-5 py-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-all" />
+              <textarea placeholder="Pesan Anda" rows="4" className="w-full bg-white px-5 py-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] resize-none transition-all"></textarea>
+              <button className="w-full bg-[#0B4D1E] text-white py-4 rounded-xl font-bold hover:bg-[#083a16] hover:shadow-lg transform hover:-translate-y-1 transition-all mt-2">
                 Send Message
               </button>
             </div>
@@ -213,11 +155,9 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* FOOTER */}
       <footer className="relative bg-[#3A837A] pt-4 pb-8 text-center text-white text-sm z-10 border-t border-white/20">
         © 2026 SIM-TH - Sistem Informasi Manajemen Tabung Hijau. All rights reserved.
       </footer>
-
     </div>
   );
 }
