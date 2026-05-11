@@ -77,7 +77,7 @@ function RegisterPage() {
 
   // Komponen Ikon Mata biar rapi
   const EyeIcon = ({ isOpen, toggle }) => (
-    <button type="button" onClick={toggle} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-[#0A391D]">
+    <button type="button" onClick={toggle} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-[#0B4D1E]">
       {isOpen ? (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" /></svg>
       ) : (
@@ -91,14 +91,14 @@ function RegisterPage() {
       <form onSubmit={handleRegister} className="flex flex-col gap-4">
         {errorMsg && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl text-sm">{errorMsg}</div>}
 
-        <div><label className="block text-sm font-bold text-gray-700 mb-1">Nama Lengkap</label><input type="text" value={nama} onChange={(e) => setNama(e.target.value)} required className="w-full bg-[#F5F5F5] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm" placeholder="Nama lengkap" /></div>
+        <div><label className="block text-sm font-bold text-gray-700 mb-1">Nama Lengkap</label><input type="text" value={nama} onChange={(e) => setNama(e.target.value)} required className="w-full bg-[#F5F5F5] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] text-sm" placeholder="Nama lengkap" /></div>
         
-        <div><label className="block text-sm font-bold text-gray-700 mb-1">Email IPB</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full bg-[#F5F5F5] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm" placeholder="nama@apps.ipb.ac.id" /></div>
+        <div><label className="block text-sm font-bold text-gray-700 mb-1">Email IPB</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full bg-[#F5F5F5] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] text-sm" placeholder="nama@apps.ipb.ac.id" /></div>
 
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-1">Password</label>
           <div className="relative">
-            <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full bg-[#F5F5F5] px-4 py-3 pr-12 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm" placeholder="Masukkan password" />
+            <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full bg-[#F5F5F5] px-4 py-3 pr-12 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] text-sm" placeholder="Masukkan password" />
             <EyeIcon isOpen={showPassword} toggle={() => setShowPassword(!showPassword)} />
           </div>
         </div>
@@ -106,7 +106,7 @@ function RegisterPage() {
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-1">Konfirmasi Password</label>
           <div className="relative">
-            <input type={showConfirm ? "text" : "password"} value={konfirmPassword} onChange={(e) => setKonfirmPassword(e.target.value)} required className="w-full bg-[#F5F5F5] px-4 py-3 pr-12 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm" placeholder="Konfirmasi password" />
+            <input type={showConfirm ? "text" : "password"} value={konfirmPassword} onChange={(e) => setKonfirmPassword(e.target.value)} required className="w-full bg-[#F5F5F5] px-4 py-3 pr-12 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] text-sm" placeholder="Konfirmasi password" />
             <EyeIcon isOpen={showConfirm} toggle={() => setShowConfirm(!showConfirm)} />
           </div>
         </div>
@@ -125,7 +125,7 @@ function RegisterPage() {
             onFocus={() => setIsDropdownOpen(true)}
             onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)} // Delay biar list bisa di-klik
             required={!roleID}
-            className="w-full bg-white border border-gray-300 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm"
+            className="w-full bg-white border border-gray-300 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] text-sm"
             placeholder="Ketik untuk mencari wilayah/organisasi..." 
           />
           
@@ -141,7 +141,7 @@ function RegisterPage() {
                       setSearchRole(role.label)
                       setIsDropdownOpen(false)
                     }}
-                    className="px-4 py-3 text-sm cursor-pointer hover:bg-[#F2EDE4] hover:text-[#0A391D] transition-colors"
+                    className="px-4 py-3 text-sm cursor-pointer hover:bg-[#F2EDE4] hover:text-[#0B4D1E] transition-colors"
                   >
                     {role.label}
                   </li>
@@ -153,13 +153,13 @@ function RegisterPage() {
           )}
         </div>
 
-        <button type="submit" disabled={isLoading} className={`w-full text-white py-3.5 rounded-xl font-bold transition-all shadow-md mt-4 ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#0A391D] hover:bg-[#072a15]'}`}>
+        <button type="submit" disabled={isLoading} className={`w-full text-white py-3.5 rounded-xl font-bold transition-all shadow-md mt-4 ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#0B4D1E] hover:bg-[#072a15]'}`}>
           {isLoading ? 'Memproses...' : 'Daftar Sekarang'}
         </button>
       </form>
 
       <p className="mt-8 text-center text-sm text-gray-600">
-        Sudah punya akun? <Link to="/login" className="text-[#0A391D] font-extrabold hover:underline">Masuk di sini</Link>
+        Sudah punya akun? <Link to="/login" className="text-[#0B4D1E] font-extrabold hover:underline">Masuk di sini</Link>
       </p>
     </AuthLayout>
   )

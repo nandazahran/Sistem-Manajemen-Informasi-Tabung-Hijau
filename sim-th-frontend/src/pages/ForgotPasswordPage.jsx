@@ -71,7 +71,7 @@ function ForgotPasswordPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)} // Tangkap ketikan user
               required
-              className="w-full bg-[#F5F5F5] pl-11 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm transition-all"
+              className="w-full bg-[#F5F5F5] pl-11 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] text-sm transition-all"
               placeholder="nama@apps.ipb.ac.id"
             />
           </div>
@@ -81,7 +81,7 @@ function ForgotPasswordPage() {
           type="submit" 
           disabled={isLoading}
           className={`w-full text-white py-3.5 rounded-xl font-bold transition-all shadow-md mt-2 ${
-            isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#0A391D] hover:bg-[#072a15]'
+            isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#0B4D1E] hover:bg-[#072a15]'
           }`}
         >
           {isLoading ? 'Mengirim...' : 'Kirim Kode OTP'}
@@ -89,7 +89,7 @@ function ForgotPasswordPage() {
       </form>
 
       <p className="mt-8 text-center text-sm text-gray-600">
-        Sudah ingat passwordnya? <Link to="/login" className="text-[#0A391D] font-extrabold hover:underline">Masuk di sini</Link>
+        Sudah ingat passwordnya? <Link to="/login" className="text-[#0B4D1E] font-extrabold hover:underline">Masuk di sini</Link>
       </p>
     </AuthLayout>
   )

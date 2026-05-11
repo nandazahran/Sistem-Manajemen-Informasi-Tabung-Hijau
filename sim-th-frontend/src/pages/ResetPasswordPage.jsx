@@ -125,12 +125,12 @@ function ResetPasswordPage() {
                   value={data}
                   onChange={(e) => handleOtpChange(e.target, index)}
                   onKeyDown={(e) => handleOtpKeyDown(e, index)}
-                  className="w-12 h-14 bg-[#F5F5F5] text-center text-xl font-bold rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] transition-all"
+                  className="w-12 h-14 bg-[#F5F5F5] text-center text-xl font-bold rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-all"
                 />
               ))}
             </div>
           </div>
-          <button type="submit" className="w-full bg-[#0A391D] text-white py-3.5 rounded-xl font-bold hover:bg-[#072a15] transition-all shadow-md">
+          <button type="submit" className="w-full bg-[#0B4D1E] text-white py-3.5 rounded-xl font-bold hover:bg-[#0B4D1E] transition-all shadow-md">
             Lanjut
           </button>
         </form>
@@ -146,7 +146,7 @@ function ResetPasswordPage() {
               value={passwordBaru}
               onChange={(e) => setPasswordBaru(e.target.value)}
               required
-              className="w-full bg-[#F5F5F5] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm"
+              className="w-full bg-[#F5F5F5] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] text-sm"
               placeholder="Minimal 8 karakter"
             />
           </div>
@@ -157,14 +157,14 @@ function ResetPasswordPage() {
               value={konfirmPassword}
               onChange={(e) => setKonfirmPassword(e.target.value)}
               required
-              className="w-full bg-[#F5F5F5] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A391D] text-sm"
+              className="w-full bg-[#F5F5F5] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] text-sm"
               placeholder="Ulangi password baru"
             />
           </div>
           <button 
             type="submit" 
             disabled={isLoading}
-            className={`w-full text-white py-3.5 rounded-xl font-bold transition-all shadow-md ${isLoading ? 'bg-gray-400' : 'bg-[#0A391D] hover:bg-[#072a15]'}`}
+            className={`w-full text-white py-3.5 rounded-xl font-bold transition-all shadow-md ${isLoading ? 'bg-gray-400' : 'bg-[#0B4D1E] hover:bg-[#0B4D1E]'}`}
           >
             {isLoading ? 'Menyimpan...' : 'Simpan Password Baru'}
           </button>
