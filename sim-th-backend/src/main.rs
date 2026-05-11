@@ -3,10 +3,7 @@ use sea_orm::Database;
 use std::env;
 use tower_http::cors::{CorsLayer, Any};
 use axum::http::{Method, header};
-use utoipa::{
-    openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
-    Modify, OpenApi,
-};
+use utoipa::{openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},Modify, OpenApi,};
 use utoipa_swagger_ui::SwaggerUi;
 
 mod handlers;
