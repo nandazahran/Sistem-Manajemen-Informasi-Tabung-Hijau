@@ -43,9 +43,9 @@ Contoh Test Endpoint: Buka browser atau gunakan cURL ke http://localhost:3000/ap
 Frontend dibangun menggunakan React dan Vite. Pastikan backend di atas sudah berjalan sebelum menjalankan frontend agar UI bisa mengambil data.
 
 1. Masuk ke Folder Frontend
-Buka tab terminal baru (jangan matikan terminal backend), dan masuk ke folder `sim-th-frontend`:
+Buka tab terminal baru (jangan matikan terminal backend), dan masuk ke folder `sim-th-frontend` dengan cara:
 
-```cd frontend```
+```cd sim-th-frontend```
 
 2. Install Dependencies
 Install semua package Node.js yang dibutuhkan:
