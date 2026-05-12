@@ -5,7 +5,8 @@ use axum::{
     response::Response,
 };
 use axum::Extension;
-use sea_orm::{DatabaseConnection, ActiveModelTrait, EntityTrait, Set, QueryFilter, ColumnTrait, FromQueryResult, JoinType, QuerySelect, RelationTrait, ModelTrait};
+use sea_orm::{DatabaseConnection, ActiveModelTrait, EntityTrait, Set, QueryFilter, ColumnTrait, FromQueryResult, JoinType, QuerySelect, RelationTrait, ModelTrait, QueryOrder};
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use bcrypt::{hash, verify, DEFAULT_COST}; // Tambahkan alat bcrypt
 use jsonwebtoken::{encode, EncodingKey, Header, decode, DecodingKey, Validation}; // Alat pembuat JWT
@@ -104,6 +105,13 @@ pub struct InputUpdateUser {
     pub status: String,
 }
 
+// Struct untuk Ubah Password dari Halaman Profil
+#[derive(Deserialize,ToSchema)]
+pub struct InputUbahPassword {
+    pub password_lama: String,
+    pub password_baru: String,
+}
+
 // Struct untuk menerima data dari frontend
 #[derive(Deserialize,ToSchema)]
 pub struct InputKategori {
@@ -117,6 +125,7 @@ pub struct InputTransaksi {
     pub kategori_id: i32,
     pub wilayah_id: i32,
     pub berat_gram: i32, 
+    pub catatan: Option<String>,
 }
 
 // Struct untuk menerima request penarikan saldo
@@ -136,6 +145,7 @@ pub struct TransaksiLengkap {
     pub nama_kategori: String, // Diambil dari tabel kategori
     pub nama_wilayah: String,  // Diambil dari tabel wilayah
     pub nama_petugas: String,  // Diambil dari tabel user
+    pub catatan: Option<String>, // Tambahan kolom catatan
 }
 
 // Ganti tipe data i32 menjadi Option<i64> dan i64
@@ -160,6 +170,23 @@ pub struct InputKontak {
     pub nama: String,
     pub email: String,
     pub pesan: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct LeaderboardItem {
+    pub peringkat: usize,
+    pub nama_wilayah: String,
+    pub poin_kpi: i64,
+    pub total_berat_gram: i64,
+    pub total_rupiah: i64,
+}
+
+#[derive(FromQueryResult, Serialize)]
+pub struct TransaksiKategoriBiasa {
+    pub id: i32,
+    pub berat: i32,
+    pub total_nilai: i32,
+    pub nama_kategori: String,
 }
 
 // Fungsi Register yang sudah di-upgrade
@@ -1136,6 +1163,7 @@ pub async fn tambah_transaksi(
         status: Set("Selesai".to_string()),
         kategori_id: Set(payload.kategori_id),
         wilayah_id: Set(payload.wilayah_id),
+        // catatan: Set(payload.catatan), // Aktifkan ini setelah kamu menambahkan kolom 'catatan' di entity/tabel transaksi_sampah
         input_by: Set(petugas.id), 
         ..Default::default()
     };
@@ -1186,23 +1214,47 @@ pub async fn tambah_transaksi(
 // 1. Fungsi Lihat Transaksi (Membaca 4 Tabel Sekaligus!)
 pub async fn lihat_transaksi(
     State(db): State<DatabaseConnection>,
+    Extension(username_jwt): Extension<String>, // Ambil identitas user login
 ) -> Json<serde_json::Value> {
     
-    let query_transaksi = transaksi_sampah::Entity::find()
+    // Cari data user untuk mengecek Role dan wilayah_id-nya
+    let pencarian_user = user::Entity::find()
+        .filter(user::Column::Username.eq(username_jwt))
+        .one(&db)
+        .await
+        .unwrap();
+
+    let (role, wilayah_id) = match pencarian_user {
+        Some(u) => (u.role, u.wilayah_id),
+        None => return Json(serde_json::json!({ "status": "gagal", "pesan": "User tidak valid" })),
+    };
+
+    // Mulai query
+    let mut query = transaksi_sampah::Entity::find()
         // Pilih kolom tambahan yang mau dicomot dari tabel tetangga
         .column_as(kategori_sampah::Column::NamaKategori, "nama_kategori")
         .column_as(wilayah::Column::Nama, "nama_wilayah")
         .column_as(user::Column::Nama, "nama_petugas")
+        // Jika kamu sudah update Sea-ORM Entity untuk catatan, tambahkan juga kolomnya di sini
         // Lakukan penggabungan (Inner Join) berdasarkan Foreign Key
         .join(JoinType::InnerJoin, transaksi_sampah::Relation::KategoriSampah.def())
         .join(JoinType::InnerJoin, transaksi_sampah::Relation::Wilayah.def())
-        .join(JoinType::InnerJoin, transaksi_sampah::Relation::User.def())
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::User.def());
+
+    // FILTER: Jika dia BEM Wilayah, HANYA BISA LIHAT transaksinya sendiri
+    if role != "bem_km" && role != "admin" {
+        if let Some(id_wil) = wilayah_id {
+            query = query.filter(transaksi_sampah::Column::WilayahId.eq(id_wil));
+        }
+    }
+
+    let hasil_eksekusi = query
         // Tuangkan hasilnya ke dalam cetakan JSON yang kita buat tadi
         .into_model::<TransaksiLengkap>()
         .all(&db)
         .await;
 
-    match query_transaksi {
+    match hasil_eksekusi {
         Ok(data) => Json(serde_json::json!({
             "status": "sukses",
             "data": data
@@ -1440,6 +1492,26 @@ pub async fn lihat_dashboard_wilayah(
         })),
     };
 
+    // 1.5. Hitung Breakdown Kategori (Untuk Pie Chart)
+    let transaksi_kategori = transaksi_sampah::Entity::find()
+        .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id))
+        .column_as(kategori_sampah::Column::NamaKategori, "nama_kategori")
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::KategoriSampah.def())
+        .into_model::<TransaksiKategoriBiasa>()
+        .all(&db)
+        .await
+        .unwrap_or_default();
+
+    let mut breakdown: HashMap<String, (i64, i64)> = HashMap::new();
+    for t in transaksi_kategori {
+        let entry = breakdown.entry(t.nama_kategori).or_insert((0,0));
+        entry.0 += t.berat as i64;
+        entry.1 += t.total_nilai as i64;
+    }
+    let breakdown_list: Vec<_> = breakdown.into_iter().map(|(nama, (b, n))| {
+        serde_json::json!({ "nama_kategori": nama, "total_berat_gram": b, "total_rupiah": n })
+    }).collect();
+
     // 2. Hitung agregasi KHUSUS untuk wilayah ini saja
     let query = transaksi_sampah::Entity::find()
         .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id)) // INI KUNCI FILTERNYA!
@@ -1464,7 +1536,8 @@ pub async fn lihat_dashboard_wilayah(
                     "total_berat_gram": berat,
                     "total_rupiah": rupiah,
                     "jumlah_transaksi": data.jumlah_transaksi
-                }
+                },
+                "breakdown_kategori": breakdown_list
             }))
         },
         Ok(None) => Json(serde_json::json!({
@@ -1474,13 +1547,97 @@ pub async fn lihat_dashboard_wilayah(
                 "total_berat_gram": 0,
                 "total_rupiah": 0,
                 "jumlah_transaksi": 0
-            }
+            },
+            "breakdown_kategori": []
         })),
         Err(e) => Json(serde_json::json!({
             "status": "error",
             "pesan": format!("Gagal menghitung rekap wilayah: {}", e)
         })),
     }
+}
+
+// Fungsi Endpoint Leaderboard KPI
+#[utoipa::path(
+    get,
+    path = "/api/dashboard/leaderboard",
+    responses((status = 200, description = "Berhasil mengambil data leaderboard KPI")),
+    tag = "Dashboard",
+    security(("jwt_auth" = []))
+)]
+pub async fn lihat_leaderboard(
+    State(db): State<DatabaseConnection>,
+) -> Json<serde_json::Value> {
+    // Ambil seluruh transaksi gabungan dengan wilayah
+    let semua_transaksi = transaksi_sampah::Entity::find()
+        .column_as(kategori_sampah::Column::NamaKategori, "nama_kategori")
+        .column_as(wilayah::Column::Nama, "nama_wilayah")
+        .column_as(user::Column::Nama, "nama_petugas")
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::KategoriSampah.def())
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::Wilayah.def())
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::User.def())
+        .into_model::<TransaksiLengkap>()
+        .all(&db)
+        .await
+        .unwrap_or_default();
+    
+    let mut rekap_wilayah: HashMap<String, (i64, i64, i64)> = HashMap::new();
+    
+    for t in semua_transaksi {
+        let entry = rekap_wilayah.entry(t.nama_wilayah).or_insert((0, 0, 0));
+        entry.0 += t.berat as i64;
+        entry.1 += t.total_nilai as i64;
+        entry.2 += 1; // jumlah transaksi
+    }
+    
+    let mut leaderboard: Vec<LeaderboardItem> = rekap_wilayah.into_iter().map(|(nama, (berat, nilai, trx))| {
+        // Formula KPI (Sesuai UI): Berat(40%) + Nilai Ekonomi(30%) + Konsistensi/Trx(10%)
+        let poin = (berat / 1000 * 40) + (nilai / 1000 * 30) + (trx * 10);
+        LeaderboardItem {
+            peringkat: 0,
+            nama_wilayah: nama,
+            poin_kpi: poin,
+            total_berat_gram: berat,
+            total_rupiah: nilai,
+        }
+    }).collect();
+    
+    leaderboard.sort_by(|a, b| b.poin_kpi.cmp(&a.poin_kpi));
+    for (i, item) in leaderboard.iter_mut().enumerate() { item.peringkat = i + 1; }
+    
+    Json(serde_json::json!({ "status": "sukses", "data": leaderboard }))
+}
+
+// Fungsi Endpoint Aktivitas / Notifikasi Terbaru
+#[utoipa::path(
+    get,
+    path = "/api/dashboard/{id}/aktivitas",
+    params(("id" = i32, Path, description = "ID Wilayah")),
+    responses((status = 200, description = "Berhasil mengambil aktivitas terbaru")),
+    tag = "Dashboard",
+    security(("jwt_auth" = []))
+)]
+pub async fn lihat_aktivitas_terbaru(
+    State(db): State<DatabaseConnection>,
+    Path(wilayah_id): Path<i32>,
+) -> Json<serde_json::Value> {
+    let transaksi = transaksi_sampah::Entity::find()
+        .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id))
+        .column_as(kategori_sampah::Column::NamaKategori, "nama_kategori")
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::KategoriSampah.def())
+        .order_by_desc(transaksi_sampah::Column::Id)
+        .limit(10)
+        .into_model::<TransaksiKategoriBiasa>()
+        .all(&db).await.unwrap_or_default();
+    
+    let aktivitas: Vec<_> = transaksi.into_iter().map(|t| serde_json::json!({
+        "judul": format!("Transaksi {} berhasil ditambahkan", t.nama_kategori.to_lowercase()),
+        "deskripsi": format!("+{}kg {} dicatat ke sistem", t.berat / 1000, t.nama_kategori.to_lowercase()),
+        "tipe": "transaksi",
+        "waktu": "Baru saja" 
+    })).collect();
+
+    Json(serde_json::json!({ "status": "sukses", "data": aktivitas }))
 }
 
 // 1. Fungsi Request OTP via Email
@@ -1584,6 +1741,51 @@ pub async fn minta_otp_email(
         Err(_) => (
             StatusCode::INTERNAL_SERVER_ERROR, // 500: Error database
             Json(ResponPesan { status: "error".to_string(), pesan: "Terjadi kesalahan sistem.".to_string() })
+        ),
+    }
+}
+
+// Fungsi Ubah Password dari menu Profil
+#[utoipa::path(
+    put,
+    path = "/api/users/ubah-password",
+    request_body = InputUbahPassword,
+    responses(
+        (status = 200, description = "Password berhasil diubah", body = ResponPesan),
+        (status = 401, description = "Password lama salah", body = ResponPesan)
+    ),
+    tag = "Manajemen User",
+    security(("jwt_auth" = []))
+)]
+pub async fn ubah_password(
+    State(db): State<DatabaseConnection>,
+    Extension(username_jwt): Extension<String>,
+    Json(payload): Json<InputUbahPassword>,
+) -> (StatusCode, Json<ResponPesan>) {
+    
+    let pencarian = user::Entity::find().filter(user::Column::Username.eq(username_jwt)).one(&db).await;
+
+    match pencarian {
+        Ok(Some(data_user)) => {
+            // Cek apakah password lamanya benar
+            if !verify(&payload.password_lama, &data_user.password).unwrap_or(false) {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(ResponPesan { status: "gagal".to_string(), pesan: "Password lama yang Anda masukkan salah.".to_string() })
+                );
+            }
+
+            // Hash password baru dan simpan
+            let password_baru_hash = hash(&payload.password_baru, DEFAULT_COST).unwrap();
+            let mut data_aktif: user::ActiveModel = data_user.into();
+            data_aktif.password = Set(password_baru_hash);
+            let _ = data_aktif.update(&db).await;
+
+            (StatusCode::OK, Json(ResponPesan { status: "sukses".to_string(), pesan: "Password berhasil diubah.".to_string() }))
+        },
+        _ => (
+            StatusCode::NOT_FOUND, 
+            Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string() })
         ),
     }
 }
