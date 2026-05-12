@@ -1163,7 +1163,7 @@ pub async fn tambah_transaksi(
         status: Set("Selesai".to_string()),
         kategori_id: Set(payload.kategori_id),
         wilayah_id: Set(payload.wilayah_id),
-        // catatan: Set(payload.catatan), // Aktifkan ini setelah kamu menambahkan kolom 'catatan' di entity/tabel transaksi_sampah
+        catatan: Set(payload.catatan), 
         input_by: Set(petugas.id), 
         ..Default::default()
     };

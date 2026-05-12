@@ -17,6 +17,7 @@ impl MigrationTrait for Migration {
                     .col(integer(TransaksiSampah::Berat)) // Simpan dalam satuan Gram
                     .col(integer(TransaksiSampah::TotalNilai))
                     .col(string(TransaksiSampah::Status))
+                    .col(ColumnDef::new(TransaksiSampah::Catatan).text().null()) // Kolom Catatan (Opsional)
                     
                     // --- KOLOM UNTUK FOREIGN KEY ---
                     .col(integer(TransaksiSampah::KategoriId))
@@ -71,6 +72,7 @@ pub enum TransaksiSampah {
     Berat,
     TotalNilai,
     Status,
+    Catatan,
     KategoriId,
     WilayahId,
     InputBy,
