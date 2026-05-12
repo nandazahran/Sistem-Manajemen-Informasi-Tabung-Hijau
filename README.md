@@ -21,7 +21,7 @@ Lalu Ikuti arahan dalam filenya
 Backend (Rust) dan Database (PostgreSQL) dibungkus menggunakan container. Kamu tidak perlu menginstall Rust atau setting database sama sekali.
 
 1. Jalankan Container
-Buka terminal di folder root project ini, lalu jalankan perintah berikut:
+Buka terminal di folder `sim-th-backend` project ini, lalu jalankan perintah berikut:
 
 ```docker compose up -d --build```
 
@@ -43,7 +43,7 @@ Contoh Test Endpoint: Buka browser atau gunakan cURL ke http://localhost:3000/ap
 Frontend dibangun menggunakan React dan Vite. Pastikan backend di atas sudah berjalan sebelum menjalankan frontend agar UI bisa mengambil data.
 
 1. Masuk ke Folder Frontend
-Buka tab terminal baru (jangan matikan terminal backend), dan masuk ke direktori frontend:
+Buka tab terminal baru (jangan matikan terminal backend), dan masuk ke folder `sim-th-frontend`:
 
 ```cd frontend```
 
