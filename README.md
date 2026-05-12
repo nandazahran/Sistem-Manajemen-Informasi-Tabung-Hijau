@@ -37,7 +37,7 @@ Backend sekarang sudah berjalan dan terkoneksi ke database. API siap di-hit di:
 
 Base URL: http://localhost:3000
 
-Contoh Test Endpoint: Buka browser atau gunakan cURL ke http://localhost:3000/api/kategori
+Contoh Test Endpoint: Buka browser atau gunakan cURL ke http://localhost:3000
 
 ## 💻 Langkah 3: Menjalankan Frontend (UI)
 Frontend dibangun menggunakan React dan Vite. Pastikan backend di atas sudah berjalan sebelum menjalankan frontend agar UI bisa mengambil data.
