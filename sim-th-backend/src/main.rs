@@ -3,10 +3,7 @@ use sea_orm::Database;
 use std::env;
 use tower_http::cors::{CorsLayer, Any};
 use axum::http::{Method, header};
-use utoipa::{
-    openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
-    Modify, OpenApi,
-};
+use utoipa::{openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},Modify, OpenApi,};
 use utoipa_swagger_ui::SwaggerUi;
 
 mod handlers;
@@ -28,7 +25,10 @@ mod entities;
         handlers::lihat_user,    
         handlers::update_user,   
         handlers::hapus_user,
-        handlers::simpan_kontak
+        handlers::simpan_kontak,
+        handlers::ubah_password,
+        handlers::lihat_leaderboard,
+        handlers::lihat_aktivitas_terbaru
     ),
     components(
         schemas(
@@ -43,10 +43,12 @@ mod entities;
             handlers::ResponLogin,
             // Struct Untuk Manajemen User
             handlers::InputUpdateUser,
+            handlers::InputUbahPassword,
             // Struct Respon Umum
             handlers::ResponPesan,
             handlers::ResponLogin,
-            handlers::InputKontak
+            handlers::InputKontak,
+            handlers::LeaderboardItem
         )
     ),
     modifiers(&SecurityAddon),
@@ -124,13 +126,16 @@ async fn main() {
     // Rute Dashboard
     let rute_dashboard = Router::new()
         .route("/", get(handlers::lihat_dashboard))
+        .route("/leaderboard", get(handlers::lihat_leaderboard))
         .route("/{id}", get(handlers::lihat_dashboard_wilayah))
+        .route("/{id}/aktivitas", get(handlers::lihat_aktivitas_terbaru))
         .route_layer(middleware::from_fn(handlers::token_jwt));
 
     // Rute Manajemen User (BARU)
     let rute_user = Router::new()
         .route("/", get(handlers::lihat_user))
         .route("/{id}", put(handlers::update_user).delete(handlers::hapus_user))
+        .route("/ubah-password", put(handlers::ubah_password))
         .route("/setup-totp", post(handlers::setup_totp))
         .route("/aktifkan-totp", post(handlers::aktifkan_totp))
         .route_layer(middleware::from_fn(handlers::token_jwt));

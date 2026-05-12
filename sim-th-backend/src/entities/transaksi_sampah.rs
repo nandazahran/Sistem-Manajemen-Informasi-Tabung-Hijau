@@ -12,6 +12,8 @@ pub struct Model {
     pub berat: i32,
     pub total_nilai: i32,
     pub status: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub catatan: Option<String>,
     pub kategori_id: i32,
     pub wilayah_id: i32,
     pub input_by: i32,
