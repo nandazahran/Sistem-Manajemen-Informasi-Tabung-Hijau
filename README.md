@@ -46,14 +46,17 @@ Frontend dibangun menggunakan React dan Vite. Pastikan backend di atas sudah ber
 Buka tab terminal baru (jangan matikan terminal backend), dan masuk ke direktori frontend:
 
 ```cd frontend```
+
 2. Install Dependencies
 Install semua package Node.js yang dibutuhkan:
 
 ```npm install```
+
 3. Jalankan Development Server
 Start aplikasi Vite:
 
 ```npm run dev```
+
 4. Buka Aplikasi
 Vite akan memberikan URL lokal. Buka browser dan klik link tersebut:
 👉 http://localhost:5173
