@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State,Json,Request},
+    extract::{Path, State, Json, Request, Query},
     http::{header, StatusCode, HeaderMap},
     middleware::Next,
     response::Response,
@@ -189,6 +189,13 @@ pub struct TransaksiKategoriBiasa {
     pub berat: i32,
     pub total_nilai: i32,
     pub nama_kategori: String,
+}
+
+// Struct untuk Filter Periode Tanggal
+#[derive(Deserialize, ToSchema)]
+pub struct FilterLeaderboard {
+    pub tanggal_mulai: Option<String>,
+    pub tanggal_akhir: Option<String>,
 }
 
 // Fungsi Register yang sudah di-upgrade
@@ -1599,21 +1606,35 @@ pub async fn lihat_dashboard_wilayah(
 #[utoipa::path(
     get,
     path = "/api/dashboard/leaderboard",
+    params(
+        ("tanggal_mulai" = Option<String>, Query, description = "Filter tanggal mulai (YYYY-MM-DD)"),
+        ("tanggal_akhir" = Option<String>, Query, description = "Filter tanggal akhir (YYYY-MM-DD)")
+    ),
     responses((status = 200, description = "Berhasil mengambil data leaderboard KPI")),
     tag = "Dashboard",
     security(("jwt_auth" = []))
 )]
 pub async fn lihat_leaderboard(
     State(db): State<DatabaseConnection>,
+    Query(filter): Query<FilterLeaderboard>,
 ) -> Json<serde_json::Value> {
     // Ambil seluruh transaksi gabungan dengan wilayah
-    let semua_transaksi = transaksi_sampah::Entity::find()
+    let mut query = transaksi_sampah::Entity::find()
         .column_as(kategori_sampah::Column::NamaKategori, "nama_kategori")
         .column_as(wilayah::Column::Nama, "nama_wilayah")
         .column_as(user::Column::Nama, "nama_petugas")
         .join(JoinType::InnerJoin, transaksi_sampah::Relation::KategoriSampah.def())
         .join(JoinType::InnerJoin, transaksi_sampah::Relation::Wilayah.def())
-        .join(JoinType::InnerJoin, transaksi_sampah::Relation::User.def())
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::User.def());
+
+    // Terapkan Filter Tanggal (Per 2 Bulan / Sesuai Periode Frontend)
+    if let (Some(mulai), Some(akhir)) = (filter.tanggal_mulai, filter.tanggal_akhir) {
+        let start = format!("{} 00:00:00", mulai);
+        let end = format!("{} 23:59:59", akhir);
+        query = query.filter(transaksi_sampah::Column::Tanggal.between(start, end));
+    }
+
+    let semua_transaksi = query
         .into_model::<TransaksiLengkap>()
         .all(&db)
         .await
