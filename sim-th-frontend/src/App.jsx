@@ -12,6 +12,8 @@ import BukuTabunganPage from './pages/BukuTabunganPage'
 import LeaderboardPage from './pages/LeaderboardPage'
 import LaporanPage from './pages/LaporanPage'
 import ProfilPage from './pages/ProfilPage'
+import NotifikasiPage from './pages/NotifikasiPage';
+import AktivitasPage from './pages/AktivitasPage';
 
 function App() {
   return (
@@ -29,6 +31,8 @@ function App() {
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/laporan" element={<LaporanPage />} />
         <Route path="/profil" element={<ProfilPage />} />
+        <Route path="/notifikasi" element={<NotifikasiPage />} />
+        <Route path="/aktivitas" element={<AktivitasPage />} />
       </Routes>
     </Router>
   )
