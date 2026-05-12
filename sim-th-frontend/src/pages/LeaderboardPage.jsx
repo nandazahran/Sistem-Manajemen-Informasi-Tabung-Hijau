@@ -136,10 +136,9 @@ function LeaderboardPage() {
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg> Cara Menghitung Poin KPI
         </h3>
         <ul className="text-sm text-[#0B4D1E]/80 space-y-2 font-medium">
-          <li>• Total berat sampah yang dikumpulkan (40%)</li>
-          <li>• Nilai ekonomi yang dihasilkan (30%)</li>
-          <li>• Konsistensi pencatatan transaksi (20%)</li>
-          <li>• Keanekaragaman kategori sampah (10%)</li>
+          <li>• Total input berat sampah secara relatif (Maksimal 40 Poin)</li>
+          <li>• Total nilai ekonomi/pendapatan secara relatif (Maksimal 30 Poin)</li>
+          <li>• Kualitas pemilahan sampah: Bersih/Terpilah (Maksimal 30 Poin)</li>
         </ul>
       </div>
     </DashboardLayout>

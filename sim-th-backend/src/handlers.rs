@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use bcrypt::{hash, verify, DEFAULT_COST}; // Tambahkan alat bcrypt
 use jsonwebtoken::{encode, EncodingKey, Header, decode, DecodingKey, Validation}; // Alat pembuat JWT
-use chrono::{Utc, Duration}; // Jam digital untuk masa berlaku token
+use chrono::{Utc, Duration, Datelike}; // Jam digital untuk masa berlaku token
 use totp_rs::{Algorithm, Secret, TOTP};
 use lettre::{Message, AsyncTransport, AsyncSmtpTransport, Tokio1Executor};
 use lettre::message::header::ContentType;
@@ -125,6 +125,7 @@ pub struct InputTransaksi {
     pub kategori_id: i32,
     pub wilayah_id: i32,
     pub berat_gram: i32, 
+    pub poin_kualitas: i32, // Tangkap skor 30, 25, 15, dll dari Frontend
     pub catatan: Option<String>,
 }
 
@@ -144,6 +145,7 @@ pub struct TransaksiLengkap {
     pub status: String,
     pub nama_kategori: String, // Diambil dari tabel kategori
     pub nama_wilayah: String,  // Diambil dari tabel wilayah
+    pub poin_kualitas: i32,    // Tambahan kolom skor
     pub nama_petugas: String,  // Diambil dari tabel user
     pub catatan: Option<String>, // Tambahan kolom catatan
 }
@@ -1163,6 +1165,7 @@ pub async fn tambah_transaksi(
         status: Set("Selesai".to_string()),
         kategori_id: Set(payload.kategori_id),
         wilayah_id: Set(payload.wilayah_id),
+        poin_kualitas: Set(payload.poin_kualitas), // Simpan poinnya
         catatan: Set(payload.catatan), 
         input_by: Set(petugas.id), 
         ..Default::default()
@@ -1512,6 +1515,39 @@ pub async fn lihat_dashboard_wilayah(
         serde_json::json!({ "nama_kategori": nama, "total_berat_gram": b, "total_rupiah": n })
     }).collect();
 
+    // 1.8. Hitung Grafik Aktivitas Bulanan (Berdasarkan Bulan dari Tanggal Transaksi)
+    let semua_trx_wilayah = transaksi_sampah::Entity::find()
+        .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id))
+        .all(&db)
+        .await
+        .unwrap_or_default();
+
+    let mut data_bulanan = vec![
+        serde_json::json!({"bulan": "Jan", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Feb", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Mar", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Apr", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Mei", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Jun", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Jul", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Ags", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Sep", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Okt", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Nov", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Des", "berat": 0, "rupiah": 0}),
+    ];
+
+    for trx in semua_trx_wilayah {
+        let bulan_idx = trx.tanggal.month() as usize - 1; 
+        if let Some(obj) = data_bulanan[bulan_idx].as_object_mut() {
+            let berat_lama = obj.get("berat").unwrap().as_i64().unwrap();
+            let rupiah_lama = obj.get("rupiah").unwrap().as_i64().unwrap();
+            
+            obj.insert("berat".to_string(), serde_json::json!(berat_lama + trx.berat as i64));
+            obj.insert("rupiah".to_string(), serde_json::json!(rupiah_lama + trx.total_nilai as i64));
+        }
+    }
+
     // 2. Hitung agregasi KHUSUS untuk wilayah ini saja
     let query = transaksi_sampah::Entity::find()
         .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id)) // INI KUNCI FILTERNYA!
@@ -1537,7 +1573,8 @@ pub async fn lihat_dashboard_wilayah(
                     "total_rupiah": rupiah,
                     "jumlah_transaksi": data.jumlah_transaksi
                 },
-                "breakdown_kategori": breakdown_list
+                "breakdown_kategori": breakdown_list,
+                "grafik_bulanan": data_bulanan
             }))
         },
         Ok(None) => Json(serde_json::json!({
@@ -1548,7 +1585,8 @@ pub async fn lihat_dashboard_wilayah(
                 "total_rupiah": 0,
                 "jumlah_transaksi": 0
             },
-            "breakdown_kategori": []
+            "breakdown_kategori": [],
+            "grafik_bulanan": data_bulanan
         })),
         Err(e) => Json(serde_json::json!({
             "status": "error",
@@ -1581,28 +1619,50 @@ pub async fn lihat_leaderboard(
         .await
         .unwrap_or_default();
     
-    let mut rekap_wilayah: HashMap<String, (i64, i64, i64)> = HashMap::new();
+    // Menyimpan agregasi data: (total_berat, total_nilai, total_poin_kualitas, jumlah_transaksi)
+    let mut rekap_wilayah: HashMap<String, (i64, i64, i64, i64)> = HashMap::new();
     
     for t in semua_transaksi {
-        let entry = rekap_wilayah.entry(t.nama_wilayah).or_insert((0, 0, 0));
+        let entry = rekap_wilayah.entry(t.nama_wilayah).or_insert((0, 0, 0, 0));
         entry.0 += t.berat as i64;
         entry.1 += t.total_nilai as i64;
-        entry.2 += 1; // jumlah transaksi
+        entry.2 += t.poin_kualitas as i64;
+        entry.3 += 1;
     }
     
-    let mut leaderboard: Vec<LeaderboardItem> = rekap_wilayah.into_iter().map(|(nama, (berat, nilai, trx))| {
-        // Formula KPI (Sesuai UI): Berat(40%) + Nilai Ekonomi(30%) + Konsistensi/Trx(10%)
-        let poin = (berat / 1000 * 40) + (nilai / 1000 * 30) + (trx * 10);
+    // Cari nilai tertinggi untuk KPI 2 dan KPI 3 sebagai pembanding relatif
+    let mut max_berat = 0;
+    let mut max_nilai = 0;
+    for &(berat, nilai, _, _) in rekap_wilayah.values() {
+        if berat > max_berat { max_berat = berat; }
+        if nilai > max_nilai { max_nilai = nilai; }
+    }
+    
+    let mut leaderboard: Vec<LeaderboardItem> = rekap_wilayah.into_iter().map(|(nama, (berat, nilai, tot_kualitas, jml_trx))| {
+        
+        // KPI 1: Rata-Rata Kualitas Pemilahan Sampah
+        let kpi_1 = if jml_trx > 0 { tot_kualitas as f64 / jml_trx as f64 } else { 0.0 };
+
+        // KPI 2: Total Input Sampah Relatif (Maks 40)
+        let kpi_2 = if max_berat > 0 { (berat as f64 / max_berat as f64) * 40.0 } else { 0.0 };
+
+        // KPI 3: Total Nilai Ekonomi Relatif (Maks 30)
+        let kpi_3 = if max_nilai > 0 { (nilai as f64 / max_nilai as f64) * 30.0 } else { 0.0 };
+
+        // Total Skor Akhir (Maks 100 poin)
+        let total_skor = (kpi_1 + kpi_2 + kpi_3).round() as i64;
+
         LeaderboardItem {
             peringkat: 0,
             nama_wilayah: nama,
-            poin_kpi: poin,
+            poin_kpi: total_skor,
             total_berat_gram: berat,
             total_rupiah: nilai,
         }
     }).collect();
     
-    leaderboard.sort_by(|a, b| b.poin_kpi.cmp(&a.poin_kpi));
+    // Urutkan berdasarkan Poin tertinggi. Jika Seri, urutkan dari Berat sampah terbanyak.
+    leaderboard.sort_by(|a, b| b.poin_kpi.cmp(&a.poin_kpi).then(b.total_berat_gram.cmp(&a.total_berat_gram)));
     for (i, item) in leaderboard.iter_mut().enumerate() { item.peringkat = i + 1; }
     
     Json(serde_json::json!({ "status": "sukses", "data": leaderboard }))
