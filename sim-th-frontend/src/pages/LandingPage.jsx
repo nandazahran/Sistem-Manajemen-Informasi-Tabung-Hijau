@@ -123,7 +123,7 @@ function LandingPage() {
           </div>
 
           {/* UDAH DIBIKIN MELENGKUNG (rounded-3xl) dan WARNA KREM */}
-          <div data-aos="zoom-in-up" className="max-w-5xl mx-auto bg-[#F5EFE6] rounded-3xl p-10 md:p-14 shadow-2xl flex flex-col md:flex-row gap-16 border border-white/50">
+          <div data-aos="zoom-in-up" className="max-w-5xl mx-auto bg-[#FFFFFF] rounded-3xl p-10 md:p-14 shadow-2xl flex flex-col md:flex-row gap-16 border border-white/50">
             <div className="md:w-1/2">
               <h3 className="text-2xl font-extrabold text-[#0B4D1E] mb-8">Contact Information</h3>
               <div className="bg-white p-6 rounded-2xl shadow-sm flex items-center gap-4 mb-10 border border-gray-100">
