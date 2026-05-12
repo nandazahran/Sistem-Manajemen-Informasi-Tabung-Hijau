@@ -1,5 +1,5 @@
 # 🌿 Setup Project Tabung Hijau
-Dokumen ini berisi panduan foolproof untuk menjalankan project Tabung Hijau secara lokal untuk keperluan testing.
+Dokumen ini berisi panduan untuk menjalankan project Tabung Hijau secara lokal untuk keperluan testing.
 
 Agar proses testing lancar di OS apapun (Windows, Mac, Linux) tanpa perlu install toolchain Rust atau konfigurasi database secara manual, bagian Backend & Database dijalankan sepenuhnya menggunakan Docker. Sementara untuk Frontend, kita menggunakan standar Node.js (Vite + React).
 
@@ -64,7 +64,7 @@ Vite akan memberikan URL lokal. Buka browser dan klik link tersebut:
 Frontend sekarang sudah jalan dan otomatis terhubung ke Backend!
 
 ## 🛑 Langkah 4: Mematikan Server
-Jika proses testing dari kelompok kalian sudah selesai, jangan hanya menutup aplikasi Docker atau terminalnya.
+Jika proses testing sudah selesai, jangan hanya menutup aplikasi Docker atau terminalnya.
 
 Matikan container dengan aman agar RAM dan port kalian kembali bersih dengan perintah ini di folder `sim-th-backend`:
 
