@@ -1,21 +1,72 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 
 function InputTransaksiPage() {
   const [kategori, setKategori] = useState('');
   const [berat, setBerat] = useState('');
-  const [tanggal, setTanggal] = useState('');
   const [catatan, setCatatan] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  const [kategoriList, setKategoriList] = useState([]);
+  const [wilayahDeteksi, setWilayahDeteksi] = useState('Memuat wilayah...');
+  const [wilayahIdDeteksi, setWilayahIdDeteksi] = useState(null);
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        // Ambil Data Kategori dari Backend
+        const resKat = await fetch(`${import.meta.env.VITE_API_URL}/kategori`, { headers });
+        const dataKat = await resKat.json();
+        if (dataKat.status === 'sukses') setKategoriList(dataKat.data);
+
+        // Ambil Wilayah dari Backend berdasarkan token user
+        const resWil = await fetch(`${import.meta.env.VITE_API_URL}/wilayah`, { headers });
+        const dataWil = await resWil.json();
+        if (dataWil.status === 'sukses' && dataWil.data.length > 0) {
+          setWilayahDeteksi(dataWil.data[0].nama);
+          setWilayahIdDeteksi(dataWil.data[0].id);
+        }
+      } catch (err) {
+        console.error("Gagal menarik data awal:", err);
+      }
+    };
+    fetchInitialData();
+  }, []);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
-      alert(`Transaksi ${kategori} seberat ${berat}kg berhasil disimpan!`);
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const payload = {
+        kategori_id: parseInt(kategori),
+        wilayah_id: wilayahIdDeteksi,
+        berat_gram: parseFloat(berat) * 1000,
+        poin_kualitas: 30, // Default maksimal: Sampah Bersih
+        catatan: catatan || "Pencatatan standar"
+      };
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/transaksi`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      
+      if (data.status === 'sukses') {
+        alert(data.pesan);
+        setKategori(''); setBerat(''); setCatatan('');
+      } else {
+        alert(`Gagal: ${data.pesan}`);
+      }
+    } catch (err) {
+      alert('Koneksi gagal saat menyimpan transaksi.');
+    } finally {
       setIsLoading(false);
-      setKategori(''); setBerat(''); setTanggal(''); setCatatan('');
-    }, 1000);
+    }
   };
 
   return (
@@ -40,9 +91,9 @@ function InputTransaksiPage() {
               <div className="relative">
                 <select value={kategori} onChange={(e) => setKategori(e.target.value)} required className="w-full bg-[#F5EFE6] border-none px-5 py-4 pr-12 rounded-2xl focus:ring-2 focus:ring-[#0B4D1E] appearance-none font-bold text-[#0B4D1E] cursor-pointer outline-none transition-all">
                   <option value="" disabled className="text-gray-400 font-normal">Pilih kategori...</option>
-                  <option value="Plastik">Plastik</option>
-                  <option value="Kertas">Kertas</option>
-                  <option value="Logam">Logam</option>
+                  {kategoriList.map(kat => (
+                    <option key={kat.id} value={kat.id}>{kat.nama_kategori} (Rp {kat.harga_per_kg}/kg)</option>
+                  ))}
                 </select>
                 {/* Ikon Panah */}
                 <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none text-[#0B4D1E]">
@@ -58,13 +109,8 @@ function InputTransaksiPage() {
 
             <div>
               <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Wilayah</label>
-              <input type="text" value="BEM FATETA" readOnly className="w-full bg-gray-100 text-gray-400 border-none px-5 py-4 rounded-2xl font-bold cursor-not-allowed outline-none" />
+              <input type="text" value={wilayahDeteksi} readOnly className="w-full bg-gray-100 text-gray-400 border-none px-5 py-4 rounded-2xl font-bold cursor-not-allowed outline-none" />
               <p className="text-[11px] text-gray-400 mt-2 font-medium">Wilayah Anda terdeteksi otomatis</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Tanggal Transaksi <span className="text-red-500">*</span></label>
-              <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} required className="w-full bg-[#F5EFE6] border-none px-5 py-4 rounded-2xl focus:ring-2 focus:ring-[#0B4D1E] font-bold text-[#0B4D1E] outline-none transition-all cursor-pointer" />
             </div>
 
             <div>

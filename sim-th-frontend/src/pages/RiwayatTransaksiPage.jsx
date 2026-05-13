@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 
 function RiwayatTransaksiPage() {
@@ -12,12 +12,44 @@ function RiwayatTransaksiPage() {
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const bulanList = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
 
-  const riwayatData = [
-    { id: 1, tanggal: '9 Mei 2026', kategori: 'Plastik', berat: '25 kg', nilai: 'Rp 50.000', status: 'Selesai', catatan: 'Botol plastik bersih' },
-    { id: 2, tanggal: '8 Mei 2026', kategori: 'Kertas', berat: '15 kg', nilai: 'Rp 25.000', status: 'Selesai', catatan: 'Kertas HVS bekas print' },
-    { id: 3, tanggal: '7 Mei 2026', kategori: 'Logam', berat: '10 kg', nilai: 'Rp 75.000', status: 'Selesai', catatan: 'Kaleng minuman' },
-    { id: 4, tanggal: '6 Mei 2026', kategori: 'Plastik', berat: '30 kg', nilai: 'Rp 60.000', status: 'Selesai', catatan: 'Gelas plastik campur' },
-  ];
+  const [riwayatData, setRiwayatData] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchRiwayat = async () => {
+      setIsLoading(true);
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/transaksi`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const resData = await response.json();
+        if (resData.status === 'sukses') {
+          setRiwayatData(resData.data.sort((a, b) => b.id - a.id));
+        }
+      } catch (error) {
+        console.error("Gagal mengambil riwayat transaksi", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchRiwayat();
+  }, []);
+
+  const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+
+  // Filter data
+  const filteredData = riwayatData.filter(item => {
+    const matchSearch = search === '' || 
+                        item.nama_kategori.toLowerCase().includes(search.toLowerCase()) || 
+                        (item.catatan && item.catatan.toLowerCase().includes(search.toLowerCase()));
+    const matchKategori = filterKategori === '' || item.nama_kategori === filterKategori;
+    return matchSearch && matchKategori;
+  });
+
+  const totalTransaksi = filteredData.length;
+  const totalBerat = filteredData.reduce((sum, item) => sum + item.berat, 0) / 1000;
+  const totalNilai = filteredData.reduce((sum, item) => sum + item.total_nilai, 0);
 
   return (
     <DashboardLayout>
@@ -47,6 +79,7 @@ function RiwayatTransaksiPage() {
                 <option value="">Semua Kategori</option>
                 <option value="Plastik">Plastik</option>
                 <option value="Kertas">Kertas</option>
+                <option value="Logam">Logam</option>
               </select>
               <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none text-[#0B4D1E]">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -92,7 +125,7 @@ function RiwayatTransaksiPage() {
         <table className="w-full text-left">
           <thead className="bg-[#F5EFE6] text-[#0B4D1E]">
             <tr>
-              <th className="px-8 py-5 font-bold">Tanggal</th>
+              <th className="px-8 py-5 font-bold">Wilayah & Petugas</th>
               <th className="px-8 py-5 font-bold">Kategori</th>
               <th className="px-8 py-5 font-bold">Berat (kg)</th>
               <th className="px-8 py-5 font-bold">Nilai (Rp)</th>
@@ -101,12 +134,17 @@ function RiwayatTransaksiPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {riwayatData.map((item) => (
+            {isLoading ? <tr><td colSpan="6" className="text-center py-8 text-gray-500 font-bold">Memuat data...</td></tr> : 
+             filteredData.length === 0 ? <tr><td colSpan="6" className="text-center py-8 text-gray-500 font-bold">Tidak ada transaksi ditemukan</td></tr> :
+             filteredData.map((item) => (
               <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-8 py-5 text-gray-600 font-medium">{item.tanggal}</td>
-                <td className="px-8 py-5"><span className="bg-[#EAE5DA] text-[#0B4D1E] px-4 py-1.5 rounded-full font-bold text-xs">{item.kategori}</span></td>
-                <td className="px-8 py-5 font-extrabold text-[#0B4D1E]">{item.berat}</td>
-                <td className="px-8 py-5 font-extrabold text-[#0B4D1E]">{item.nilai}</td>
+                <td className="px-8 py-5 text-gray-600 font-medium">
+                  <div className="font-bold text-[#0B4D1E]">{item.nama_wilayah}</div>
+                  <div className="text-xs text-gray-400">Oleh: {item.nama_petugas}</div>
+                </td>
+                <td className="px-8 py-5"><span className="bg-[#EAE5DA] text-[#0B4D1E] px-4 py-1.5 rounded-full font-bold text-xs">{item.nama_kategori}</span></td>
+                <td className="px-8 py-5 font-extrabold text-[#0B4D1E]">{item.berat / 1000}</td>
+                <td className="px-8 py-5 font-extrabold text-[#0B4D1E]">{formatRp(item.total_nilai)}</td>
                 <td className="px-8 py-5"><span className="text-green-600 bg-green-100 px-3 py-1.5 rounded-full font-bold text-xs">{item.status}</span></td>
                 <td className="px-8 py-5 text-center">
                   <button onClick={() => setSelectedTrx(item)} className="text-[#0B4D1E] font-bold hover:text-[#F4A300] transition-colors text-sm underline">Lihat Detail</button>
@@ -121,17 +159,17 @@ function RiwayatTransaksiPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col justify-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
           <p className="text-gray-400 font-medium text-sm mb-1">Total Transaksi</p>
-          <h3 className="text-4xl font-extrabold text-[#0B4D1E]">8</h3>
+          <h3 className="text-4xl font-extrabold text-[#0B4D1E]">{totalTransaksi}</h3>
           <p className="text-xs text-gray-400 mt-2">Semua data</p>
         </div>
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col justify-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
           <p className="text-gray-400 font-medium text-sm mb-1">Total Berat</p>
-          <h3 className="text-4xl font-extrabold text-[#0B4D1E]">138 kg</h3>
+          <h3 className="text-4xl font-extrabold text-[#0B4D1E]">{totalBerat} kg</h3>
           <p className="text-xs text-gray-400 mt-2">Semua data</p>
         </div>
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col justify-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
           <p className="text-gray-400 font-medium text-sm mb-1">Total Nilai</p>
-          <h3 className="text-4xl font-extrabold text-[#0B4D1E]">Rp 366.000</h3>
+          <h3 className="text-4xl font-extrabold text-[#0B4D1E]">{formatRp(totalNilai)}</h3>
           <p className="text-xs text-gray-400 mt-2">Semua data</p>
         </div>
       </div>
@@ -154,20 +192,20 @@ function RiwayatTransaksiPage() {
 
             <div className="space-y-6">
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
-                <p className="text-gray-500 font-medium text-sm">Tanggal Transaksi</p>
-                <p className="font-bold text-[#0B4D1E]">{selectedTrx.tanggal}</p>
+                <p className="text-gray-500 font-medium text-sm">Wilayah Asal</p>
+                <p className="font-bold text-[#0B4D1E]">{selectedTrx.nama_wilayah}</p>
               </div>
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
                 <p className="text-gray-500 font-medium text-sm">Kategori Sampah</p>
-                <span className="bg-[#F5EFE6] text-[#0B4D1E] px-4 py-1.5 rounded-full font-bold text-xs">{selectedTrx.kategori}</span>
+                <span className="bg-[#F5EFE6] text-[#0B4D1E] px-4 py-1.5 rounded-full font-bold text-xs">{selectedTrx.nama_kategori}</span>
               </div>
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
                 <p className="text-gray-500 font-medium text-sm">Berat Sampah</p>
-                <p className="font-extrabold text-[#0B4D1E] text-lg">{selectedTrx.berat}</p>
+                <p className="font-extrabold text-[#0B4D1E] text-lg">{selectedTrx.berat / 1000} kg</p>
               </div>
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
                 <p className="text-gray-500 font-medium text-sm">Nilai Ekonomi</p>
-                <p className="font-extrabold text-[#0B4D1E] text-lg">{selectedTrx.nilai}</p>
+                <p className="font-extrabold text-[#0B4D1E] text-lg">{formatRp(selectedTrx.total_nilai)}</p>
               </div>
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
                 <p className="text-gray-500 font-medium text-sm">Status</p>
