@@ -78,7 +78,7 @@ function DashboardPage() {
         setAktivitas(myTrx.slice(0, 2).map(t => ({
           judul: `Transaksi ${t.nama_kategori} ditambahkan`,
           deskripsi: `+${t.berat/1000}kg dicatat oleh ${t.nama_petugas}`,
-          waktu: 'Baru saja'
+          waktu: new Date(t.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
         })));
 
       } catch (error) {
@@ -90,6 +90,11 @@ function DashboardPage() {
   }, [navigate]);
 
   const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+  const formatTanggalSingkat = (isoString) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
 
   return (
     <DashboardLayout>
@@ -181,7 +186,7 @@ function DashboardPage() {
           <div className="space-y-4">
             {transaksiTerbaru.map((trx, idx) => (
               <div key={idx} className="flex justify-between items-center bg-[#F5EFE6] p-4 rounded-2xl hover:bg-white hover:shadow-md transition-all cursor-pointer border border-transparent hover:border-gray-100">
-                <div><p className="font-bold text-[#0B4D1E]">{trx.nama_kategori} - {trx.berat / 1000} kg</p><p className="text-xs text-gray-500 mt-1">Oleh: {trx.nama_petugas}</p></div>
+                <div><p className="font-bold text-[#0B4D1E]">{trx.nama_kategori} - {trx.berat / 1000} kg</p><p className="text-xs text-gray-500 mt-1">{formatTanggalSingkat(trx.tanggal)} • Oleh: {trx.nama_petugas}</p></div>
                 <div className="font-extrabold text-[#0B4D1E]">{formatRp(trx.total_nilai)}</div>
               </div>
             ))}

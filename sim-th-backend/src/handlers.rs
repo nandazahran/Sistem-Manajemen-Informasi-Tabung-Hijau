@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use bcrypt::{hash, verify, DEFAULT_COST}; // Tambahkan alat bcrypt
 use jsonwebtoken::{encode, EncodingKey, Header, decode, DecodingKey, Validation}; // Alat pembuat JWT
-use chrono::{Utc, Duration, Datelike}; // Jam digital untuk masa berlaku token
+use chrono::{Utc, Duration, Datelike, NaiveDateTime}; // Jam digital untuk masa berlaku token
 use totp_rs::{Algorithm, Secret, TOTP};
 use lettre::{Message, AsyncTransport, AsyncSmtpTransport, Tokio1Executor};
 use lettre::message::header::ContentType;
@@ -103,6 +103,7 @@ pub struct InputResetPasswordEmail {
 pub struct InputUpdateUser {
     pub nama: String,
     pub status: String,
+    pub telepon: Option<String>,
 }
 
 // Struct untuk Ubah Password dari Halaman Profil
@@ -127,6 +128,7 @@ pub struct InputTransaksi {
     pub berat_gram: i32, 
     pub poin_kualitas: i32, // Tangkap skor 30, 25, 15, dll dari Frontend
     pub catatan: Option<String>,
+    pub tanggal: Option<String>, // Tambahan field Tanggal
 }
 
 // Struct untuk menerima request penarikan saldo
@@ -148,6 +150,8 @@ pub struct TransaksiLengkap {
     pub poin_kualitas: i32,    // Tambahan kolom skor
     pub nama_petugas: String,  // Diambil dari tabel user
     pub catatan: Option<String>, // Tambahan kolom catatan
+    #[schema(value_type = String)]
+    pub tanggal: NaiveDateTime, 
 }
 
 // Ganti tipe data i32 menjadi Option<i64> dan i64
@@ -189,6 +193,7 @@ pub struct TransaksiKategoriBiasa {
     pub berat: i32,
     pub total_nilai: i32,
     pub nama_kategori: String,
+    pub tanggal: NaiveDateTime, // Tambahan kolom tanggal
 }
 
 // Struct untuk Filter Periode Tanggal
@@ -329,7 +334,8 @@ pub async fn lihat_user(
                     "id": u.id,
                     "username": u.username,
                     "nama": u.nama,
-                    "role": u.role
+                    "role": u.role,
+                    "telepon": u.telepon
                 })
             }).collect();
 
@@ -386,6 +392,7 @@ pub async fn update_user(
             // Update nama dan status
             data_aktif.nama = Set(payload.nama.clone()); 
             data_aktif.status = Set(payload.status.clone()); 
+            data_aktif.telepon = Set(payload.telepon.clone()); 
 
             match data_aktif.update(&db).await {
                 Ok(_) => (
@@ -1277,6 +1284,14 @@ pub async fn tambah_transaksi(
     // --- TAHAP 3: KALKULASI INTEGER MURNI ---
     let kalkulasi_total_nilai = (payload.berat_gram * kategori.harga_per_kg) / 1000;
 
+    // --- TAHAP 3.5: PARSING TANGGAL TRANSAKSI ---
+    let tanggal_parsed = if let Some(ref tgl) = payload.tanggal {
+        chrono::NaiveDateTime::parse_from_str(&format!("{} 00:00:00", tgl), "%Y-%m-%d %H:%M:%S")
+            .unwrap_or_else(|_| Utc::now().naive_utc())
+    } else {
+        Utc::now().naive_utc()
+    };
+
     // --- TAHAP 4: SIMPAN KE BRANKAS ---
     let transaksi_baru = transaksi_sampah::ActiveModel {
         berat: Set(payload.berat_gram),
@@ -1287,6 +1302,7 @@ pub async fn tambah_transaksi(
         poin_kualitas: Set(payload.poin_kualitas), // Simpan poinnya
         catatan: Set(payload.catatan), 
         input_by: Set(petugas.id), 
+        tanggal: Set(tanggal_parsed), // Simpan tanggal manual
         ..Default::default()
     };
 
@@ -1952,7 +1968,8 @@ pub async fn lihat_aktivitas_terbaru(
         "judul": format!("Transaksi {} berhasil ditambahkan", t.nama_kategori.to_lowercase()),
         "deskripsi": format!("+{}kg {} dicatat ke sistem", t.berat / 1000, t.nama_kategori.to_lowercase()),
         "tipe": "transaksi",
-        "waktu": "Baru saja" 
+        "waktu": t.tanggal.format("%d %b %Y").to_string(),
+        "tanggal": t.tanggal
     })).collect();
 
     Json(serde_json::json!({ "status": "sukses", "data": aktivitas }))

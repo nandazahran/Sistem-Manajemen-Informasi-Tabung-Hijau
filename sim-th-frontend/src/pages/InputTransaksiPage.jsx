@@ -5,6 +5,7 @@ function InputTransaksiPage() {
   const [kategori, setKategori] = useState('');
   const [berat, setBerat] = useState('');
   const [catatan, setCatatan] = useState('');
+  const [tanggal, setTanggal] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
   const [kategoriList, setKategoriList] = useState([]);
@@ -46,7 +47,8 @@ function InputTransaksiPage() {
         wilayah_id: wilayahIdDeteksi,
         berat_gram: parseFloat(berat) * 1000,
         poin_kualitas: 30, // Default maksimal: Sampah Bersih
-        catatan: catatan || "Pencatatan standar"
+        catatan: catatan || "Pencatatan standar",
+        tanggal: tanggal || new Date().toISOString().split('T')[0] // Kirim Tgl Jika ada, jika tidak, hari ini
       };
 
       const res = await fetch(`${import.meta.env.VITE_API_URL}/transaksi`, {
@@ -58,7 +60,7 @@ function InputTransaksiPage() {
       
       if (data.status === 'sukses') {
         alert(data.pesan);
-        setKategori(''); setBerat(''); setCatatan('');
+        setKategori(''); setBerat(''); setCatatan(''); setTanggal('');
       } else {
         alert(`Gagal: ${data.pesan}`);
       }
@@ -111,6 +113,11 @@ function InputTransaksiPage() {
               <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Wilayah</label>
               <input type="text" value={wilayahDeteksi} readOnly className="w-full bg-gray-100 text-gray-400 border-none px-5 py-4 rounded-2xl font-bold cursor-not-allowed outline-none" />
               <p className="text-[11px] text-gray-400 mt-2 font-medium">Wilayah Anda terdeteksi otomatis</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Tanggal Transaksi <span className="text-red-500">*</span></label>
+              <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} required className="w-full bg-[#F5EFE6] border-none px-5 py-4 rounded-2xl focus:ring-2 focus:ring-[#0B4D1E] font-bold text-[#0B4D1E] outline-none transition-all cursor-pointer" />
             </div>
 
             <div>

@@ -67,7 +67,8 @@ function ProfilPage() {
               ...prev,
               nama: myUser.nama,
               organisasi: formatRole(myUser.role),
-              username: myUser.username
+              username: myUser.username,
+              telepon: myUser.telepon || 'Belum diatur'
             }));
           }
         }
@@ -92,7 +93,11 @@ function ProfilPage() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ nama: formData.nama, status: "Aktif" }) // Menembak endpoint update profil
+        body: JSON.stringify({ 
+          nama: formData.nama, 
+          status: "Aktif",
+          telepon: formData.telepon !== 'Belum diatur' ? formData.telepon : null
+        })
       });
       const data = await res.json();
       

@@ -28,6 +28,12 @@ function AktivitasPage() {
     fetchAktivitas();
   }, []);
 
+  const formatTanggalWaktu = (isoString) => {
+    if (!isoString) return '-';
+    const date = new Date(isoString);
+    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
     <DashboardLayout>
       <div className="bg-[#0B4D1E] rounded-3xl p-10 flex items-center gap-4 text-white shadow-sm mt-2 mb-8">
@@ -84,7 +90,7 @@ function AktivitasPage() {
                 <div>
                   <p className="font-bold text-[#0B4D1E] text-base">Transaksi {akt.nama_kategori} berhasil dicatat</p>
                   <p className="text-sm text-gray-500 font-medium mt-1">+{akt.berat / 1000}kg ditambahkan oleh {akt.nama_petugas}</p>
-                  <p className="text-xs text-gray-400 mt-2">Wilayah {akt.nama_wilayah}</p>
+                  <p className="text-xs text-gray-400 mt-2">{formatTanggalWaktu(akt.tanggal)} • Wilayah {akt.nama_wilayah}</p>
                 </div>
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               </div>

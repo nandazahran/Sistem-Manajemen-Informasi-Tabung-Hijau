@@ -38,6 +38,12 @@ function RiwayatTransaksiPage() {
 
   const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
 
+  const formatTanggal = (isoString) => {
+    if (!isoString) return '-';
+    const date = new Date(isoString);
+    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
   // Filter data
   const filteredData = riwayatData.filter(item => {
     const matchSearch = search === '' || 
@@ -125,7 +131,7 @@ function RiwayatTransaksiPage() {
         <table className="w-full text-left">
           <thead className="bg-[#F5EFE6] text-[#0B4D1E]">
             <tr>
-              <th className="px-8 py-5 font-bold">Wilayah & Petugas</th>
+              <th className="px-8 py-5 font-bold">Tanggal & Wilayah</th>
               <th className="px-8 py-5 font-bold">Kategori</th>
               <th className="px-8 py-5 font-bold">Berat (kg)</th>
               <th className="px-8 py-5 font-bold">Nilai (Rp)</th>
@@ -139,8 +145,8 @@ function RiwayatTransaksiPage() {
              filteredData.map((item) => (
               <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-8 py-5 text-gray-600 font-medium">
-                  <div className="font-bold text-[#0B4D1E]">{item.nama_wilayah}</div>
-                  <div className="text-xs text-gray-400">Oleh: {item.nama_petugas}</div>
+                  <div className="font-bold text-[#0B4D1E]">{formatTanggal(item.tanggal)}</div>
+                  <div className="text-xs text-gray-400">{item.nama_wilayah} (Oleh: {item.nama_petugas})</div>
                 </td>
                 <td className="px-8 py-5"><span className="bg-[#EAE5DA] text-[#0B4D1E] px-4 py-1.5 rounded-full font-bold text-xs">{item.nama_kategori}</span></td>
                 <td className="px-8 py-5 font-extrabold text-[#0B4D1E]">{item.berat / 1000}</td>
@@ -192,8 +198,8 @@ function RiwayatTransaksiPage() {
 
             <div className="space-y-6">
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
-                <p className="text-gray-500 font-medium text-sm">Wilayah Asal</p>
-                <p className="font-bold text-[#0B4D1E]">{selectedTrx.nama_wilayah}</p>
+                <p className="text-gray-500 font-medium text-sm">Tanggal & Wilayah</p>
+                <p className="font-bold text-[#0B4D1E]">{formatTanggal(selectedTrx.tanggal)} • {selectedTrx.nama_wilayah}</p>
               </div>
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
                 <p className="text-gray-500 font-medium text-sm">Kategori Sampah</p>
