@@ -14,7 +14,8 @@ function DashboardPage() {
   const [top3, setTop3] = useState([]);
   const [transaksiTerbaru, setTransaksiTerbaru] = useState([]);
   const [aktivitas, setAktivitas] = useState([]);
-  const [namaWilayah, setNamaWilayah] = useState('Memuat...');
+  const [namaLengkap, setNamaLengkap] = useState('Memuat...');
+  const [grafikBulanan, setGrafikBulanan] = useState([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -55,7 +56,6 @@ function DashboardPage() {
         const wilayahName = myTrx.length > 0 
             ? myTrx[0].nama_wilayah 
             : (username === 'bem_km' ? 'BEM KM IPB' : username.toUpperCase().replace('_', ' '));
-        setNamaWilayah(wilayahName);
 
         // Cari Rank berdasarkan nama wilayah dari Leaderboard
         let rank = '-';
@@ -73,6 +73,26 @@ function DashboardPage() {
 
         setTop3(leaderboard.slice(0, 3));
         setTransaksiTerbaru(myTrx.slice(0, 4));
+
+        // Setup Grafik Bulanan berdasarkan riwayat transaksi yang ditarik
+        const bulanList = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+        const bulanan = Array(12).fill(0).map((_, i) => ({ bulan: bulanList[i], berat: 0 }));
+        myTrx.forEach(t => {
+          if (t.tanggal) {
+            const m = new Date(t.tanggal).getMonth();
+            bulanan[m].berat += t.berat;
+          }
+        });
+        setGrafikBulanan(bulanan);
+
+        // Tentukan Nama Lengkap User (bukan username) untuk ditaruh di sapaan Selamat Datang
+        const resUser = await fetch(`${import.meta.env.VITE_API_URL}/users`, { headers });
+        const dataUser = await resUser.json();
+        if (dataUser.status === 'sukses') {
+           const myUser = dataUser.data.find(u => u.username === username);
+           if (myUser) setNamaLengkap(myUser.nama);
+           else setNamaLengkap(username.toUpperCase());
+        }
 
         // Set Aktivitas Terbaru (Maksimal 2 item untuk menyesuaikan layout)
         setAktivitas(myTrx.slice(0, 2).map(t => ({
@@ -100,7 +120,7 @@ function DashboardPage() {
     <DashboardLayout>
       <div className="bg-gradient-to-r from-[#F5EFE6] via-[#F5EFE6] to-[#8FA57A]/30 rounded-3xl p-12 flex items-center justify-between shadow-sm relative overflow-hidden mt-2 border border-white/60">
         <div className="z-10 max-w-xl">
-          <h2 className="text-4xl font-extrabold text-[#0B4D1E] mb-4">Selamat Datang, {namaWilayah} <span className="text-green-600">🌱</span></h2>
+          <h2 className="text-4xl font-extrabold text-[#0B4D1E] mb-4">Selamat Datang, {namaLengkap} <span className="text-green-600">🌱</span></h2>
           <p className="text-gray-700 font-medium text-lg mb-8">Kelola transaksi sampah wilayah dengan lebih terstruktur dan transparan.</p>
           {/* Link ke Input Transaksi */}
           <Link to="/input-transaksi" className="inline-flex bg-[#F4A300] text-white px-8 py-4 rounded-full font-bold items-center gap-2 hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
@@ -138,8 +158,24 @@ function DashboardPage() {
         <div onClick={() => navigate('/laporan')} className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 lg:col-span-2 hover:-translate-y-1 transition-transform duration-300 cursor-pointer group">
           <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-1 group-hover:text-[#F4A300] transition-colors">Aktivitas Bulanan <span className="text-sm font-normal text-gray-400 ml-2">(Klik untuk detail)</span></h3>
           <p className="text-gray-500 text-sm mb-6">Pengumpulan sampah per bulan (kg)</p>
-          <div className="w-full h-64 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex items-center justify-center">
-            <p className="text-gray-400 font-medium">Grafik Line Chart</p>
+          
+          {/* GRAFIK BAR INTERAKTIF */}
+          <div className="w-full h-64 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex items-end justify-between p-4 gap-2">
+            {grafikBulanan.map((g, i) => {
+               const maxBerat = Math.max(...grafikBulanan.map(x => x.berat), 1);
+               const heightPct = Math.max((g.berat / maxBerat) * 100, 2); // minimal 2% tinggi biar tetap kelihatan bar-nya
+               return (
+                 <div key={i} className="flex flex-col items-center justify-end w-full h-full gap-2 group">
+                   <div className="w-full bg-[#8FA57A] rounded-t-md relative group-hover:bg-[#F4A300] transition-colors" style={{ height: `${heightPct}%` }}>
+                      {/* Hover Tooltip Angka */}
+                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity z-10">
+                        {g.berat / 1000} kg
+                      </div>
+                   </div>
+                   <span className="text-[10px] text-gray-500 font-bold">{g.bulan}</span>
+                 </div>
+               )
+            })}
           </div>
         </div>
 

@@ -9,8 +9,8 @@ function InputTransaksiPage() {
   const [isLoading, setIsLoading] = useState(false);
   
   const [kategoriList, setKategoriList] = useState([]);
-  const [wilayahDeteksi, setWilayahDeteksi] = useState('Memuat wilayah...');
-  const [wilayahIdDeteksi, setWilayahIdDeteksi] = useState(null);
+  const [wilayahList, setWilayahList] = useState([]);
+  const [wilayahId, setWilayahId] = useState('');
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -23,12 +23,11 @@ function InputTransaksiPage() {
         const dataKat = await resKat.json();
         if (dataKat.status === 'sukses') setKategoriList(dataKat.data);
 
-        // Ambil Wilayah dari Backend berdasarkan token user
-        const resWil = await fetch(`${import.meta.env.VITE_API_URL}/wilayah`, { headers });
+        // Ambil SEMUA wilayah aktif ke dalam dropdown (Khusus BEM KM)
+        const resWil = await fetch(`${import.meta.env.VITE_API_URL}/wilayah/aktif`, { headers });
         const dataWil = await resWil.json();
-        if (dataWil.status === 'sukses' && dataWil.data.length > 0) {
-          setWilayahDeteksi(dataWil.data[0].nama);
-          setWilayahIdDeteksi(dataWil.data[0].id);
+        if (dataWil.status === 'sukses') {
+          setWilayahList(dataWil.data);
         }
       } catch (err) {
         console.error("Gagal menarik data awal:", err);
@@ -44,7 +43,7 @@ function InputTransaksiPage() {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       const payload = {
         kategori_id: parseInt(kategori),
-        wilayah_id: wilayahIdDeteksi,
+        wilayah_id: parseInt(wilayahId),
         berat_gram: parseFloat(berat) * 1000,
         poin_kualitas: 30, // Default maksimal: Sampah Bersih
         catatan: catatan || "Pencatatan standar",
@@ -60,7 +59,7 @@ function InputTransaksiPage() {
       
       if (data.status === 'sukses') {
         alert(data.pesan);
-        setKategori(''); setBerat(''); setCatatan(''); setTanggal('');
+        setKategori(''); setBerat(''); setCatatan(''); setTanggal(''); setWilayahId('');
       } else {
         alert(`Gagal: ${data.pesan}`);
       }
@@ -110,9 +109,18 @@ function InputTransaksiPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Wilayah</label>
-              <input type="text" value={wilayahDeteksi} readOnly className="w-full bg-gray-100 text-gray-400 border-none px-5 py-4 rounded-2xl font-bold cursor-not-allowed outline-none" />
-              <p className="text-[11px] text-gray-400 mt-2 font-medium">Wilayah Anda terdeteksi otomatis</p>
+              <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Wilayah Asal Sampah <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <select value={wilayahId} onChange={(e) => setWilayahId(e.target.value)} required className="w-full bg-[#F5EFE6] border-none px-5 py-4 pr-12 rounded-2xl focus:ring-2 focus:ring-[#0B4D1E] appearance-none font-bold text-[#0B4D1E] cursor-pointer outline-none transition-all">
+                  <option value="" disabled className="text-gray-400 font-normal">Pilih wilayah tujuan...</option>
+                  {wilayahList.map(w => (
+                    <option key={w.id} value={w.id}>{w.nama}</option>
+                  ))}
+                </select>
+                <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none text-[#0B4D1E]">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                </div>
+              </div>
             </div>
 
             <div>

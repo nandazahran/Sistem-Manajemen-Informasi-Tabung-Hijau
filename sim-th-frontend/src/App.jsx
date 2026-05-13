@@ -16,6 +16,7 @@ import NotifikasiPage from './pages/NotifikasiPage';
 import AktivitasPage from './pages/AktivitasPage';
 import OtpPage from './pages/OtpPage';
 import ResetPasswordAuthPage from './pages/ResetPasswordAuthPage';
+import PengaturanDataPage from './pages/PengaturanDataPage';
 
 function App() {
   return (
@@ -37,6 +38,7 @@ function App() {
         <Route path="/aktivitas" element={<AktivitasPage />} />
         <Route path="/otp" element={<OtpPage />} />
         <Route path="/reset-password-auth" element={<ResetPasswordAuthPage />} />
+        <Route path="/pengaturan" element={<PengaturanDataPage />} />
       </Routes>
     </Router>
   )
