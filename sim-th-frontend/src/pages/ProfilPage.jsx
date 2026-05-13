@@ -8,6 +8,7 @@ function ProfilPage() {
   const [userId, setUserId] = useState(null);
   const [formData, setFormData] = useState({
     nama: 'Memuat...',
+    organisasi: 'Memuat...',
     username: 'Memuat...',
     telepon: 'Belum diatur',
     alamat: 'Institut Pertanian Bogor'
@@ -18,6 +19,28 @@ function ProfilPage() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [passData, setPassData] = useState({ current: '', new: '', confirm: '' });
+
+  // Pemetaan label agar rapi seperti di RegisterPage
+  const formatRole = (role) => {
+    const roles = {
+      'bem_km': 'BEM KM IPB',
+      'bem_faperta': 'BEM FAPERTA',
+      'bem_skhb': 'BEM SKHB',
+      'bem_fpik': 'BEM FPIK',
+      'bem_fapet': 'BEM FAPET',
+      'bem_fahutan': 'BEM FAHUTAN',
+      'bem_fateta': 'BEM FATETA',
+      'bem_fmipa': 'BEM FMIPA',
+      'bem_fem': 'BEM FEM',
+      'bem_fema': 'BEM FEMA',
+      'bem_vokasi': 'BEM VOKASI',
+      'bem_sb': 'BEM SB',
+      'bem_fk': 'BEM FK',
+      'bem_ssmi': 'BEM SSMI',
+      'ormawa_ppku': 'Ormawa Eksekutif PPKU'
+    };
+    return roles[role] || (role ? role.toUpperCase() : 'Memuat...');
+  };
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -43,6 +66,7 @@ function ProfilPage() {
             setFormData(prev => ({
               ...prev,
               nama: myUser.nama,
+              organisasi: formatRole(myUser.role),
               username: myUser.username
             }));
           }
@@ -121,7 +145,7 @@ function ProfilPage() {
   };
 
   // Membuat singkatan nama untuk foto profil dinamis (contoh: "BEM FATETA" -> "BF")
-  const initials = formData.nama ? formData.nama.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U';
+  const initials = formData.organisasi !== 'Memuat...' ? formData.organisasi.replace('BEM ', '').replace('Ormawa ', '').substring(0, 2).toUpperCase() : 'U';
 
   return (
     <DashboardLayout>
@@ -134,8 +158,8 @@ function ProfilPage() {
           </div>
         </div>
         <div className="z-10">
-          <h2 className="text-4xl font-extrabold mb-2">{formData.nama}</h2>
-          <p className="text-green-100/80 font-medium mb-4">Kelola informasi akun Anda</p>
+          <h2 className="text-4xl font-extrabold mb-2">{formData.organisasi}</h2>
+          <p className="text-green-100/80 font-medium mb-4">{formData.nama} • Kelola informasi akun Anda</p>
           <span className="bg-white/20 px-4 py-1.5 rounded-full text-xs font-bold backdrop-blur-sm border border-white/30">Role: User Aktif</span>
         </div>
       </div>
@@ -150,13 +174,13 @@ function ProfilPage() {
         </div>
         <div className="space-y-6">
           {Object.keys(formData).map((key) => {
-            const isReadOnly = !isEditing || key === 'username';
+            const isReadOnly = !isEditing || key === 'username' || key === 'organisasi';
             return (
               <div key={key}>
                 <label className="flex items-center gap-2 text-sm font-bold text-gray-500 mb-2 capitalize">
-                  {key} {key === 'nama' ? 'Lengkap / Wilayah' : ''}
+                  {key === 'nama' ? 'Nama Lengkap' : key}
                 </label>
-                <input type="text" value={formData[key]} onChange={(e) => setFormData({...formData, [key]: e.target.value})} readOnly={isReadOnly} className={`w-full px-5 py-4 rounded-2xl font-bold transition-all outline-none ${!isReadOnly ? 'bg-white border-2 border-[#F4A300] text-[#0B4D1E]' : 'bg-[#F5EFE6] border-2 border-transparent text-[#0B4D1E] cursor-not-allowed'}`} />
+                <input type="text" value={formData[key]} onChange={(e) => setFormData({...formData, [key]: e.target.value})} readOnly={isReadOnly} className={`w-full px-5 py-4 rounded-2xl font-bold transition-all outline-none ${(!isReadOnly && key !== 'organisasi') ? 'bg-white border-2 border-[#F4A300] text-[#0B4D1E]' : 'bg-[#F5EFE6] border-2 border-transparent text-[#0B4D1E] cursor-not-allowed'}`} />
               </div>
             );
           })}

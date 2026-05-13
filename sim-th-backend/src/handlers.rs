@@ -328,7 +328,8 @@ pub async fn lihat_user(
                 serde_json::json!({
                     "id": u.id,
                     "username": u.username,
-                    "nama": u.nama
+                    "nama": u.nama,
+                    "role": u.role
                 })
             }).collect();
 
