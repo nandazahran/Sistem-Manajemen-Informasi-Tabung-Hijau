@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State,Json,Request},
+    extract::{Path, State, Json, Request, Query},
     http::{header, StatusCode, HeaderMap},
     middleware::Next,
     response::Response,
@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use bcrypt::{hash, verify, DEFAULT_COST}; // Tambahkan alat bcrypt
 use jsonwebtoken::{encode, EncodingKey, Header, decode, DecodingKey, Validation}; // Alat pembuat JWT
-use chrono::{Utc, Duration}; // Jam digital untuk masa berlaku token
+use chrono::{Utc, Duration, Datelike}; // Jam digital untuk masa berlaku token
 use totp_rs::{Algorithm, Secret, TOTP};
 use lettre::{Message, AsyncTransport, AsyncSmtpTransport, Tokio1Executor};
 use lettre::message::header::ContentType;
@@ -125,6 +125,7 @@ pub struct InputTransaksi {
     pub kategori_id: i32,
     pub wilayah_id: i32,
     pub berat_gram: i32, 
+    pub poin_kualitas: i32, // Tangkap skor 30, 25, 15, dll dari Frontend
     pub catatan: Option<String>,
 }
 
@@ -144,6 +145,7 @@ pub struct TransaksiLengkap {
     pub status: String,
     pub nama_kategori: String, // Diambil dari tabel kategori
     pub nama_wilayah: String,  // Diambil dari tabel wilayah
+    pub poin_kualitas: i32,    // Tambahan kolom skor
     pub nama_petugas: String,  // Diambil dari tabel user
     pub catatan: Option<String>, // Tambahan kolom catatan
 }
@@ -187,6 +189,13 @@ pub struct TransaksiKategoriBiasa {
     pub berat: i32,
     pub total_nilai: i32,
     pub nama_kategori: String,
+}
+
+// Struct untuk Filter Periode Tanggal
+#[derive(Deserialize, ToSchema)]
+pub struct FilterLeaderboard {
+    pub tanggal_mulai: Option<String>,
+    pub tanggal_akhir: Option<String>,
 }
 
 // Fungsi Register yang sudah di-upgrade
@@ -851,6 +860,17 @@ pub async fn aktifkan_totp(
     }
 }
 // Fungsi Tambah Wilayah
+#[utoipa::path(
+    post,
+    path = "/api/wilayah",
+    request_body = InputWilayah,
+    responses(
+        (status = 200, description = "Wilayah berhasil ditambahkan", body = ResponPesan),
+        (status = 500, description = "Gagal menambahkan wilayah", body = ResponPesan)
+    ),
+    tag = "Wilayah",
+    security(("jwt_auth" = []))
+)]
 pub async fn tambah_wilayah(
     State(db): State<DatabaseConnection>,
     Json(payload): Json<InputWilayah>,
@@ -923,6 +943,21 @@ pub async fn lihat_wilayah(
 }
 
 // Fungsi Update Wilayah (PUT)
+#[utoipa::path(
+    put,
+    path = "/api/wilayah/{id}",
+    request_body = InputWilayah,
+    params(
+        ("id" = i32, Path, description = "ID Wilayah yang ingin diupdate")
+    ),
+    responses(
+        (status = 200, description = "Data wilayah berhasil diupdate", body = ResponPesan),
+        (status = 404, description = "Wilayah tidak ditemukan", body = ResponPesan),
+        (status = 500, description = "Terjadi kesalahan pada server/database", body = ResponPesan)
+    ),
+    tag = "Wilayah",
+    security(("jwt_auth" = []))
+)]
 pub async fn update_wilayah(
     State(db): State<DatabaseConnection>,
     Path(wilayah_id): Path<i32>,
@@ -953,6 +988,20 @@ pub async fn update_wilayah(
 }
 
 // 2. Fungsi Hapus Wilayah (DELETE)
+#[utoipa::path(
+    delete,
+    path = "/api/wilayah/{id}",
+    params(
+        ("id" = i32, Path, description = "ID Wilayah yang ingin dihapus")
+    ),
+    responses(
+        (status = 200, description = "Wilayah berhasil dihapus", body = ResponPesan),
+        (status = 404, description = "Wilayah tidak ditemukan", body = ResponPesan),
+        (status = 500, description = "Terjadi kesalahan pada server/database", body = ResponPesan)
+    ),
+    tag = "Wilayah",
+    security(("jwt_auth" = []))
+)]
 pub async fn hapus_wilayah(
     State(db): State<DatabaseConnection>,
     Path(wilayah_id): Path<i32>,
@@ -978,6 +1027,17 @@ pub async fn hapus_wilayah(
 }
 
 // Fungsi Tambah Kategori
+#[utoipa::path(
+    post,
+    path = "/api/kategori",
+    request_body = InputKategori,
+    responses(
+        (status = 200, description = "Kategori berhasil ditambahkan", body = ResponPesan),
+        (status = 500, description = "Gagal menambahkan kategori", body = ResponPesan)
+    ),
+    tag = "Kategori",
+    security(("jwt_auth" = []))
+)]
 pub async fn tambah_kategori(
     State(db): State<DatabaseConnection>,
     Json(payload): Json<InputKategori>,
@@ -1002,6 +1062,16 @@ pub async fn tambah_kategori(
 }
 
 // 2. Fungsi Lihat Semua Kategori
+#[utoipa::path(
+    get,
+    path = "/api/kategori",
+    responses(
+        (status = 200, description = "Berhasil mengambil data kategori", body = serde_json::Value),
+        (status = 500, description = "Gagal mengambil data kategori", body = serde_json::Value)
+    ),
+    tag = "Kategori",
+    security(("jwt_auth" = []))
+)]
 pub async fn lihat_kategori(
     State(db): State<DatabaseConnection>,
 ) -> Json<serde_json::Value> {
@@ -1021,6 +1091,21 @@ pub async fn lihat_kategori(
 }
 
 // Fungsi Update Kategori Sampah (Misal untuk mengubah harga)
+#[utoipa::path(
+    put,
+    path = "/api/kategori/{id}",
+    request_body = InputKategori,
+    params(
+        ("id" = i32, Path, description = "ID Kategori yang ingin diupdate")
+    ),
+    responses(
+        (status = 200, description = "Kategori berhasil diupdate", body = ResponPesan),
+        (status = 404, description = "Kategori tidak ditemukan", body = ResponPesan),
+        (status = 500, description = "Terjadi kesalahan sistem", body = ResponPesan)
+    ),
+    tag = "Kategori",
+    security(("jwt_auth" = []))
+)]
 pub async fn update_kategori(
     State(db): State<DatabaseConnection>,
     Path(kategori_id): Path<i32>,
@@ -1066,6 +1151,20 @@ pub async fn update_kategori(
 }
 
 // 3. Fungsi Hapus Kategori (DELETE)
+#[utoipa::path(
+    delete,
+    path = "/api/kategori/{id}",
+    params(
+        ("id" = i32, Path, description = "ID Kategori yang ingin dihapus")
+    ),
+    responses(
+        (status = 200, description = "Kategori berhasil dihapus", body = ResponPesan),
+        (status = 404, description = "Kategori tidak ditemukan", body = ResponPesan),
+        (status = 500, description = "Terjadi kesalahan sistem", body = ResponPesan)
+    ),
+    tag = "Kategori",
+    security(("jwt_auth" = []))
+)]
 pub async fn hapus_kategori(
     State(db): State<DatabaseConnection>,
     Path(kategori_id): Path<i32>,
@@ -1091,6 +1190,17 @@ pub async fn hapus_kategori(
 }
 
 // 3. Fungsi Tambah Transaksi
+#[utoipa::path(
+    post,
+    path = "/api/transaksi",
+    request_body = InputTransaksi,
+    responses(
+        (status = 200, description = "Transaksi berhasil dicatat", body = ResponPesan),
+        (status = 500, description = "Gagal mencatat transaksi", body = ResponPesan)
+    ),
+    tag = "Transaksi",
+    security(("jwt_auth" = []))
+)]
 pub async fn tambah_transaksi(
     State(db): State<DatabaseConnection>,
     headers: HeaderMap, // Tangkap header untuk membaca JWT
@@ -1122,6 +1232,16 @@ pub async fn tambah_transaksi(
             pesan: "Akses ditolak! Akun di token JWT ini sudah tidak ada di database. Silakan login ulang.".to_string(),
         }),
     };
+
+    // --- TAHAP 1.2: GEMBOK LINTAS WILAYAH (ISOLASI DATA) ---
+    if petugas.role != "bem_km" && petugas.role != "admin" && petugas.role != "dui" {
+        if petugas.wilayah_id != Some(payload.wilayah_id) {
+            return Json(ResponPesan {
+                status: "gagal".to_string(),
+                pesan: "Akses ditolak! Anda tidak diizinkan mencatat setoran untuk wilayah lain.".to_string(),
+            });
+        }
+    }
 
     // --- TAHAP 1.5: GEMBOK KEAMANAN (CEK STATUS WILAYAH) ---
     let pencarian_wilayah = wilayah::Entity::find_by_id(payload.wilayah_id).one(&db).await;
@@ -1163,6 +1283,7 @@ pub async fn tambah_transaksi(
         status: Set("Selesai".to_string()),
         kategori_id: Set(payload.kategori_id),
         wilayah_id: Set(payload.wilayah_id),
+        poin_kualitas: Set(payload.poin_kualitas), // Simpan poinnya
         catatan: Set(payload.catatan), 
         input_by: Set(petugas.id), 
         ..Default::default()
@@ -1212,6 +1333,16 @@ pub async fn tambah_transaksi(
 }
 
 // 1. Fungsi Lihat Transaksi (Membaca 4 Tabel Sekaligus!)
+#[utoipa::path(
+    get,
+    path = "/api/transaksi",
+    responses(
+        (status = 200, description = "Berhasil mengambil data transaksi", body = serde_json::Value),
+        (status = 500, description = "Gagal mengambil data transaksi", body = serde_json::Value)
+    ),
+    tag = "Transaksi",
+    security(("jwt_auth" = []))
+)]
 pub async fn lihat_transaksi(
     State(db): State<DatabaseConnection>,
     Extension(username_jwt): Extension<String>, // Ambil identitas user login
@@ -1242,7 +1373,7 @@ pub async fn lihat_transaksi(
         .join(JoinType::InnerJoin, transaksi_sampah::Relation::User.def());
 
     // FILTER: Jika dia BEM Wilayah, HANYA BISA LIHAT transaksinya sendiri
-    if role != "bem_km" && role != "admin" {
+    if role != "bem_km" && role != "admin" && role != "dui" {
         if let Some(id_wil) = wilayah_id {
             query = query.filter(transaksi_sampah::Column::WilayahId.eq(id_wil));
         }
@@ -1267,6 +1398,16 @@ pub async fn lihat_transaksi(
 }
 
 // 2. Fungsi Lihat Tabungan (Membaca 2 Tabel)
+#[utoipa::path(
+    get,
+    path = "/api/tabungan",
+    responses(
+        (status = 200, description = "Berhasil mengambil data tabungan", body = serde_json::Value),
+        (status = 500, description = "Gagal mengambil data tabungan", body = serde_json::Value)
+    ),
+    tag = "Tabungan",
+    security(("jwt_auth" = []))
+)]
 pub async fn lihat_tabungan(
     State(db): State<DatabaseConnection>,
 ) -> Json<serde_json::Value> {
@@ -1291,9 +1432,24 @@ pub async fn lihat_tabungan(
 }
 
 // Fungsi Hapus Transaksi (Dilengkapi dengan Auto-Kurang Saldo)
+#[utoipa::path(
+    delete,
+    path = "/api/transaksi/{id}",
+    params(
+        ("id" = i32, Path, description = "ID Transaksi yang ingin dihapus")
+    ),
+    responses(
+        (status = 200, description = "Transaksi berhasil dihapus", body = ResponPesan),
+        (status = 404, description = "Transaksi tidak ditemukan", body = ResponPesan),
+        (status = 500, description = "Terjadi kesalahan sistem", body = ResponPesan)
+    ),
+    tag = "Transaksi",
+    security(("jwt_auth" = []))
+)]
 pub async fn hapus_transaksi(
     State(db): State<DatabaseConnection>,
     Path(transaksi_id): Path<i32>, // Mengambil ID dari URL
+    Extension(username_jwt): Extension<String>,
 ) -> Json<ResponPesan> {
     
     // 1. Cari data transaksi yang mau dihapus
@@ -1301,6 +1457,17 @@ pub async fn hapus_transaksi(
 
     match pencarian_transaksi {
         Ok(Some(data_trx)) => {
+            // CEK HAK AKSES: Apakah yang menghapus adalah pemilik transaksinya?
+            let user_login = user::Entity::find().filter(user::Column::Username.eq(username_jwt)).one(&db).await.unwrap().unwrap();
+            if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui" {
+                if user_login.wilayah_id != Some(data_trx.wilayah_id) {
+                    return Json(ResponPesan {
+                        status: "gagal".to_string(),
+                        pesan: "Akses ditolak! Anda tidak boleh memanipulasi/menghapus transaksi milik wilayah lain.".to_string(),
+                    });
+                }
+            }
+
             // Ambil informasi nilai dan wilayah sebelum transaksinya dimusnahkan
             let nilai_yang_dihapus = data_trx.total_nilai;
             let id_wilayah = data_trx.wilayah_id;
@@ -1350,11 +1517,35 @@ pub async fn hapus_transaksi(
 }
 
 // Fungsi Tarik Saldo (Hanya mengubah Tabungan, TIDAK menyentuh Transaksi)
+#[utoipa::path(
+    post,
+    path = "/api/tabungan/tarik",
+    request_body = InputTarik,
+    responses(
+        (status = 200, description = "Saldo berhasil ditarik", body = ResponPesan),
+        (status = 404, description = "Wilayah belum memiliki catatan tabungan", body = ResponPesan),
+        (status = 500, description = "Terjadi kesalahan sistem", body = ResponPesan)
+    ),
+    tag = "Tabungan",
+    security(("jwt_auth" = []))
+)]
 pub async fn tarik_saldo(
     State(db): State<DatabaseConnection>,
+    Extension(username_jwt): Extension<String>,
     Json(payload): Json<InputTarik>,
 ) -> Json<ResponPesan> {
     
+    // CEK HAK AKSES: BEM dilarang narik tabungan BEM wilayah lain!
+    let user_login = user::Entity::find().filter(user::Column::Username.eq(username_jwt)).one(&db).await.unwrap().unwrap();
+    if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui" {
+        if user_login.wilayah_id != Some(payload.wilayah_id) {
+            return Json(ResponPesan {
+                status: "gagal".to_string(),
+                pesan: "Akses ditolak! Anda tidak berhak mencairkan dana tabungan milik wilayah lain.".to_string(),
+            });
+        }
+    }
+
     // 1. Cari dompet tabungan wilayah tersebut
     let pencarian_dompet = tabungan_sampah::Entity::find()
         .filter(tabungan_sampah::Column::WilayahId.eq(payload.wilayah_id))
@@ -1406,6 +1597,16 @@ pub async fn tarik_saldo(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/dashboard",
+    responses(
+        (status = 200, description = "Berhasil mengambil data dashboard", body = serde_json::Value),
+        (status = 500, description = "Gagal menghitung rekap", body = serde_json::Value)
+    ),
+    tag = "Dashboard",
+    security(("jwt_auth" = []))
+)]
 pub async fn lihat_dashboard(
     State(db): State<DatabaseConnection>,
 ) -> Json<serde_json::Value> {
@@ -1450,6 +1651,16 @@ pub async fn lihat_dashboard(
 }
 
 // Fungsi khusus mengambil Wilayah yang statusnya HANYA "Aktif"
+#[utoipa::path(
+    get,
+    path = "/api/wilayah/aktif",
+    responses(
+        (status = 200, description = "Berhasil mengambil data wilayah aktif", body = serde_json::Value),
+        (status = 500, description = "Gagal mengambil data wilayah aktif", body = serde_json::Value)
+    ),
+    tag = "Wilayah",
+    security(("jwt_auth" = []))
+)]
 pub async fn lihat_wilayah_aktif(
     State(db): State<DatabaseConnection>,
 ) -> Json<serde_json::Value> {
@@ -1473,11 +1684,36 @@ pub async fn lihat_wilayah_aktif(
 }
 
 // Dashboard Spesifik per Wilayah
+#[utoipa::path(
+    get,
+    path = "/api/dashboard/{id}",
+    params(
+        ("id" = i32, Path, description = "ID Wilayah")
+    ),
+    responses(
+        (status = 200, description = "Berhasil mengambil data dashboard wilayah", body = serde_json::Value),
+        (status = 500, description = "Gagal menghitung rekap wilayah", body = serde_json::Value)
+    ),
+    tag = "Dashboard",
+    security(("jwt_auth" = []))
+)]
 pub async fn lihat_dashboard_wilayah(
     State(db): State<DatabaseConnection>,
     Path(wilayah_id): Path<i32>,
+    Extension(username_jwt): Extension<String>,
 ) -> Json<serde_json::Value> {
     
+    // CEK HAK AKSES: Kunci agar BEM tidak bisa mengintip ringkasan dashboard BEM saingannya
+    let user_login = user::Entity::find().filter(user::Column::Username.eq(username_jwt)).one(&db).await.unwrap().unwrap();
+    if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui" {
+        if user_login.wilayah_id != Some(wilayah_id) {
+            return Json(serde_json::json!({
+                "status": "gagal",
+                "pesan": "Akses ditolak! Anda hanya boleh melihat detail dashboard wilayah Anda sendiri."
+            }));
+        }
+    }
+
     // 1. Cek dulu apakah wilayahnya ada, sekalian ambil namanya untuk ditampilkan
     let pencarian_wilayah = wilayah::Entity::find_by_id(wilayah_id).one(&db).await;
     let nama_wilayah = match pencarian_wilayah {
@@ -1512,6 +1748,39 @@ pub async fn lihat_dashboard_wilayah(
         serde_json::json!({ "nama_kategori": nama, "total_berat_gram": b, "total_rupiah": n })
     }).collect();
 
+    // 1.8. Hitung Grafik Aktivitas Bulanan (Berdasarkan Bulan dari Tanggal Transaksi)
+    let semua_trx_wilayah = transaksi_sampah::Entity::find()
+        .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id))
+        .all(&db)
+        .await
+        .unwrap_or_default();
+
+    let mut data_bulanan = vec![
+        serde_json::json!({"bulan": "Jan", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Feb", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Mar", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Apr", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Mei", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Jun", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Jul", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Ags", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Sep", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Okt", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Nov", "berat": 0, "rupiah": 0}),
+        serde_json::json!({"bulan": "Des", "berat": 0, "rupiah": 0}),
+    ];
+
+    for trx in semua_trx_wilayah {
+        let bulan_idx = trx.tanggal.month() as usize - 1; 
+        if let Some(obj) = data_bulanan[bulan_idx].as_object_mut() {
+            let berat_lama = obj.get("berat").unwrap().as_i64().unwrap();
+            let rupiah_lama = obj.get("rupiah").unwrap().as_i64().unwrap();
+            
+            obj.insert("berat".to_string(), serde_json::json!(berat_lama + trx.berat as i64));
+            obj.insert("rupiah".to_string(), serde_json::json!(rupiah_lama + trx.total_nilai as i64));
+        }
+    }
+
     // 2. Hitung agregasi KHUSUS untuk wilayah ini saja
     let query = transaksi_sampah::Entity::find()
         .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id)) // INI KUNCI FILTERNYA!
@@ -1537,7 +1806,8 @@ pub async fn lihat_dashboard_wilayah(
                     "total_rupiah": rupiah,
                     "jumlah_transaksi": data.jumlah_transaksi
                 },
-                "breakdown_kategori": breakdown_list
+                "breakdown_kategori": breakdown_list,
+                "grafik_bulanan": data_bulanan
             }))
         },
         Ok(None) => Json(serde_json::json!({
@@ -1548,7 +1818,8 @@ pub async fn lihat_dashboard_wilayah(
                 "total_rupiah": 0,
                 "jumlah_transaksi": 0
             },
-            "breakdown_kategori": []
+            "breakdown_kategori": [],
+            "grafik_bulanan": data_bulanan
         })),
         Err(e) => Json(serde_json::json!({
             "status": "error",
@@ -1561,48 +1832,84 @@ pub async fn lihat_dashboard_wilayah(
 #[utoipa::path(
     get,
     path = "/api/dashboard/leaderboard",
+    params(
+        ("tanggal_mulai" = Option<String>, Query, description = "Filter tanggal mulai (YYYY-MM-DD)"),
+        ("tanggal_akhir" = Option<String>, Query, description = "Filter tanggal akhir (YYYY-MM-DD)")
+    ),
     responses((status = 200, description = "Berhasil mengambil data leaderboard KPI")),
     tag = "Dashboard",
     security(("jwt_auth" = []))
 )]
 pub async fn lihat_leaderboard(
     State(db): State<DatabaseConnection>,
+    Query(filter): Query<FilterLeaderboard>,
 ) -> Json<serde_json::Value> {
     // Ambil seluruh transaksi gabungan dengan wilayah
-    let semua_transaksi = transaksi_sampah::Entity::find()
+    let mut query = transaksi_sampah::Entity::find()
         .column_as(kategori_sampah::Column::NamaKategori, "nama_kategori")
         .column_as(wilayah::Column::Nama, "nama_wilayah")
         .column_as(user::Column::Nama, "nama_petugas")
         .join(JoinType::InnerJoin, transaksi_sampah::Relation::KategoriSampah.def())
         .join(JoinType::InnerJoin, transaksi_sampah::Relation::Wilayah.def())
-        .join(JoinType::InnerJoin, transaksi_sampah::Relation::User.def())
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::User.def());
+
+    // Terapkan Filter Tanggal (Per 2 Bulan / Sesuai Periode Frontend)
+    if let (Some(mulai), Some(akhir)) = (filter.tanggal_mulai, filter.tanggal_akhir) {
+        let start = format!("{} 00:00:00", mulai);
+        let end = format!("{} 23:59:59", akhir);
+        query = query.filter(transaksi_sampah::Column::Tanggal.between(start, end));
+    }
+
+    let semua_transaksi = query
         .into_model::<TransaksiLengkap>()
         .all(&db)
         .await
         .unwrap_or_default();
     
-    let mut rekap_wilayah: HashMap<String, (i64, i64, i64)> = HashMap::new();
+    // Menyimpan agregasi data: (total_berat, total_nilai, total_poin_kualitas, jumlah_transaksi)
+    let mut rekap_wilayah: HashMap<String, (i64, i64, i64, i64)> = HashMap::new();
     
     for t in semua_transaksi {
-        let entry = rekap_wilayah.entry(t.nama_wilayah).or_insert((0, 0, 0));
+        let entry = rekap_wilayah.entry(t.nama_wilayah).or_insert((0, 0, 0, 0));
         entry.0 += t.berat as i64;
         entry.1 += t.total_nilai as i64;
-        entry.2 += 1; // jumlah transaksi
+        entry.2 += t.poin_kualitas as i64;
+        entry.3 += 1;
     }
     
-    let mut leaderboard: Vec<LeaderboardItem> = rekap_wilayah.into_iter().map(|(nama, (berat, nilai, trx))| {
-        // Formula KPI (Sesuai UI): Berat(40%) + Nilai Ekonomi(30%) + Konsistensi/Trx(10%)
-        let poin = (berat / 1000 * 40) + (nilai / 1000 * 30) + (trx * 10);
+    // Cari nilai tertinggi untuk KPI 2 dan KPI 3 sebagai pembanding relatif
+    let mut max_berat = 0;
+    let mut max_nilai = 0;
+    for &(berat, nilai, _, _) in rekap_wilayah.values() {
+        if berat > max_berat { max_berat = berat; }
+        if nilai > max_nilai { max_nilai = nilai; }
+    }
+    
+    let mut leaderboard: Vec<LeaderboardItem> = rekap_wilayah.into_iter().map(|(nama, (berat, nilai, tot_kualitas, jml_trx))| {
+        
+        // KPI 1: Rata-Rata Kualitas Pemilahan Sampah
+        let kpi_1 = if jml_trx > 0 { tot_kualitas as f64 / jml_trx as f64 } else { 0.0 };
+
+        // KPI 2: Total Input Sampah Relatif (Maks 40)
+        let kpi_2 = if max_berat > 0 { (berat as f64 / max_berat as f64) * 40.0 } else { 0.0 };
+
+        // KPI 3: Total Nilai Ekonomi Relatif (Maks 30)
+        let kpi_3 = if max_nilai > 0 { (nilai as f64 / max_nilai as f64) * 30.0 } else { 0.0 };
+
+        // Total Skor Akhir (Maks 100 poin)
+        let total_skor = (kpi_1 + kpi_2 + kpi_3).round() as i64;
+
         LeaderboardItem {
             peringkat: 0,
             nama_wilayah: nama,
-            poin_kpi: poin,
+            poin_kpi: total_skor,
             total_berat_gram: berat,
             total_rupiah: nilai,
         }
     }).collect();
     
-    leaderboard.sort_by(|a, b| b.poin_kpi.cmp(&a.poin_kpi));
+    // Urutkan berdasarkan Poin tertinggi. Jika Seri, urutkan dari Berat sampah terbanyak.
+    leaderboard.sort_by(|a, b| b.poin_kpi.cmp(&a.poin_kpi).then(b.total_berat_gram.cmp(&a.total_berat_gram)));
     for (i, item) in leaderboard.iter_mut().enumerate() { item.peringkat = i + 1; }
     
     Json(serde_json::json!({ "status": "sukses", "data": leaderboard }))
@@ -1620,7 +1927,17 @@ pub async fn lihat_leaderboard(
 pub async fn lihat_aktivitas_terbaru(
     State(db): State<DatabaseConnection>,
     Path(wilayah_id): Path<i32>,
+    Extension(username_jwt): Extension<String>,
 ) -> Json<serde_json::Value> {
+
+    // CEK HAK AKSES
+    let user_login = user::Entity::find().filter(user::Column::Username.eq(username_jwt)).one(&db).await.unwrap().unwrap();
+    if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui" {
+        if user_login.wilayah_id != Some(wilayah_id) {
+            return Json(serde_json::json!({ "status": "gagal", "pesan": "Akses ditolak!" }));
+        }
+    }
+
     let transaksi = transaksi_sampah::Entity::find()
         .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id))
         .column_as(kategori_sampah::Column::NamaKategori, "nama_kategori")

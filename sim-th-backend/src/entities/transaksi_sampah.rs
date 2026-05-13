@@ -12,6 +12,7 @@ pub struct Model {
     pub berat: i32,
     pub total_nilai: i32,
     pub status: String,
+    pub poin_kualitas: i32,
     #[sea_orm(column_type = "Text", nullable)]
     pub catatan: Option<String>,
     pub kategori_id: i32,

@@ -1,29 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 
 function LeaderboardPage() {
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
-  const [filterBulan, setFilterBulan] = useState('Mei 2026');
   const [isExpanded, setIsExpanded] = useState(false);
   
-  const bulanList = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
-
- // Dummy Data Lengkap (Udah ditambah BEM SKHB & BEM SSMI)
-  const fullLeaderboard = [
-    { rank: 1, name: 'BEM FAPET', poin: 925, berat: '580 kg', nilai: 'Rp 1.450.000', change: '↑ 2' },
-    { rank: 2, name: 'BEM FEM', poin: 890, berat: '550 kg', nilai: 'Rp 1.350.000', change: '- 0' },
-    { rank: 3, name: 'BEM FATETA', poin: 875, berat: '520 kg', nilai: 'Rp 1.250.000', change: '↑ 1' },
-    { rank: 4, name: 'BEM FAHUTAN', poin: 820, berat: '480 kg', nilai: 'Rp 1.100.000', change: '↓ 1' },
-    { rank: 5, name: 'BEM FPIK', poin: 780, berat: '450 kg', nilai: 'Rp 980.000', change: '↑ 2' },
-    { rank: 6, name: 'BEM FEMA', poin: 745, berat: '420 kg', nilai: 'Rp 890.000', change: '↓ 1' },
-    { rank: 7, name: 'BEM FMIPA', poin: 720, berat: '400 kg', nilai: 'Rp 850.000', change: '- 0' },
-    { rank: 8, name: 'BEM SKHB', poin: 700, berat: '390 kg', nilai: 'Rp 810.000', change: '↑ 1' },
-    { rank: 9, name: 'BEM SSMI', poin: 680, berat: '360 kg', nilai: 'Rp 750.000', change: '↓ 2' },
-    { rank: 10, name: 'Ormawa Eksekutif PPKU', poin: 650, berat: '300 kg', nilai: 'Rp 650.000', change: '- 0' },
-    { rank: 11, name: 'BEM FK', poin: 650, berat: '300 kg', nilai: 'Rp 650.000', change: '- 0' },
+  const periodeList = [
+    { label: 'Jan - Feb 2026', start: '2026-01-01', end: '2026-02-28' },
+    { label: 'Mar - Apr 2026', start: '2026-03-01', end: '2026-04-30' },
+    { label: 'Mei - Jun 2026', start: '2026-05-01', end: '2026-06-30' },
+    { label: 'Jul - Ags 2026', start: '2026-07-01', end: '2026-08-31' },
+    { label: 'Sep - Okt 2026', start: '2026-09-01', end: '2026-10-31' },
+    { label: 'Nov - Des 2026', start: '2026-11-01', end: '2026-12-31' },
   ];
 
-  const displayedLeaderboard = isExpanded ? fullLeaderboard : fullLeaderboard.slice(0, 5);
+  const [filterPeriode, setFilterPeriode] = useState(periodeList[2]); // Default Mei-Jun
+  const [leaderboardData, setLeaderboardData] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      setIsLoading(true);
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/leaderboard?tanggal_mulai=${filterPeriode.start}&tanggal_akhir=${filterPeriode.end}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const resData = await response.json();
+        if (resData.status === 'sukses') {
+          setLeaderboardData(resData.data);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil leaderboard", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchLeaderboard();
+  }, [filterPeriode]);
+
+  const displayedLeaderboard = isExpanded ? leaderboardData : leaderboardData.slice(0, 5);
+  const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+
+  const juara1 = leaderboardData[0] || null;
+  const juara2 = leaderboardData[1] || null;
+  const juara3 = leaderboardData[2] || null;
 
   return (
     <DashboardLayout>
@@ -45,18 +66,18 @@ function LeaderboardPage() {
             className="bg-[#F4A300] text-white px-6 py-3.5 rounded-2xl flex items-center gap-3 font-bold shadow-md hover:bg-[#d68e00] transition-all"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-            {filterBulan}
+            {filterPeriode.label}
           </button>
           
           {isMonthPickerOpen && (
-            <div className="absolute top-full mt-3 right-0 w-64 bg-white p-4 rounded-[2rem] shadow-2xl border border-gray-100 z-50 grid grid-cols-3 gap-2">
-              {bulanList.map((bln) => (
+            <div className="absolute top-full mt-3 right-0 w-80 bg-white p-4 rounded-[2rem] shadow-2xl border border-gray-100 z-50 grid grid-cols-2 gap-2">
+              {periodeList.map((prd) => (
                 <button 
-                  key={bln} 
-                  onClick={() => { setFilterBulan(`${bln} 2026`); setIsMonthPickerOpen(false); }}
-                  className={`py-2 rounded-xl text-xs font-bold transition-all ${filterBulan.includes(bln) ? 'bg-[#0B4D1E] text-white' : 'bg-[#F5EFE6] text-[#0B4D1E] hover:bg-[#F4A300] hover:text-white'}`}
+                  key={prd.label} 
+                  onClick={() => { setFilterPeriode(prd); setIsMonthPickerOpen(false); }}
+                  className={`py-3 rounded-xl text-xs font-bold transition-all text-center ${filterPeriode.label === prd.label ? 'bg-[#0B4D1E] text-white' : 'bg-[#F5EFE6] text-[#0B4D1E] hover:bg-[#F4A300] hover:text-white'}`}
                 >
-                  {bln}
+                  {prd.label}
                 </button>
               ))}
             </div>
@@ -74,8 +95,8 @@ function LeaderboardPage() {
               <span className="text-xl">🥈</span>
             </div>
             <h4 className="text-4xl font-extrabold text-[#0B4D1E]">2</h4>
-            <p className="font-bold text-[#0B4D1E] mt-1">BEM FEM</p>
-            <p className="text-2xl font-extrabold text-[#0B4D1E] mt-2">890 <span className="text-xs font-medium">poin</span></p>
+            <p className="font-bold text-[#0B4D1E] mt-1 text-center">{juara2 ? juara2.nama_wilayah : '-'}</p>
+            <p className="text-2xl font-extrabold text-[#0B4D1E] mt-2">{juara2 ? juara2.poin_kpi : 0} <span className="text-xs font-medium">poin</span></p>
           </div>
 
           {/* Posisi 1 (Paling Tinggi) */}
@@ -84,8 +105,8 @@ function LeaderboardPage() {
               <span className="text-3xl">🏆</span>
             </div>
             <h4 className="text-5xl font-extrabold text-[#F4A300]">1</h4>
-            <p className="font-bold text-[#0B4D1E] text-lg mt-1">BEM FAPET</p>
-            <p className="text-3xl font-extrabold text-[#0B4D1E] mt-2">925 <span className="text-sm font-medium">poin</span></p>
+            <p className="font-bold text-[#0B4D1E] text-lg mt-1 text-center">{juara1 ? juara1.nama_wilayah : '-'}</p>
+            <p className="text-3xl font-extrabold text-[#0B4D1E] mt-2">{juara1 ? juara1.poin_kpi : 0} <span className="text-sm font-medium">poin</span></p>
           </div>
 
           {/* Posisi 3 (YOU) */}
@@ -94,9 +115,9 @@ function LeaderboardPage() {
               <span className="text-xl">🥉</span>
             </div>
             <h4 className="text-4xl font-extrabold text-[#F4A300]">3</h4>
-            <p className="font-bold text-[#0B4D1E] mt-1">BEM FATETA</p>
-            <span className="bg-[#F4A300] text-white text-[10px] px-3 py-0.5 rounded-full mb-1 font-bold">YOU</span>
-            <p className="text-2xl font-extrabold text-[#0B4D1E]">875 <span className="text-xs font-medium">poin</span></p>
+            <p className="font-bold text-[#0B4D1E] mt-1 text-center">{juara3 ? juara3.nama_wilayah : '-'}</p>
+            <span className="bg-transparent text-transparent text-[10px] px-3 py-0.5 rounded-full mb-1 font-bold select-none">-</span>
+            <p className="text-2xl font-extrabold text-[#0B4D1E]">{juara3 ? juara3.poin_kpi : 0} <span className="text-xs font-medium">poin</span></p>
           </div>
         </div>
       </div>
@@ -116,15 +137,15 @@ function LeaderboardPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {displayedLeaderboard.map((item) => (
-              <tr key={item.rank} className={`${item.name === 'BEM FATETA' ? 'bg-orange-50/50' : 'hover:bg-gray-50'} transition-colors`}>
-                <td className="px-8 py-5 font-bold text-gray-500">#{item.rank}</td>
-                <td className="px-8 py-5 font-bold text-[#0B4D1E]">{item.name}</td>
-                <td className="px-8 py-5 font-extrabold text-[#0B4D1E] text-xl">{item.poin}</td>
-                <td className="px-8 py-5 text-gray-600 font-medium">{item.berat}</td>
-                <td className="px-8 py-5 font-bold text-[#0B4D1E]">{item.nilai}</td>
+              <tr key={item.peringkat} className="hover:bg-gray-50 transition-colors">
+                <td className="px-8 py-5 font-bold text-gray-500">#{item.peringkat}</td>
+                <td className="px-8 py-5 font-bold text-[#0B4D1E]">{item.nama_wilayah}</td>
+                <td className="px-8 py-5 font-extrabold text-[#0B4D1E] text-xl">{item.poin_kpi}</td>
+                <td className="px-8 py-5 text-gray-600 font-medium">{item.total_berat_gram / 1000} kg</td>
+                <td className="px-8 py-5 font-bold text-[#0B4D1E]">{formatRp(item.total_rupiah)}</td>
                 <td className="px-8 py-5">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${item.change.includes('↑') ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                    {item.change}
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600">
+                    -
                   </span>
                 </td>
               </tr>
@@ -136,6 +157,17 @@ function LeaderboardPage() {
              {isExpanded ? 'Tutup Peringkat ↑' : 'Lihat Semua Peringkat ↓'}
           </button>
         </div>
+      </div>
+
+      <div className="bg-[#EAE5DA] p-8 rounded-3xl mb-8 border border-[#0B4D1E]/10">
+        <h3 className="font-extrabold text-[#0B4D1E] flex items-center gap-2 mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg> Cara Menghitung Poin KPI
+        </h3>
+        <ul className="text-sm text-[#0B4D1E]/80 space-y-2 font-medium">
+          <li>• Total input berat sampah secara relatif (Maksimal 40 Poin)</li>
+          <li>• Total nilai ekonomi/pendapatan secara relatif (Maksimal 30 Poin)</li>
+          <li>• Kualitas pemilahan sampah: Bersih/Terpilah (Maksimal 30 Poin)</li>
+        </ul>
       </div>
     </DashboardLayout>
   );

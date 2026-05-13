@@ -27,6 +27,27 @@ mod entities;
         handlers::hapus_user,
         handlers::simpan_kontak,
         handlers::ubah_password,
+        // Modul Wilayah
+        handlers::tambah_wilayah,
+        handlers::lihat_wilayah,
+        handlers::update_wilayah,
+        handlers::hapus_wilayah,
+        handlers::lihat_wilayah_aktif,
+        // Modul Kategori
+        handlers::tambah_kategori,
+        handlers::lihat_kategori,
+        handlers::update_kategori,
+        handlers::hapus_kategori,
+        // Modul Transaksi
+        handlers::tambah_transaksi,
+        handlers::lihat_transaksi,
+        handlers::hapus_transaksi,
+        // Modul Tabungan
+        handlers::lihat_tabungan,
+        handlers::tarik_saldo,
+        // Modul Dashboard
+        handlers::lihat_dashboard,
+        handlers::lihat_dashboard_wilayah,
         handlers::lihat_leaderboard,
         handlers::lihat_aktivitas_terbaru
     ),
@@ -45,16 +66,27 @@ mod entities;
             handlers::InputUpdateUser,
             handlers::InputUbahPassword,
             // Struct Respon Umum
-            handlers::ResponPesan,
-            handlers::ResponLogin,
             handlers::InputKontak,
+            // Struct Untuk Wilayah, Kategori, Transaksi, Tabungan
+            handlers::InputWilayah,
+            handlers::InputKategori,
+            handlers::InputTransaksi,
+            handlers::InputTarik,
+            handlers::TransaksiLengkap,
+            handlers::RekapDashboard,
+            handlers::TabunganLengkap,
             handlers::LeaderboardItem
         )
     ),
     modifiers(&SecurityAddon),
     tags(
         (name = "Auth", description = "Endpoint untuk Autentikasi (Register, Login, Lupa Password)"),
-        (name = "Manajemen User", description = "Endpoint untuk pengaturan User dan 2FA")
+        (name = "Manajemen User", description = "Endpoint untuk pengaturan User dan 2FA"),
+        (name = "Wilayah", description = "Endpoint untuk pengelolaan wilayah"),
+        (name = "Kategori", description = "Endpoint untuk pengelolaan kategori sampah"),
+        (name = "Transaksi", description = "Endpoint untuk mencatat dan mengelola transaksi sampah"),
+        (name = "Tabungan", description = "Endpoint untuk melihat dan menarik saldo tabungan"),
+        (name = "Dashboard", description = "Endpoint untuk statistik dan aktivitas dashboard")
     )
 )]
 struct ApiDoc;
