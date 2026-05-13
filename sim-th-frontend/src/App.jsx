@@ -14,6 +14,8 @@ import LaporanPage from './pages/LaporanPage'
 import ProfilPage from './pages/ProfilPage'
 import NotifikasiPage from './pages/NotifikasiPage';
 import AktivitasPage from './pages/AktivitasPage';
+import OtpPage from './pages/OtpPage';
+import ResetPasswordAuthPage from './pages/ResetPasswordAuthPage';
 
 function App() {
   return (
@@ -33,6 +35,8 @@ function App() {
         <Route path="/profil" element={<ProfilPage />} />
         <Route path="/notifikasi" element={<NotifikasiPage />} />
         <Route path="/aktivitas" element={<AktivitasPage />} />
+        <Route path="/otp" element={<OtpPage />} />
+        <Route path="/reset-password-auth" element={<ResetPasswordAuthPage />} />
       </Routes>
     </Router>
   )
