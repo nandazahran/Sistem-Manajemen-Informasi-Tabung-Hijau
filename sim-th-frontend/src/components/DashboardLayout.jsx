@@ -10,27 +10,43 @@ function DashboardLayout({ children }) {
   const [isBEMWilayah, setIsBEMWilayah] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    if (token) {
+    const fetchProfil = async () => {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) return;
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
         const username = payload.sub;
-        
-        const roles = {
-          'bem_km': 'BEM KM IPB', 'bem_faperta': 'BEM FAPERTA', 'bem_skhb': 'BEM SKHB', 'bem_fpik': 'BEM FPIK',
-          'bem_fapet': 'BEM FAPET', 'bem_fahutan': 'BEM FAHUTAN', 'bem_fateta': 'BEM FATETA', 'bem_fmipa': 'BEM FMIPA',
-          'bem_fem': 'BEM FEM', 'bem_fema': 'BEM FEMA', 'bem_vokasi': 'BEM VOKASI', 'bem_sb': 'BEM SB',
-          'bem_fk': 'BEM FK', 'bem_ssmi': 'BEM SSMI', 'ormawa_ppku': 'Ormawa Eksekutif PPKU'
-        };
-        setNamaProfil(roles[username] || username.toUpperCase());
-        
-        const isNotAdmin = username !== 'bem_km' && username !== 'admin' && username !== 'dui';
-        setIsBEMWilayah(isNotAdmin);
-        setRoleProfil(isNotAdmin ? 'BEM Wilayah' : 'Administrator');
+
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/users`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+
+        if (data.status === 'sukses') {
+          // Cari user yang sesuai dengan username yang login
+          const myUser = data.data.find(u => u.username === username);
+          if (myUser) {
+            setNamaProfil(myUser.nama); // Menampilkan Nama Lengkap dari Database
+            // Cek role yang sebenarnya (bukan sekedar ngecek username)
+            let displayedRole = 'BEM Wilayah';
+            if (myUser.role === 'dui') {
+              displayedRole = 'Direktorat Umum dan Infrastruktur';
+            } else if (myUser.role === 'bem_km') {
+              displayedRole = 'BEM KM IPB';
+            } else if (myUser.role === 'admin') {
+              displayedRole = 'Administrator';
+            }
+            
+            const isNotAdmin = myUser.role !== 'bem_km' && myUser.role !== 'admin' && myUser.role !== 'dui';
+            setIsBEMWilayah(isNotAdmin); 
+            setRoleProfil(displayedRole);
+          }
+        }
       } catch (error) {
-        console.error("Token tidak valid");
+        console.error("Gagal memuat profil layout:", error);
       }
-    }
+    };
+    fetchProfil();
   }, []);
 
   const menuItems = [
