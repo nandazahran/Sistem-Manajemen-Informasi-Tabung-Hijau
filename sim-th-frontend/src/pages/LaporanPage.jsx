@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 function LaporanPage() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState('Mei 2026');
+  const [selectedMonth, setSelectedMonth] = useState('Semua Periode');
   
   // State untuk Modal Export
   const [exportFormat, setExportFormat] = useState('PDF');
@@ -18,11 +21,78 @@ function LaporanPage() {
     rincian: true
   });
 
+  // State untuk Data Riil
+  const [dataTrx, setDataTrx] = useState([]);
+  const [saldoTotal, setSaldoTotal] = useState(0);
+
   const bulanList = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
   const periodeOptions = ['Semua Periode', 'Mei 2026', 'April 2026', 'Maret 2026'];
 
+  // Ambil Data dari Backend
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}` };
+        
+        const [resTrx, resTab] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_URL}/transaksi`, { headers }),
+          fetch(`${import.meta.env.VITE_API_URL}/tabungan`, { headers })
+        ]);
+
+        const trx = await resTrx.json();
+        const tab = await resTab.json();
+
+        if (trx.status === 'sukses') setDataTrx(trx.data.sort((a, b) => b.id - a.id));
+        if (tab.status === 'sukses') setSaldoTotal(tab.data.reduce((sum, item) => sum + item.saldo, 0));
+      } catch (error) {
+        console.error("Gagal mengambil data laporan:", error);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Filter data sesuai bulan yang dipilih
+  const filteredData = dataTrx.filter(t => {
+    if (selectedMonth === 'Semua Periode') return true;
+    const date = new Date(t.tanggal);
+    return `${bulanList[date.getMonth()]} ${date.getFullYear()}` === selectedMonth;
+  });
+
+  const totalBerat = filteredData.reduce((sum, t) => sum + t.berat, 0) / 1000;
+  const totalNilai = filteredData.reduce((sum, t) => sum + t.total_nilai, 0);
+  const totalTransaksi = filteredData.length;
+
   const handleExport = () => {
-    alert(`Laporan format ${exportFormat} untuk periode ${exportPeriode} sedang diunduh...`);
+    let dataToExport = dataTrx;
+    if (exportPeriode !== 'Semua Periode') {
+      dataToExport = dataTrx.filter(t => {
+        const date = new Date(t.tanggal);
+        return `${bulanList[date.getMonth()]} ${date.getFullYear()}` === exportPeriode;
+      });
+    }
+
+    if (exportFormat === 'Excel') {
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport.map(t => ({
+        "ID Transaksi": t.id,
+        "Tanggal": new Date(t.tanggal).toLocaleDateString('id-ID'),
+        "Wilayah": t.nama_wilayah,
+        "Kategori": t.nama_kategori,
+        "Berat (kg)": t.berat / 1000,
+        "Total Nilai (Rp)": t.total_nilai,
+        "Petugas": t.nama_petugas,
+        "Status": t.status
+      })));
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Data Laporan");
+      XLSX.writeFile(workbook, `Laporan_Transaksi_SIMTH_${exportPeriode.replace(' ', '_')}.xlsx`);
+    } else {
+      const doc = new jsPDF();
+      doc.text(`Laporan Transaksi - ${exportPeriode}`, 14, 15);
+      const tableData = dataToExport.map(t => [new Date(t.tanggal).toLocaleDateString('id-ID'), t.nama_wilayah, t.nama_kategori, `${t.berat / 1000} kg`, `Rp ${t.total_nilai.toLocaleString('id-ID')}`, t.status]);
+      doc.autoTable({ head: [['Tanggal', 'Wilayah', 'Kategori', 'Berat', 'Nilai', 'Status']], body: tableData, startY: 20 });
+      doc.save(`Laporan_Transaksi_SIMTH_${exportPeriode.replace(' ', '_')}.pdf`);
+    }
     setIsExportModalOpen(false);
   };
 
@@ -50,6 +120,7 @@ function LaporanPage() {
             </button>
             {isMonthPickerOpen && (
               <div className="absolute top-full mt-3 right-0 w-64 bg-white p-4 rounded-[2rem] shadow-2xl border border-gray-100 z-50 grid grid-cols-3 gap-2">
+                <button onClick={() => { setSelectedMonth('Semua Periode'); setIsMonthPickerOpen(false); }} className="col-span-3 py-2 rounded-xl text-xs font-bold bg-[#0B4D1E] text-white hover:bg-[#083a16] transition-all mb-2">Semua Periode</button>
                 {bulanList.map(bln => (
                   <button key={bln} onClick={() => { setSelectedMonth(`${bln} 2026`); setIsMonthPickerOpen(false); }} className="py-2 rounded-xl text-xs font-bold bg-[#F5EFE6] text-[#0B4D1E] hover:bg-[#F4A300] hover:text-white transition-all">
                     {bln}
@@ -68,10 +139,10 @@ function LaporanPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         {[
-          { title: 'Total Sampah', val: '520 kg', badge: '+12% dari bln lalu' },
-          { title: 'Nilai Ekonomi', val: 'Rp 1.25jt', badge: '+8% dari bln lalu' },
-          { title: 'Total Transaksi', val: '128', badge: '+15% dari bln lalu' },
-          { title: 'Saldo Tabungan', val: 'Rp 270rb', badge: '+28% bulan ini' },
+          { title: 'Total Sampah', val: `${totalBerat.toLocaleString('id-ID')} kg`, badge: 'Berdasarkan Filter' },
+          { title: 'Nilai Ekonomi', val: `Rp ${totalNilai.toLocaleString('id-ID')}`, badge: 'Berdasarkan Filter' },
+          { title: 'Total Transaksi', val: totalTransaksi, badge: 'Berdasarkan Filter' },
+          { title: 'Saldo Tabungan Global', val: `Rp ${saldoTotal.toLocaleString('id-ID')}`, badge: 'Total Keseluruhan' },
         ].map((item, i) => (
           <div key={i} className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 hover:-translate-y-1 hover:shadow-xl transition-all duration-300 cursor-pointer">
             <p className="text-gray-500 font-medium text-sm mb-1">{item.title}</p>

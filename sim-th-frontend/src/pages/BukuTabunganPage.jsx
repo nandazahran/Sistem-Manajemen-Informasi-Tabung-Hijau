@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 function BukuTabunganPage() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -65,7 +68,27 @@ function BukuTabunganPage() {
   const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
 
   const handleExport = () => {
-    alert(`File ${exportFormat} sedang diunduh...`);
+    if (exportFormat === 'Excel') {
+      const worksheet = XLSX.utils.json_to_sheet(riwayatPemasukan.map(t => ({
+        "ID Transaksi": t.id,
+        "Tanggal": new Date(t.tanggal).toLocaleDateString('id-ID'),
+        "Kategori Setoran": t.nama_kategori,
+        "Nominal Pemasukan (Rp)": t.total_nilai,
+        "Wilayah": t.nama_wilayah,
+        "Petugas": t.nama_petugas
+      })));
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Buku Tabungan");
+      XLSX.writeFile(workbook, `Buku_Tabungan_${namaWilayah.replace(' ', '_')}.xlsx`);
+    } else {
+      const doc = new jsPDF();
+      doc.text(`Buku Tabungan - ${namaWilayah}`, 14, 15);
+      doc.text(`Total Saldo Saat Ini: Rp ${saldo.toLocaleString('id-ID')}`, 14, 22);
+      
+      const tableData = riwayatPemasukan.map(t => [new Date(t.tanggal).toLocaleDateString('id-ID'), `Setoran ${t.nama_kategori}`, `Rp ${t.total_nilai.toLocaleString('id-ID')}`, t.nama_petugas]);
+      doc.autoTable({ head: [['Tanggal', 'Keterangan', 'Pemasukan (Rp)', 'Petugas']], body: tableData, startY: 30 });
+      doc.save(`Buku_Tabungan_${namaWilayah.replace(' ', '_')}.pdf`);
+    }
     setIsExportModalOpen(false);
   };
 
