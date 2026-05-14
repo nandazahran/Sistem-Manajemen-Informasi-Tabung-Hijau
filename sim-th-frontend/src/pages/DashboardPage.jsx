@@ -15,6 +15,7 @@ function DashboardPage() {
   const [transaksiTerbaru, setTransaksiTerbaru] = useState([]);
   const [aktivitas, setAktivitas] = useState([]);
   const [namaLengkap, setNamaLengkap] = useState('Memuat...');
+  const [namaWilayah, setNamaWilayah] = useState('Memuat...');
   const [grafikBulanan, setGrafikBulanan] = useState([]);
 
   useEffect(() => {
@@ -56,6 +57,7 @@ function DashboardPage() {
         const wilayahName = myTrx.length > 0 
             ? myTrx[0].nama_wilayah 
             : (username === 'bem_km' ? 'BEM KM IPB' : username.toUpperCase().replace('_', ' '));
+        setNamaWilayah(wilayahName);
 
         // Cari Rank berdasarkan nama wilayah dari Leaderboard
         let rank = '-';
