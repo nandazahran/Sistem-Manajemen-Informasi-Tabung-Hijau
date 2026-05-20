@@ -124,7 +124,6 @@ pub struct InputKategori {
 #[derive(Deserialize,ToSchema)]
 pub struct InputTransaksi {
     pub kategori_id: i32,
-    pub wilayah_id: i32,
     pub berat_gram: i32, 
     pub poin_kualitas: i32, // Tangkap skor 30, 25, 15, dll dari Frontend
     pub catatan: Option<String>,
@@ -1241,32 +1240,30 @@ pub async fn tambah_transaksi(
         }),
     };
 
-    // --- TAHAP 1.2: GEMBOK LINTAS WILAYAH (ISOLASI DATA) ---
-    if petugas.role != "bem_km" && petugas.role != "admin" && petugas.role != "dui" {
-        if petugas.wilayah_id != Some(payload.wilayah_id) {
-            return Json(ResponPesan {
-                status: "gagal".to_string(),
-                pesan: "Akses ditolak! Anda tidak diizinkan mencatat setoran untuk wilayah lain.".to_string(),
-            });
+    // --- TAHAP 1.2: VALIDASI ROLE & WILAYAH ---
+    // Hanya BEM Wilayah yang bisa input, dan mereka wajib punya wilayah_id.
+    // BEM KM/Admin tidak bisa input, mereka hanya audit.
+    let id_wilayah_petugas = match petugas.role.as_str() {
+        "bem_km" | "admin" | "dui" => {
+            return Json(ResponPesan { status: "gagal".to_string(), pesan: "Akses ditolak! Administrator tidak dapat menginput transaksi, hanya BEM Wilayah.".to_string() });
+        },
+        _ => match petugas.wilayah_id {
+            Some(id) => id,
+            None => return Json(ResponPesan { status: "gagal".to_string(), pesan: "Akun Anda tidak terasosiasi dengan wilayah manapun. Hubungi admin.".to_string() }),
         }
-    }
+    };
 
     // --- TAHAP 1.5: GEMBOK KEAMANAN (CEK STATUS WILAYAH) ---
-    let pencarian_wilayah = wilayah::Entity::find_by_id(payload.wilayah_id).one(&db).await;
+    let pencarian_wilayah = wilayah::Entity::find_by_id(id_wilayah_petugas).one(&db).await;
     match pencarian_wilayah {
         Ok(Some(w)) => {
             // Kalau ketemu, tapi statusnya bukan Aktif, tolak setorannya!
             if w.status != "Aktif" {
-                return Json(ResponPesan {
-                    status: "gagal".to_string(),
-                    pesan: format!("Setoran ditolak! Wilayah '{}' saat ini berstatus Nonaktif.", w.nama),
-                });
+                return Json(ResponPesan { status: "gagal".to_string(), pesan: format!("Setoran ditolak! Wilayah '{}' saat ini berstatus Nonaktif.", w.nama) });
             }
         },
-        Ok(None) => return Json(ResponPesan {
-            status: "gagal".to_string(),
-            pesan: format!("Wilayah ID {} tidak ditemukan di sistem!", payload.wilayah_id),
-        }),
+        // Ini seharusnya tidak terjadi jika data konsisten, tapi sebagai pengaman
+        Ok(None) => return Json(ResponPesan { status: "gagal".to_string(), pesan: "Wilayah yang terdaftar di akun Anda tidak ditemukan di sistem.".to_string() }),
         Err(e) => return Json(ResponPesan { status: "error".to_string(), pesan: e.to_string() }),
     };
 
@@ -1298,7 +1295,7 @@ pub async fn tambah_transaksi(
         total_nilai: Set(kalkulasi_total_nilai),
         status: Set("Selesai".to_string()),
         kategori_id: Set(payload.kategori_id),
-        wilayah_id: Set(payload.wilayah_id),
+        wilayah_id: Set(id_wilayah_petugas),
         poin_kualitas: Set(payload.poin_kualitas), // Simpan poinnya
         catatan: Set(payload.catatan), 
         input_by: Set(petugas.id), 
@@ -1310,7 +1307,7 @@ pub async fn tambah_transaksi(
     Ok(_) => {
         // --- TAHAP 5: OTOMATISASI SALDO TABUNGAN WILAYAH ---
         let pencarian_dompet = tabungan_sampah::Entity::find()
-            .filter(tabungan_sampah::Column::WilayahId.eq(payload.wilayah_id))
+            .filter(tabungan_sampah::Column::WilayahId.eq(id_wilayah_petugas))
             .one(&db)
             .await
             .unwrap();
@@ -1327,7 +1324,7 @@ pub async fn tambah_transaksi(
                 let dompet_baru = tabungan_sampah::ActiveModel {
                     saldo: Set(kalkulasi_total_nilai),
                     status: Set("Aktif".to_string()),
-                    wilayah_id: Set(payload.wilayah_id),
+                    wilayah_id: Set(id_wilayah_petugas),
                     ..Default::default()
                 };
                 let _ = dompet_baru.insert(&db).await;
