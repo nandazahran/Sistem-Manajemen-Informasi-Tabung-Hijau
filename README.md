@@ -23,14 +23,14 @@ Backend (Rust) dan Database (PostgreSQL) dibungkus menggunakan container. Kamu t
 ### 1. Jalankan Container
 Buka terminal di folder `sim-th-backend` project ini, lalu jalankan perintah berikut:
 
-```docker compose up -d --build```
+```docker compose up -d --build``` *(atau `podman compose up -d --build`)*
 
 (Catatan: Flag `--build` akan menyuruh Docker untuk meng-compile kode Rust. Proses ini memakan waktu beberapa menit saat pertama kali dijalankan, tunggu saja sampai selesai).
 
 ### 2. Cek Status Container
 Pastikan service backend dan db sudah berjalan dengan normal (statusnya Up):
 
-```docker compose ps```
+```docker compose ps``` *(atau `podman compose ps`)*
 
 ### 3. Test API
 Backend sekarang sudah berjalan dan terkoneksi ke database. API siap di-hit di:
@@ -68,4 +68,38 @@ Jika proses testing sudah selesai, jangan hanya menutup aplikasi Docker atau ter
 
 Matikan container dengan aman agar RAM dan port kalian kembali bersih dengan perintah ini di folder `sim-th-backend`:
 
-```docker compose down```
+```docker compose down``` *(atau `podman compose down`)*
+
+## 🖥️ Alternatif: Menjalankan Backend Secara Lokal (Tanpa Docker Rust)
+Jika kamu ingin mendevelop backend dengan instalasi Rust lokal (native), ikuti panduan berikut:
+
+### 1. Prasyarat
+Pastikan kamu sudah menginstall toolchain Rust melalui [rustup](https://rustup.rs/).
+
+### 2. Jalankan Database Secara Terpisah
+Masuk ke folder `sim-th-backend` dan nyalakan hanya container database:
+```sh
+# Jika menggunakan Podman, gunakan: podman compose up -d db_sim_th
+docker compose up -d db_sim_th
+```
+
+### 3. Konfigurasi `.env`
+Buka file `.env` di dalam folder `sim-th-backend`. Karena Docker compose di-set mem-forward port ke **5433**, pastikan URL database kamu mengarah ke `localhost:5433`:
+```env
+DATABASE_URL=postgres://[USER]:[PASSWORD]@localhost:5433/[DB_NAME]
+```
+*(Ganti bagian dalam kurung siku sesuai dengan isi `DB_USER`, `DB_PASSWORD`, dan `DB_NAME` kamu).*
+
+### 4. Jalankan Migrasi Database
+Sistem menggunakan SeaORM untuk migrasi. Masuk ke folder `migration` dan eksekusi migrasinya:
+```sh
+cd migration
+cargo run -- up
+cd ..
+```
+
+### 5. Jalankan Backend Server
+Di dalam folder `sim-th-backend`, jalankan server Rust kamu:
+```sh
+cargo run
+```
