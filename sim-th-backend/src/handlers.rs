@@ -924,7 +924,7 @@ pub async fn lihat_wilayah(
     // 1. Jika bem_km -> Ambil semua baris di tabel wilayah
     // 2. Jika bukan -> Ambil yang ID-nya cocok dengan wilayah si user
     
-    let query = if role_user == "bem_km" {
+    let query = if role_user == "bem_km" || role_user == "admin" || role_user == "dui" {
         wilayah::Entity::find()
     } else {
         wilayah::Entity::find().filter(wilayah::Column::Id.eq(id_wilayah_user))
@@ -1244,7 +1244,10 @@ pub async fn tambah_transaksi(
     // Hanya BEM Wilayah yang bisa input, dan mereka wajib punya wilayah_id.
     // BEM KM/Admin tidak bisa input, mereka hanya audit.
     let id_wilayah_petugas = match petugas.role.as_str() {
-        "bem_km" | "admin" | "dui" => {
+        "dui" => {
+            return Json(ResponPesan { status: "gagal".to_string(), pesan: "Akses ditolak! Role DUI hanya dapat melihat data (Read-Only).".to_string() });
+        },
+        "bem_km" | "admin" => {
             return Json(ResponPesan { status: "gagal".to_string(), pesan: "Akses ditolak! Administrator tidak dapat menginput transaksi, hanya BEM Wilayah.".to_string() });
         },
         _ => match petugas.wilayah_id {
@@ -1445,6 +1448,113 @@ pub async fn lihat_tabungan(
     }
 }
 
+// Fungsi Update / Edit Transaksi (Otomatis Penyesuaian Saldo)
+#[utoipa::path(
+    put,
+    path = "/api/transaksi/{id}",
+    request_body = InputTransaksi,
+    params(
+        ("id" = i32, Path, description = "ID Transaksi yang ingin diedit/diupdate")
+    ),
+    responses(
+        (status = 200, description = "Transaksi berhasil diperbarui dan saldo disesuaikan", body = ResponPesan),
+        (status = 403, description = "Akses ditolak: Hanya Admin/DUI/Pemilik yang bisa edit", body = ResponPesan),
+        (status = 404, description = "Transaksi atau Kategori tidak ditemukan", body = ResponPesan),
+        (status = 500, description = "Terjadi kesalahan sistem", body = ResponPesan)
+    ),
+    tag = "Transaksi",
+    security(("jwt_auth" = []))
+)]
+pub async fn update_transaksi(
+    State(db): State<DatabaseConnection>,
+    Path(transaksi_id): Path<i32>,
+    Extension(username_jwt): Extension<String>,
+    Json(payload): Json<InputTransaksi>,
+) -> Json<ResponPesan> {
+    
+    // 1. Cari data transaksi lama
+    let pencarian_transaksi = transaksi_sampah::Entity::find_by_id(transaksi_id).one(&db).await;
+    let data_trx_lama = match pencarian_transaksi {
+        Ok(Some(t)) => t,
+        _ => return Json(ResponPesan { status: "gagal".to_string(), pesan: format!("Transaksi ID {} tidak ditemukan.", transaksi_id) }),
+    };
+
+    // 2. Cek Hak Akses (Otorisasi)
+    let user_login = user::Entity::find().filter(user::Column::Username.eq(username_jwt)).one(&db).await.unwrap().unwrap();
+    
+    if user_login.role == "dui" {
+        return Json(ResponPesan {
+            status: "gagal".to_string(),
+            pesan: "Akses ditolak! Role DUI hanya memiliki hak akses untuk melihat data (Read-Only).".to_string(),
+        });
+    }
+
+    if user_login.role != "bem_km" && user_login.role != "admin" {
+        return Json(ResponPesan {
+            status: "gagal".to_string(),
+            pesan: "Akses ditolak! Hanya Administrator (BEM KM / Admin) yang dapat mengedit transaksi untuk alasan keamanan.".to_string(),
+        });
+    }
+
+    // 3. Ambil Harga Kategori Baru
+    let pencarian_kategori = kategori_sampah::Entity::find_by_id(payload.kategori_id).one(&db).await;
+    let kategori = match pencarian_kategori {
+        Ok(Some(k)) => k,
+        _ => return Json(ResponPesan { status: "gagal".to_string(), pesan: "Kategori sampah tidak ditemukan di sistem!".to_string() }),
+    };
+
+    // 4. Hitung Nilai Baru & Hitung Selisih dengan Nilai Lama
+    let kalkulasi_total_nilai_baru = (payload.berat_gram * kategori.harga_per_kg) / 1000;
+    let selisih_nilai = kalkulasi_total_nilai_baru - data_trx_lama.total_nilai;
+    let id_wilayah = data_trx_lama.wilayah_id;
+    let tanggal_lama = data_trx_lama.tanggal;
+
+    let tanggal_parsed = if let Some(ref tgl) = payload.tanggal {
+        NaiveDateTime::parse_from_str(&format!("{} 00:00:00", tgl), "%Y-%m-%d %H:%M:%S").unwrap_or(tanggal_lama)
+    } else {
+        tanggal_lama
+    };
+
+    // 5. Update Record Transaksi di Tabel
+    let mut trx_aktif: transaksi_sampah::ActiveModel = data_trx_lama.into();
+    trx_aktif.berat = Set(payload.berat_gram);
+    trx_aktif.total_nilai = Set(kalkulasi_total_nilai_baru);
+    trx_aktif.kategori_id = Set(payload.kategori_id);
+    trx_aktif.poin_kualitas = Set(payload.poin_kualitas);
+    trx_aktif.catatan = Set(payload.catatan);
+    trx_aktif.tanggal = Set(tanggal_parsed);
+
+    if let Err(e) = trx_aktif.update(&db).await {
+        return Json(ResponPesan { status: "gagal".to_string(), pesan: format!("Gagal menyimpan perubahan transaksi: {}", e) });
+    }
+
+    // 6. Penyesuaian Otomatis Dompet (Tabungan)
+    // Jika selisih_nilai positif (menguntungkan), tambah saldo. Jika negatif (merugikan), kurangi saldo.
+    if selisih_nilai != 0 {
+        let pencarian_dompet = tabungan_sampah::Entity::find().filter(tabungan_sampah::Column::WilayahId.eq(id_wilayah)).one(&db).await.unwrap();
+
+        if let Some(dompet_lama) = pencarian_dompet {
+            let mut dompet_aktif: tabungan_sampah::ActiveModel = dompet_lama.into();
+            let saldo_sekarang = dompet_aktif.saldo.clone().unwrap();
+            dompet_aktif.saldo = Set(saldo_sekarang + selisih_nilai);
+            let _ = dompet_aktif.update(&db).await;
+        } else if selisih_nilai > 0 { // Just in case, buat dompet baru kalau belum ada
+            let dompet_baru = tabungan_sampah::ActiveModel {
+                saldo: Set(selisih_nilai),
+                status: Set("Aktif".to_string()),
+                wilayah_id: Set(id_wilayah),
+                ..Default::default()
+            };
+            let _ = dompet_baru.insert(&db).await;
+        }
+    }
+
+    Json(ResponPesan {
+        status: "sukses".to_string(),
+        pesan: format!("Transaksi berhasil diperbarui! Saldo otomatis disesuaikan sebesar Rp {}", selisih_nilai),
+    })
+}
+
 // Fungsi Hapus Transaksi (Dilengkapi dengan Auto-Kurang Saldo)
 #[utoipa::path(
     delete,
@@ -1473,7 +1583,15 @@ pub async fn hapus_transaksi(
         Ok(Some(data_trx)) => {
             // CEK HAK AKSES: Apakah yang menghapus adalah pemilik transaksinya?
             let user_login = user::Entity::find().filter(user::Column::Username.eq(username_jwt)).one(&db).await.unwrap().unwrap();
-            if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui" {
+            
+            if user_login.role == "dui" {
+                return Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: "Akses ditolak! Role DUI hanya memiliki hak akses untuk melihat data (Read-Only).".to_string(),
+                });
+            }
+
+            if user_login.role != "bem_km" && user_login.role != "admin" {
                 if user_login.wilayah_id != Some(data_trx.wilayah_id) {
                     return Json(ResponPesan {
                         status: "gagal".to_string(),
