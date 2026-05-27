@@ -1,11 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 
 function AktivitasPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filterWaktu, setFilterWaktu] = useState('Filter');
+  const [aktivitasData, setAktivitasData] = useState([]);
   
   const filterOptions = ['Semua Waktu', 'Hari Ini', 'Kemarin', '7 Hari Terakhir', 'Bulan Ini'];
+
+  useEffect(() => {
+    const fetchAktivitas = async () => {
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/transaksi`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const resData = await response.json();
+        
+        if (resData.status === 'sukses') {
+          setAktivitasData(resData.data.sort((a, b) => b.id - a.id));
+        }
+      } catch (error) {
+        console.error("Gagal mengambil data aktivitas:", error);
+      }
+    };
+
+    fetchAktivitas();
+  }, []);
+
+  const formatTanggalWaktu = (isoString) => {
+    if (!isoString) return '-';
+    const date = new Date(isoString);
+    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
     <DashboardLayout>
@@ -52,19 +79,24 @@ function AktivitasPage() {
       </div>
 
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 mb-6">
-        <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-8">Hari Ini</h3>
+        <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-8">Semua Aktivitas</h3>
         <div className="relative border-l-2 border-gray-100 ml-6 space-y-10">
-          <div className="relative pl-8">
-            <div className="absolute -left-[19px] top-0 w-9 h-9 bg-green-100 text-green-600 rounded-full border-4 border-white flex items-center justify-center shadow-sm"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></div>
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="font-bold text-[#0B4D1E] text-base">Transaksi plastik berhasil ditambahkan</p>
-                <p className="text-sm text-gray-500 font-medium mt-1">+25kg plastik dicatat</p>
-                <p className="text-xs text-gray-400 mt-2">5 menit lalu</p>
+          {aktivitasData.map((akt, idx) => (
+            <div key={akt.id} className="relative pl-8">
+              <div className={`absolute -left-[19px] top-0 w-9 h-9 rounded-full border-4 border-white flex items-center justify-center shadow-sm ${idx % 2 === 0 ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-[#F4A300]'}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
               </div>
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-bold text-[#0B4D1E] text-base">Transaksi {akt.nama_kategori} berhasil dicatat</p>
+                  <p className="text-sm text-gray-500 font-medium mt-1">+{akt.berat / 1000}kg ditambahkan oleh {akt.nama_petugas}</p>
+                  <p className="text-xs text-gray-400 mt-2">{formatTanggalWaktu(akt.tanggal)} • Wilayah {akt.nama_wilayah}</p>
+                </div>
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              </div>
             </div>
-          </div>
+          ))}
+          {aktivitasData.length === 0 && <p className="text-gray-500 font-bold">Belum ada aktivitas di sistem ini.</p>}
         </div>
       </div>
     </DashboardLayout>

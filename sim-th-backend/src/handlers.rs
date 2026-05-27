@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use bcrypt::{hash, verify, DEFAULT_COST}; // Tambahkan alat bcrypt
 use jsonwebtoken::{encode, EncodingKey, Header, decode, DecodingKey, Validation}; // Alat pembuat JWT
-use chrono::{Utc, Duration, Datelike}; // Jam digital untuk masa berlaku token
+use chrono::{Utc, Duration, Datelike, NaiveDateTime}; // Jam digital untuk masa berlaku token
 use totp_rs::{Algorithm, Secret, TOTP};
 use lettre::{Message, AsyncTransport, AsyncSmtpTransport, Tokio1Executor};
 use lettre::message::header::ContentType;
@@ -103,6 +103,7 @@ pub struct InputResetPasswordEmail {
 pub struct InputUpdateUser {
     pub nama: String,
     pub status: String,
+    pub telepon: Option<String>,
 }
 
 // Struct untuk Ubah Password dari Halaman Profil
@@ -123,10 +124,10 @@ pub struct InputKategori {
 #[derive(Deserialize,ToSchema)]
 pub struct InputTransaksi {
     pub kategori_id: i32,
-    pub wilayah_id: i32,
     pub berat_gram: i32, 
     pub poin_kualitas: i32, // Tangkap skor 30, 25, 15, dll dari Frontend
     pub catatan: Option<String>,
+    pub tanggal: Option<String>, // Tambahan field Tanggal
 }
 
 // Struct untuk menerima request penarikan saldo
@@ -148,6 +149,8 @@ pub struct TransaksiLengkap {
     pub poin_kualitas: i32,    // Tambahan kolom skor
     pub nama_petugas: String,  // Diambil dari tabel user
     pub catatan: Option<String>, // Tambahan kolom catatan
+    #[schema(value_type = String)]
+    pub tanggal: NaiveDateTime, 
 }
 
 // Ganti tipe data i32 menjadi Option<i64> dan i64
@@ -189,6 +192,7 @@ pub struct TransaksiKategoriBiasa {
     pub berat: i32,
     pub total_nilai: i32,
     pub nama_kategori: String,
+    pub tanggal: NaiveDateTime, // Tambahan kolom tanggal
 }
 
 // Struct untuk Filter Periode Tanggal
@@ -328,7 +332,9 @@ pub async fn lihat_user(
                 serde_json::json!({
                     "id": u.id,
                     "username": u.username,
-                    "nama": u.nama
+                    "nama": u.nama,
+                    "role": u.role,
+                    "telepon": u.telepon
                 })
             }).collect();
 
@@ -385,6 +391,7 @@ pub async fn update_user(
             // Update nama dan status
             data_aktif.nama = Set(payload.nama.clone()); 
             data_aktif.status = Set(payload.status.clone()); 
+            data_aktif.telepon = Set(payload.telepon.clone()); 
 
             match data_aktif.update(&db).await {
                 Ok(_) => (
@@ -1233,32 +1240,30 @@ pub async fn tambah_transaksi(
         }),
     };
 
-    // --- TAHAP 1.2: GEMBOK LINTAS WILAYAH (ISOLASI DATA) ---
-    if petugas.role != "bem_km" && petugas.role != "admin" && petugas.role != "dui" {
-        if petugas.wilayah_id != Some(payload.wilayah_id) {
-            return Json(ResponPesan {
-                status: "gagal".to_string(),
-                pesan: "Akses ditolak! Anda tidak diizinkan mencatat setoran untuk wilayah lain.".to_string(),
-            });
+    // --- TAHAP 1.2: VALIDASI ROLE & WILAYAH ---
+    // Hanya BEM Wilayah yang bisa input, dan mereka wajib punya wilayah_id.
+    // BEM KM/Admin tidak bisa input, mereka hanya audit.
+    let id_wilayah_petugas = match petugas.role.as_str() {
+        "bem_km" | "admin" | "dui" => {
+            return Json(ResponPesan { status: "gagal".to_string(), pesan: "Akses ditolak! Administrator tidak dapat menginput transaksi, hanya BEM Wilayah.".to_string() });
+        },
+        _ => match petugas.wilayah_id {
+            Some(id) => id,
+            None => return Json(ResponPesan { status: "gagal".to_string(), pesan: "Akun Anda tidak terasosiasi dengan wilayah manapun. Hubungi admin.".to_string() }),
         }
-    }
+    };
 
     // --- TAHAP 1.5: GEMBOK KEAMANAN (CEK STATUS WILAYAH) ---
-    let pencarian_wilayah = wilayah::Entity::find_by_id(payload.wilayah_id).one(&db).await;
+    let pencarian_wilayah = wilayah::Entity::find_by_id(id_wilayah_petugas).one(&db).await;
     match pencarian_wilayah {
         Ok(Some(w)) => {
             // Kalau ketemu, tapi statusnya bukan Aktif, tolak setorannya!
             if w.status != "Aktif" {
-                return Json(ResponPesan {
-                    status: "gagal".to_string(),
-                    pesan: format!("Setoran ditolak! Wilayah '{}' saat ini berstatus Nonaktif.", w.nama),
-                });
+                return Json(ResponPesan { status: "gagal".to_string(), pesan: format!("Setoran ditolak! Wilayah '{}' saat ini berstatus Nonaktif.", w.nama) });
             }
         },
-        Ok(None) => return Json(ResponPesan {
-            status: "gagal".to_string(),
-            pesan: format!("Wilayah ID {} tidak ditemukan di sistem!", payload.wilayah_id),
-        }),
+        // Ini seharusnya tidak terjadi jika data konsisten, tapi sebagai pengaman
+        Ok(None) => return Json(ResponPesan { status: "gagal".to_string(), pesan: "Wilayah yang terdaftar di akun Anda tidak ditemukan di sistem.".to_string() }),
         Err(e) => return Json(ResponPesan { status: "error".to_string(), pesan: e.to_string() }),
     };
 
@@ -1276,16 +1281,25 @@ pub async fn tambah_transaksi(
     // --- TAHAP 3: KALKULASI INTEGER MURNI ---
     let kalkulasi_total_nilai = (payload.berat_gram * kategori.harga_per_kg) / 1000;
 
+    // --- TAHAP 3.5: PARSING TANGGAL TRANSAKSI ---
+    let tanggal_parsed = if let Some(ref tgl) = payload.tanggal {
+        chrono::NaiveDateTime::parse_from_str(&format!("{} 00:00:00", tgl), "%Y-%m-%d %H:%M:%S")
+            .unwrap_or_else(|_| Utc::now().naive_utc())
+    } else {
+        Utc::now().naive_utc()
+    };
+
     // --- TAHAP 4: SIMPAN KE BRANKAS ---
     let transaksi_baru = transaksi_sampah::ActiveModel {
         berat: Set(payload.berat_gram),
         total_nilai: Set(kalkulasi_total_nilai),
         status: Set("Selesai".to_string()),
         kategori_id: Set(payload.kategori_id),
-        wilayah_id: Set(payload.wilayah_id),
+        wilayah_id: Set(id_wilayah_petugas),
         poin_kualitas: Set(payload.poin_kualitas), // Simpan poinnya
         catatan: Set(payload.catatan), 
         input_by: Set(petugas.id), 
+        tanggal: Set(tanggal_parsed), // Simpan tanggal manual
         ..Default::default()
     };
 
@@ -1293,7 +1307,7 @@ pub async fn tambah_transaksi(
     Ok(_) => {
         // --- TAHAP 5: OTOMATISASI SALDO TABUNGAN WILAYAH ---
         let pencarian_dompet = tabungan_sampah::Entity::find()
-            .filter(tabungan_sampah::Column::WilayahId.eq(payload.wilayah_id))
+            .filter(tabungan_sampah::Column::WilayahId.eq(id_wilayah_petugas))
             .one(&db)
             .await
             .unwrap();
@@ -1310,7 +1324,7 @@ pub async fn tambah_transaksi(
                 let dompet_baru = tabungan_sampah::ActiveModel {
                     saldo: Set(kalkulasi_total_nilai),
                     status: Set("Aktif".to_string()),
-                    wilayah_id: Set(payload.wilayah_id),
+                    wilayah_id: Set(id_wilayah_petugas),
                     ..Default::default()
                 };
                 let _ = dompet_baru.insert(&db).await;
@@ -1951,7 +1965,8 @@ pub async fn lihat_aktivitas_terbaru(
         "judul": format!("Transaksi {} berhasil ditambahkan", t.nama_kategori.to_lowercase()),
         "deskripsi": format!("+{}kg {} dicatat ke sistem", t.berat / 1000, t.nama_kategori.to_lowercase()),
         "tipe": "transaksi",
-        "waktu": "Baru saja" 
+        "waktu": t.tanggal.format("%d %b %Y").to_string(),
+        "tanggal": t.tanggal
     })).collect();
 
     Json(serde_json::json!({ "status": "sukses", "data": aktivitas }))

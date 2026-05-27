@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 function BukuTabunganPage() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -17,17 +20,77 @@ function BukuTabunganPage() {
   const [isPeriodeOpen, setIsPeriodeOpen] = useState(false);
   const periodeOptions = ['Semua Periode', 'Mei 2026', 'April 2026', 'Maret 2026'];
 
+  // State Data Real
+  const [saldo, setSaldo] = useState(0);
+  const [namaWilayah, setNamaWilayah] = useState('Memuat...');
+  const [riwayatPemasukan, setRiwayatPemasukan] = useState([]);
+  const [pemasukanBulanIni, setPemasukanBulanIni] = useState(0);
+  const [rataRataTrx, setRataRataTrx] = useState(0);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        // Ambil Data Tabungan dan Transaksi
+        const [resTabungan, resTrx] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_URL}/tabungan`, { headers }),
+          fetch(`${import.meta.env.VITE_API_URL}/transaksi`, { headers })
+        ]);
+
+        const dataTabungan = await resTabungan.json();
+        const dataTrx = await resTrx.json();
+
+        let myWilayah = 'BEM KM / Pusat';
+        if (dataTrx.status === 'sukses' && dataTrx.data.length > 0) {
+          const myTrx = dataTrx.data.sort((a, b) => b.id - a.id);
+          setRiwayatPemasukan(myTrx.slice(0, 5)); // Ambil 5 terbaru
+          myWilayah = myTrx[0].nama_wilayah;
+          setNamaWilayah(myWilayah);
+          
+          const totalNilai = myTrx.reduce((sum, t) => sum + t.total_nilai, 0);
+          setPemasukanBulanIni(totalNilai);
+          setRataRataTrx(myTrx.length > 0 ? totalNilai / myTrx.length : 0);
+        }
+
+        if (dataTabungan.status === 'sukses') {
+          const myDompet = dataTabungan.data.find(t => t.nama_wilayah === myWilayah);
+          if (myDompet) setSaldo(myDompet.saldo);
+        }
+      } catch (err) {
+        console.error("Gagal menarik data tabungan:", err);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+
   const handleExport = () => {
-    alert(`File ${exportFormat} sedang diunduh...`);
+    if (exportFormat === 'Excel') {
+      const worksheet = XLSX.utils.json_to_sheet(riwayatPemasukan.map(t => ({
+        "ID Transaksi": t.id,
+        "Tanggal": new Date(t.tanggal).toLocaleDateString('id-ID'),
+        "Kategori Setoran": t.nama_kategori,
+        "Nominal Pemasukan (Rp)": t.total_nilai,
+        "Wilayah": t.nama_wilayah,
+        "Petugas": t.nama_petugas
+      })));
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Buku Tabungan");
+      XLSX.writeFile(workbook, `Buku_Tabungan_${namaWilayah.replace(' ', '_')}.xlsx`);
+    } else {
+      const doc = new jsPDF();
+      doc.text(`Buku Tabungan - ${namaWilayah}`, 14, 15);
+      doc.text(`Total Saldo Saat Ini: Rp ${saldo.toLocaleString('id-ID')}`, 14, 22);
+      
+      const tableData = riwayatPemasukan.map(t => [new Date(t.tanggal).toLocaleDateString('id-ID'), `Setoran ${t.nama_kategori}`, `Rp ${t.total_nilai.toLocaleString('id-ID')}`, t.nama_petugas]);
+      doc.autoTable({ head: [['Tanggal', 'Keterangan', 'Pemasukan (Rp)', 'Petugas']], body: tableData, startY: 30 });
+      doc.save(`Buku_Tabungan_${namaWilayah.replace(' ', '_')}.pdf`);
+    }
     setIsExportModalOpen(false);
   };
-
-  const riwayatPemasukan = [
-    { jenis: 'Setoran Plastik', tanggal: '9 Mei 2026', nilai: '+ Rp 50.000' },
-    { jenis: 'Setoran Kertas', tanggal: '8 Mei 2026', nilai: '+ Rp 25.000' },
-    { jenis: 'Setoran Logam', tanggal: '7 Mei 2026', nilai: '+ Rp 75.000' },
-    { jenis: 'Setoran Plastik', tanggal: '6 Mei 2026', nilai: '+ Rp 30.000' },
-  ];
 
   return (
     <DashboardLayout>
@@ -52,8 +115,8 @@ function BukuTabunganPage() {
         <div className="absolute right-0 top-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4"></div>
         <div className="z-10">
           <p className="text-green-100 font-medium mb-1">Total Saldo Tabungan</p>
-          <h3 className="text-5xl font-extrabold mb-2">Rp 270.000</h3>
-          <p className="text-sm text-green-200">Wilayah: BEM FATETA • Terakhir diperbarui: 9 Mei 2026</p>
+          <h3 className="text-5xl font-extrabold mb-2">{formatRp(saldo)}</h3>
+          <p className="text-sm text-green-200">Wilayah: {namaWilayah} • Otomatis sinkron</p>
         </div>
         <div className="bg-white/20 px-5 py-2.5 rounded-full font-bold backdrop-blur-sm border border-white/30 flex items-center gap-2 z-10">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
@@ -81,22 +144,23 @@ function BukuTabunganPage() {
                 <div className="bg-green-100 p-2.5 rounded-xl text-[#0B4D1E]">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7M5 19l7-7 7 7" /></svg>
                 </div>
-                <div><p className="font-bold text-[#0B4D1E]">{item.jenis}</p><p className="text-xs text-gray-500">{item.tanggal}</p></div>
+                <div><p className="font-bold text-[#0B4D1E]">Setoran {item.nama_kategori}</p><p className="text-xs text-gray-500">Oleh: {item.nama_petugas}</p></div>
               </div>
-              <div className="font-extrabold text-[#0B4D1E]">{item.nilai}</div>
+              <div className="font-extrabold text-[#0B4D1E]">+ {formatRp(item.total_nilai)}</div>
             </div>
           ))}
+          {riwayatPemasukan.length === 0 && <p className="text-center text-sm font-bold text-gray-400 py-4">Belum ada pemasukan tabungan.</p>}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
           <p className="text-gray-500 font-medium text-sm mb-1">Pemasukan Bulan Ini</p>
-          <h3 className="text-3xl font-extrabold text-[#0B4D1E]">Rp 60.000</h3>
+          <h3 className="text-3xl font-extrabold text-[#0B4D1E]">{formatRp(pemasukanBulanIni)}</h3>
         </div>
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
           <p className="text-gray-500 font-medium text-sm mb-1">Rata-rata per Transaksi</p>
-          <h3 className="text-3xl font-extrabold text-[#0B4D1E]">Rp 44.000</h3>
+          <h3 className="text-3xl font-extrabold text-[#0B4D1E]">{formatRp(rataRataTrx)}</h3>
         </div>
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
           <p className="text-gray-500 font-medium text-sm mb-1">Pertumbuhan</p>

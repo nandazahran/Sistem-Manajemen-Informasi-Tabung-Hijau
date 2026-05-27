@@ -18,6 +18,7 @@ impl MigrationTrait for Migration {
                     .col(string(User::Nama))
                     .col(string(User::Role))   // Isinya nanti: "Admin", "BEMWilayah", atau "DUI"
                     .col(string(User::Status)) // Isinya nanti: "Aktif" atau "Non-Aktif"
+                    .col(ColumnDef::new(User::Telepon).string().null()) // Tambah kolom telepon
                     // Kolom wilayah_id boleh kosong (null) karena Admin dan DUI tidak terikat 1 wilayah spesifik
                     .col(integer_null(User::WilayahId)) 
                     // --- MEMBUAT RELASI (FOREIGN KEY) KE TABEL WILAYAH ---
@@ -52,6 +53,7 @@ pub enum User {
     Nama,
     Role,
     Status,
+    Telepon, // Tambah telepon di Enum User
     WilayahId,
 }
 

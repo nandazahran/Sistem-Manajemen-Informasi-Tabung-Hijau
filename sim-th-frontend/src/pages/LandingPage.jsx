@@ -6,6 +6,43 @@ import 'aos/dist/aos.css';
 function LandingPage() {
   const [activeSection, setActiveSection] = useState('home');
 
+  // State untuk form kontak
+  const [nama, setNama] = useState('');
+  const [email, setEmail] = useState('');
+  const [pesan, setPesan] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [statusPesan, setStatusPesan] = useState({ tipe: '', teks: '' });
+
+  // Fungsi untuk mengirim pesan ke backend
+  const handleKirimPesan = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setStatusPesan({ tipe: '', teks: '' });
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/kontak`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nama, email, pesan })
+      });
+
+      const data = await response.json();
+
+      if (response.status === 201) {
+        setStatusPesan({ tipe: 'sukses', teks: data.pesan });
+        setNama('');
+        setEmail('');
+        setPesan('');
+      } else {
+        setStatusPesan({ tipe: 'error', teks: data.pesan || 'Gagal mengirim pesan.' });
+      }
+    } catch (error) {
+      setStatusPesan({ tipe: 'error', teks: 'Koneksi gagal. Pastikan backend sudah menyala.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     AOS.init({ duration: 800, once: true, offset: 100 });
     const handleScroll = () => {
@@ -143,14 +180,47 @@ function LandingPage() {
                 <button className="px-6 py-2.5 bg-[#0B4D1E] text-white font-bold rounded-full text-sm hover:bg-[#083a16] transition-colors">Twitter</button>
               </div>
             </div>
-            <div className="md:w-1/2 flex flex-col gap-4">
-              <input type="text" placeholder="Nama Lengkap" className="w-full bg-white px-5 py-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-all" />
-              <input type="email" placeholder="Email" className="w-full bg-white px-5 py-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-all" />
-              <textarea placeholder="Pesan Anda" rows="4" className="w-full bg-white px-5 py-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] resize-none transition-all"></textarea>
-              <button className="w-full bg-[#0B4D1E] text-white py-4 rounded-xl font-bold hover:bg-[#083a16] hover:shadow-lg transform hover:-translate-y-1 transition-all mt-2">
-                Send Message
+            <form onSubmit={handleKirimPesan} className="md:w-1/2 flex flex-col gap-4">
+              {/* Notifikasi Status Pesan */}
+              {statusPesan.teks && (
+                <div className={`px-4 py-3 rounded-xl text-sm border ${
+                  statusPesan.tipe === 'sukses' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700'
+                }`}>
+                  {statusPesan.teks}
+                </div>
+              )}
+              <input 
+                type="text" 
+                placeholder="Nama Lengkap" 
+                value={nama}
+                onChange={(e) => setNama(e.target.value)}
+                required
+                className="w-full bg-white px-5 py-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-all" 
+              />
+              <input 
+                type="email" 
+                placeholder="Email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full bg-white px-5 py-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-all" 
+              />
+              <textarea 
+                placeholder="Pesan Anda" 
+                rows="4" 
+                value={pesan}
+                onChange={(e) => setPesan(e.target.value)}
+                required
+                className="w-full bg-white px-5 py-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] resize-none transition-all"
+              ></textarea>
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className={`w-full text-white py-4 rounded-xl font-bold transition-all mt-2 ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#0B4D1E] hover:bg-[#083a16] hover:shadow-lg transform hover:-translate-y-1'}`}
+              >
+                {isLoading ? 'Mengirim...' : 'Send Message'}
               </button>
-            </div>
+            </form>
           </div>
         </div>
       </section>

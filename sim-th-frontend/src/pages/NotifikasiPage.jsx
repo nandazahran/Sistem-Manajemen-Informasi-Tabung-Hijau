@@ -1,16 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 
 function NotifikasiPage() {
   const [activeTab, setActiveTab] = useState('semua');
   
-  const [notifikasi, setNotifikasi] = useState([
-    { id: 1, type: 'up', title: 'Harga plastik diperbarui', desc: 'Harga baru: Rp 4.500/kg', time: '5 menit lalu', read: false },
-    { id: 2, type: 'check', title: 'Transaksi berhasil dicatat', desc: 'Setoran plastik 25kg telah dicatat', time: '10 menit lalu', read: false },
-    { id: 3, type: 'up', title: 'Leaderboard periode baru tersedia', desc: 'Lihat peringkat bulan Mei 2026', time: '1 jam lalu', read: false },
-    { id: 4, type: 'alert', title: 'Reminder: Deadline laporan', desc: 'Laporan bulanan deadline 2 hari lagi', time: '2 jam lalu', read: true },
-    { id: 5, type: 'wallet', title: 'Saldo bertambah', desc: '+Rp 50.000 dari setoran plastik', time: '3 jam lalu', read: true },
-  ]);
+  const [notifikasi, setNotifikasi] = useState([]);
+
+  useEffect(() => {
+    const fetchNotifikasi = async () => {
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/transaksi`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const resData = await response.json();
+        
+        if (resData.status === 'sukses') {
+          const dataTrx = resData.data.sort((a, b) => b.id - a.id);
+          
+          // Mapping riwayat transaksi ke format Notifikasi
+          const mappedNotif = dataTrx.map((t, index) => ({
+            id: t.id,
+            type: 'check',
+            title: `Transaksi ${t.nama_kategori} berhasil dicatat`,
+            desc: `Setoran ${t.nama_kategori.toLowerCase()} ${t.berat/1000}kg telah dicatat oleh ${t.nama_petugas}`,
+            time: 'Sistem Terhubung',
+            read: index >= 3 // 3 aktivitas terbaru ditandai sebagai belum dibaca
+          }));
+
+          // Tambahkan notifikasi sistem default di awal
+          mappedNotif.unshift({
+            id: 'sys-1', type: 'up', title: 'Sistem Notifikasi Aktif', desc: 'Notifikasi berjalan real-time dengan database', time: 'Baru saja', read: false
+          });
+
+          setNotifikasi(mappedNotif);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil data notifikasi:", error);
+      }
+    };
+    fetchNotifikasi();
+  }, []);
 
   const unreadCount = notifikasi.filter(n => !n.read).length;
 

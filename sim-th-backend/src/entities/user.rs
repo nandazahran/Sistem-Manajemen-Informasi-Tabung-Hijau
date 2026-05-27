@@ -16,6 +16,7 @@ pub struct Model {
     pub nama: String,
     pub role: String,
     pub status: String,
+    pub telepon: Option<String>,
     pub wilayah_id: Option<i32>,
     pub totp_secret: Option<String>,
     pub totp_aktif: bool,

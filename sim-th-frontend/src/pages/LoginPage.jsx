@@ -23,7 +23,7 @@ function LoginPage() {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: email, password: password }) // BE Nanda pakai 'username'
+        body: JSON.stringify({ username: email.split('@')[0], password: password }) // BE Nanda pakai 'username'
       });
 
       const data = await response.json();
