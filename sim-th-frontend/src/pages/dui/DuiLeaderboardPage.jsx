@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import AdminLayout from '../../components/AdminLayout';
+import DuiLayout from '../../components/DuiLayout';
 
-function LeaderboardPage() {
+function DuiLeaderboardPage() {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const leaderboardData = [
-    { rank: 1, wilayah: 'BEM FATETA', kpi: 925, input: '385 kg', nilai: 'Rp 1250k', trend: 'up' },
-    { rank: 2, wilayah: 'BEM FAPET', kpi: 890, input: '360 kg', nilai: 'Rp 1180k', trend: 'up' },
-    { rank: 3, wilayah: 'BEM FEM', kpi: 875, input: '340 kg', nilai: 'Rp 1100k', trend: 'flat' },
+    { rank: 1, wilayah: 'BEM FATETA', kpi: 925, input: '385 kg', nilai: 'Rp 1.250k', trend: 'up' },
+    { rank: 2, wilayah: 'BEM FAPET', kpi: 890, input: '360 kg', nilai: 'Rp 1.180k', trend: 'up' },
+    { rank: 3, wilayah: 'BEM FEM', kpi: 875, input: '340 kg', nilai: 'Rp 1.100k', trend: 'flat' },
     { rank: 4, wilayah: 'BEM FAHUTAN', kpi: 820, input: '310 kg', nilai: 'Rp 950k', trend: 'down' },
     { rank: 5, wilayah: 'BEM FPIK', kpi: 780, input: '285 kg', nilai: 'Rp 850k', trend: 'flat' },
     { rank: 6, wilayah: 'BEM FMIPA', kpi: 750, input: '260 kg', nilai: 'Rp 780k', trend: 'up' },
@@ -18,7 +18,7 @@ function LeaderboardPage() {
   const visibleData = isExpanded ? leaderboardData.slice(3) : leaderboardData.slice(3, 5); 
 
   return (
-    <AdminLayout>
+    <DuiLayout>
       {/* BANNER */}
       <div className="bg-[#0B4D1E] rounded-[2rem] p-10 flex flex-col md:flex-row items-start md:items-center justify-between shadow-sm mt-2 mb-8">
         <div className="flex items-center gap-5 text-white mb-6 md:mb-0">
@@ -28,7 +28,7 @@ function LeaderboardPage() {
         <select className="bg-[#F4A300] text-white px-6 py-3.5 rounded-xl font-bold outline-none cursor-pointer"><option>Mei 2026</option><option>April 2026</option></select>
       </div>
 
-      {/* TOP 3 PODIUM - WARNA EMAS PERAK PERUNGGU */}
+      {/* TOP 3 PODIUM */}
       <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-8">
         <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-8">Top 3 Wilayah</h3>
         <div className="flex flex-col md:flex-row justify-center items-end gap-4 h-72 px-4 mb-10">
@@ -72,7 +72,7 @@ function LeaderboardPage() {
           </tbody>
         </table>
         
-        {/* EXPAND BUTTON (PAKAI PANAH BAWAH) */}
+        {/* EXPAND BUTTON */}
         {!isExpanded && (
            <div className="text-center p-4 border-t border-gray-100">
              <button onClick={() => setIsExpanded(true)} className="text-[#0B4D1E] font-bold text-sm hover:underline flex items-center justify-center gap-2 w-full mt-2">
@@ -83,17 +83,8 @@ function LeaderboardPage() {
         )}
       </div>
 
-      <div className="bg-[#E8F5E9] p-8 rounded-[2rem] border border-[#A5D6A7] mb-10 flex flex-col md:flex-row justify-between items-center">
-        <div>
-          <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-2">KPI Breakdown</h3>
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-[#2E7D32] flex gap-4"><span className="w-32">Total Input Sampah</span> <b>Bobot: 60%</b></p>
-            <p className="text-sm font-medium text-[#2E7D32] flex gap-4"><span className="w-32">Nilai Ekonomi</span> <b>Bobot: 40%</b></p>
-          </div>
-        </div>
-      </div>
-    </AdminLayout>
+    </DuiLayout>
   );
 }
 
-export default LeaderboardPage;
+export default DuiLeaderboardPage;

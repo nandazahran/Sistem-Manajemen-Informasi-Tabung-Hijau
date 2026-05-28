@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import AdminLayout from '../../components/AdminLayout';
+import DuiLayout from '../../components/DuiLayout';
 
-function LaporanPage() {
+function DuiLaporanPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [exportFormat, setExportFormat] = useState('XLSX');
-  
-  // States Filter & Search
   const [searchTerm, setSearchTerm] = useState('');
 
   const rekapData = [
@@ -28,7 +26,9 @@ function LaporanPage() {
   const COLORS = ['#125B2A', '#F4A300', '#8FA57A', '#517D3B', '#D1D5DB'];
 
   return (
-    <AdminLayout>
+    <DuiLayout>
+      <style>{`@keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+      
       {/* BANNER */}
       <div className="bg-[#0B4D1E] rounded-[2rem] p-10 flex flex-col md:flex-row items-start md:items-center justify-between shadow-sm mt-2 mb-8">
         <div className="flex items-center gap-5 text-white mb-6 md:mb-0">
@@ -47,8 +47,14 @@ function LaporanPage() {
           <input type="text" placeholder="Cari wilayah..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#F5EFE6] px-14 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E]" />
         </div>
         <div className="flex gap-4">
-          <select className="w-40 bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl outline-none cursor-pointer"><option>Mei 2026</option></select>
-          <select className="w-32 bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl outline-none cursor-pointer"><option>2026</option></select>
+          <div className="relative w-40">
+             <select className="w-full bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl outline-none cursor-pointer appearance-none"><option>Mei 2026</option></select>
+             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+          </div>
+          <div className="relative w-32">
+             <select className="w-full bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl outline-none cursor-pointer appearance-none"><option>2026</option></select>
+             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+          </div>
         </div>
       </div>
 
@@ -83,6 +89,7 @@ function LaporanPage() {
           </div>
         </div>
       </div>
+
       <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-8 h-80 flex flex-col">
         <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Kontribusi Wilayah (kg)</h3>
         <div className="flex-1 relative">
@@ -103,53 +110,93 @@ function LaporanPage() {
             {filteredRekap.map((r) => (
               <tr key={r.id} onClick={() => handleRowClick(r)} className="hover:bg-[#FDF6EA] transition-colors cursor-pointer group">
                 <td className="px-8 py-5 font-extrabold text-[#0B4D1E] group-hover:text-[#F4A300] transition-colors">{r.wilayah}</td>
-                <td className="px-8 py-5 font-medium text-gray-500">{r.totalTx}</td>
-                <td className="px-8 py-5 font-bold text-[#0B4D1E]">{r.berat}</td>
-                <td className="px-8 py-5 font-extrabold text-green-600">{r.nilai}</td>
-                <td className="px-8 py-5 font-extrabold text-[#F4A300]">{r.kpi}</td>
+                <td className="px-8 py-5 font-medium text-gray-500">{r.totalTx}</td><td className="px-8 py-5 font-bold text-[#0B4D1E]">{r.berat}</td><td className="px-8 py-5 font-extrabold text-green-600">{r.nilai}</td><td className="px-8 py-5 font-extrabold text-[#F4A300]">{r.kpi}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {/* MODAL 1: EXPORT DATA (SUDAH DI REVISI DESAIN OUTLINE) */}
+      {/* MODAL EXPORT LAPORAN */}
       {isExportOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl relative border border-gray-100">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl relative animate-fade-in-up border border-gray-100">
             <div className="flex justify-between items-center mb-8">
-              <div className="flex items-center gap-3"><div className="bg-[#FDF6EA] p-3 rounded-2xl text-[#F4A300]"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg></div><h3 className="text-2xl font-extrabold text-[#0B4D1E]">Export Laporan</h3></div>
-              <button onClick={() => setIsExportOpen(false)} className="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+              <div className="flex items-center gap-3">
+                <div className="bg-[#FDF6EA] p-3 rounded-2xl text-[#F4A300]">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                </div>
+                <h3 className="text-2xl font-extrabold text-[#0B4D1E]">Export Laporan</h3>
+              </div>
+              <button onClick={() => setIsExportOpen(false)} className="text-[#0B4D1E] hover:text-red-500 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
+            
             <form onSubmit={(e) => { e.preventDefault(); setIsExportOpen(false); alert('Laporan berhasil didownload!'); }} className="space-y-6">
-              <div><label className="block text-sm font-bold text-[#0B4D1E] mb-2">Periode Laporan</label><select className="w-full bg-[#F5EFE6] px-5 py-4 rounded-2xl font-bold text-[#0B4D1E] outline-none cursor-pointer"><option>Mei 2026</option><option>April 2026</option></select></div>
+              {/* Periode */}
+              <div>
+                <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Periode Laporan</label>
+                <div className="relative">
+                  <select className="w-full bg-[#F5EFE6] px-5 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none appearance-none cursor-pointer">
+                    <option>Mei 2026</option><option>April 2026</option>
+                  </select>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute right-4 top-1/2 transform -translate-y-1/2 text-[#0B4D1E] pointer-events-none" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                </div>
+              </div>
+
+              {/* Format File */}
               <div>
                 <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Format File</label>
                 <div className="flex gap-4">
-                  <button type="button" onClick={() => setExportFormat('XLSX')} className={`flex-1 py-4 flex flex-col items-center justify-center gap-2 rounded-2xl font-bold transition-all duration-300 ${exportFormat === 'XLSX' ? 'border-2 border-[#125B2A] text-[#125B2A] bg-white' : 'border border-gray-200 text-gray-500 bg-white hover:bg-gray-50'}`}>XLSX (Excel)</button>
-                  <button type="button" onClick={() => setExportFormat('PDF')} className={`flex-1 py-4 flex flex-col items-center justify-center gap-2 rounded-2xl font-bold transition-all duration-300 ${exportFormat === 'PDF' ? 'border-2 border-[#125B2A] text-[#125B2A] bg-white' : 'border border-gray-200 text-gray-500 bg-white hover:bg-gray-50'}`}>PDF</button>
+                  <button type="button" onClick={() => setExportFormat('XLSX')} className={`flex-1 py-4 rounded-2xl font-bold transition-all ${exportFormat === 'XLSX' ? 'bg-[#125B2A] text-white shadow-md' : 'bg-[#F5EFE6] text-gray-500 hover:bg-[#EAE5DA]'}`}>XLSX (Excel)</button>
+                  <button type="button" onClick={() => setExportFormat('PDF')} className={`flex-1 py-4 rounded-2xl font-bold transition-all ${exportFormat === 'PDF' ? 'bg-[#125B2A] text-white shadow-md' : 'bg-[#F5EFE6] text-gray-500 hover:bg-[#EAE5DA]'}`}>PDF</button>
                 </div>
               </div>
+
+              {/* Data Export Checkboxes */}
               <div>
                 <label className="block text-sm font-bold text-[#0B4D1E] mb-3">Pilih Data yang akan diexport</label>
-                <div className="bg-[#F5EFE6] p-5 rounded-2xl space-y-4">
+                <div className="space-y-3">
                   {['Tren Sampah per Kategori', 'Nilai Ekonomi per Wilayah', 'Kontribusi Wilayah', 'Rekap Transaksi'].map((item) => (
-                    <label key={item} className="flex items-center gap-4 cursor-pointer group"><input type="checkbox" defaultChecked className="w-5 h-5 text-[#0A8895] bg-white border-gray-300 rounded cursor-pointer accent-[#0A8895]" /><span className="text-sm font-bold text-[#0B4D1E]">{item}</span></label>
+                    <label key={item} className="flex items-center gap-4 cursor-pointer bg-[#F5EFE6] p-4 rounded-2xl group hover:bg-[#EAE5DA] transition-colors">
+                      <input type="checkbox" defaultChecked className="w-5 h-5 text-[#0A8895] bg-white border-gray-300 rounded cursor-pointer accent-[#0A8895]" />
+                      <span className="text-sm font-bold text-[#0B4D1E]">{item}</span>
+                    </label>
                   ))}
                 </div>
               </div>
+
+              {/* Action Buttons */}
               <div className="flex gap-4 mt-8 pt-2">
-                <button type="button" onClick={() => setIsExportOpen(false)} className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-4 rounded-2xl font-bold hover:bg-[#EAE5DA]">Batal</button>
-                <button type="submit" className="flex-1 bg-[#0B4D1E] text-white py-4 rounded-2xl font-bold hover:bg-[#083a16] shadow-md flex items-center justify-center gap-2">Download</button>
+                <button type="button" onClick={() => setIsExportOpen(false)} className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-4 rounded-2xl font-bold hover:bg-[#EAE5DA] transition-all">Batal</button>
+                <button type="submit" className="flex-1 bg-[#125B2A] text-white py-4 rounded-2xl font-bold hover:bg-[#0B4D1E] shadow-md flex items-center justify-center gap-2 transition-all">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Download
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL 2: DETAIL REKAP (KLIK BARIS) ... [Paste Modal detail rincian Laporan] */}
-    </AdminLayout>
+      {/* MODAL 2: DETAIL REKAP (KLIK BARIS) */}
+      {isDetailOpen && selectedRow && (
+         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-10 shadow-2xl relative animate-fade-in-up border border-gray-100">
+             <button onClick={() => setIsDetailOpen(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+             <h3 className="text-2xl font-extrabold text-[#0B4D1E] mb-6 border-b border-gray-100 pb-4">{selectedRow.wilayah}</h3>
+             <div className="space-y-4">
+               <div className="flex justify-between"><span className="text-gray-500 text-sm">Total Transaksi:</span><strong className="text-[#0B4D1E]">{selectedRow.totalTx}</strong></div>
+               <div className="flex justify-between"><span className="text-gray-500 text-sm">Total Berat:</span><strong className="text-[#0B4D1E]">{selectedRow.berat}</strong></div>
+               <div className="flex justify-between"><span className="text-gray-500 text-sm">Nilai Ekonomi:</span><strong className="text-green-600">{selectedRow.nilai}</strong></div>
+               <div className="flex justify-between pt-2 border-t border-gray-100"><span className="text-gray-500 text-sm font-bold">KPI Score:</span><strong className="text-[#F4A300] text-xl">{selectedRow.kpi}</strong></div>
+             </div>
+             <button onClick={() => setIsDetailOpen(false)} className="w-full bg-[#0B4D1E] text-white py-3.5 rounded-2xl font-bold mt-8 hover:bg-[#083a16] transition-all">Tutup Detail</button>
+           </div>
+         </div>
+      )}
+    </DuiLayout>
   );
 }
 
-export default LaporanPage;
+export default DuiLaporanPage;

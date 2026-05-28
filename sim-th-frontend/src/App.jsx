@@ -16,7 +16,8 @@ import NotifikasiPage from './pages/NotifikasiPage';
 import AktivitasPage from './pages/AktivitasPage';
 import OtpPage from './pages/OtpPage';
 import ResetPasswordAuthPage from './pages/ResetPasswordAuthPage';
-
+import AktivitasAdminPage from './pages/Admin/AktivitasAdminPage';
+import RiwayatHargaPage from './pages/Admin/RiwayatHargaPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import KelolaTransaksiPage from './pages/admin/KelolaTransaksiPage';
 import AdminRiwayatTransaksiPage from './pages/admin/RiwayatTransaksiPage'; // Import Admin
@@ -26,6 +27,15 @@ import KelolaKategoriPage from './pages/admin/KelolaKategoriPage';
 import AdminLeaderboardPage from './pages/admin/LeaderboardPage'; // Nama Alias
 import AdminLaporanPage from './pages/admin/LaporanPage'; // Nama Alias
 import AdminProfilPage from './pages/admin/ProfilPage';
+// Rute DUI
+import DuiDashboardPage from './pages/dui/DuiDashboardPage';
+import DuiMonitoringPage from './pages/dui/DuiMonitoringPage';
+// Rute Tambahan DUI
+import DuiLeaderboardPage from './pages/dui/DuiLeaderboardPage';
+import DuiLaporanPage from './pages/dui/DuiLaporanPage';
+import DuiAktivitasPage from './pages/dui/DuiAktivitasPage';
+import DuiProfilPage from './pages/dui/DuiProfilPage';
+import DuiNotifikasiPage from './pages/dui/DuiNotifikasiPage';
 
 import PengaturanDataPage from './pages/PengaturanDataPage';
 
@@ -64,9 +74,26 @@ function App() {
         <Route path="/admin/leaderboard" element={<AdminLeaderboardPage />} /> 
         <Route path="/admin/laporan" element={<AdminLaporanPage />} />
         <Route path="/admin/profil" element={<AdminProfilPage />} />
+        <Route path="/admin/aktivitas" element={<AktivitasAdminPage />} />
+        <Route path="/admin/riwayat-harga" element={<RiwayatHargaPage />} />  
 
         {/* Rute Tambahan dari Teman Kelompok */}
         <Route path="/pengaturan" element={<PengaturanDataPage />} />
+
+        {/* Rute DUI */}
+        <Route path="/dui/dashboard" element={<DuiDashboardPage />} /> 
+        {/* Rute DUI */}
+        <Route path="/dui/dashboard" element={<DuiDashboardPage />} />
+        <Route path="/dui/monitoring" element={<DuiMonitoringPage />} /> 
+        {/* Rute DUI */}
+        <Route path="/dui/dashboard" element={<DuiDashboardPage />} />
+        <Route path="/dui/monitoring" element={<DuiMonitoringPage />} />
+        <Route path="/dui/leaderboard" element={<DuiLeaderboardPage />} />
+        <Route path="/dui/laporan" element={<DuiLaporanPage />} />
+        <Route path="/dui/aktivitas" element={<DuiAktivitasPage />} />
+        <Route path="/dui/profil" element={<DuiProfilPage />} />
+        <Route path="/dui/notifikasi" element={<DuiNotifikasiPage />} />
+        
       </Routes>
     </Router>
   )
