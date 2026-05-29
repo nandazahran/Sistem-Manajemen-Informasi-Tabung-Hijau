@@ -41,6 +41,7 @@ mod entities;
         // Modul Transaksi
         handlers::tambah_transaksi,
         handlers::lihat_transaksi,
+        handlers::export_transaksi,
         handlers::update_transaksi,
         handlers::hapus_transaksi,
         // Modul Tabungan
@@ -72,6 +73,7 @@ mod entities;
             handlers::InputWilayah,
             handlers::InputKategori,
             handlers::InputTransaksi,
+            handlers::FilterExport,
             handlers::InputTarik,
             handlers::TransaksiLengkap,
             handlers::RekapDashboard,
@@ -148,6 +150,7 @@ async fn main() {
 
     let rute_transaksi = Router::new()
         .route("/", get(handlers::lihat_transaksi).post(handlers::tambah_transaksi))
+        .route("/export", get(handlers::export_transaksi))
         .route("/{id}", put(handlers::update_transaksi).delete(handlers::hapus_transaksi))
         .route_layer(middleware::from_fn(handlers::token_jwt));
 

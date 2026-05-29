@@ -205,6 +205,14 @@ pub struct FilterLeaderboard {
     pub tanggal_akhir: Option<String>,
 }
 
+// Struct untuk Filter Export Transaksi
+#[derive(Deserialize, ToSchema)]
+pub struct FilterExport {
+    pub tanggal_mulai: Option<String>,
+    pub tanggal_akhir: Option<String>,
+    pub wilayah_id: Option<i32>, // Admin/DUI bisa export spesifik 1 wilayah
+}
+
 // Fungsi Register yang sudah di-upgrade
 #[utoipa::path(
     post,
@@ -1481,6 +1489,70 @@ pub async fn lihat_transaksi(
             "status": "error",
             "pesan": format!("Gagal mengambil data transaksi: {}", e)
         })),
+    }
+}
+
+// Fungsi Export Transaksi (Mendukung Filter Tanggal & Wilayah)
+#[utoipa::path(
+    get,
+    path = "/api/transaksi/export",
+    params(
+        ("tanggal_mulai" = Option<String>, Query, description = "Filter tanggal mulai (YYYY-MM-DD)"),
+        ("tanggal_akhir" = Option<String>, Query, description = "Filter tanggal akhir (YYYY-MM-DD)"),
+        ("wilayah_id" = Option<i32>, Query, description = "Filter ID Wilayah (Hanya untuk Admin/DUI)")
+    ),
+    responses(
+        (status = 200, description = "Berhasil mengambil data transaksi untuk diexport", body = serde_json::Value),
+        (status = 500, description = "Gagal mengambil data transaksi", body = serde_json::Value)
+    ),
+    tag = "Transaksi",
+    security(("jwt_auth" = []))
+)]
+pub async fn export_transaksi(
+    State(db): State<DatabaseConnection>,
+    Extension(username_jwt): Extension<String>,
+    Query(filter): Query<FilterExport>,
+) -> Json<serde_json::Value> {
+    
+    let user_login = user::Entity::find().filter(user::Column::Username.eq(username_jwt)).one(&db).await.unwrap().unwrap();
+    let role = user_login.role;
+    let id_wil_user = user_login.wilayah_id;
+
+    let mut query = transaksi_sampah::Entity::find()
+        .column_as(kategori_sampah::Column::NamaKategori, "nama_kategori")
+        .column_as(wilayah::Column::Nama, "nama_wilayah")
+        .column_as(user::Column::Nama, "nama_petugas")
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::KategoriSampah.def())
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::Wilayah.def())
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::User.def());
+
+    // FILTER HAK AKSES WILAYAH
+    if role != "bem_km" && role != "admin" && role != "dui" {
+        if let Some(id_wil) = id_wil_user {
+            query = query.filter(transaksi_sampah::Column::WilayahId.eq(id_wil));
+        }
+    } else {
+        // Admin/DUI bisa memfilter laporan berdasarkan wilayah tertentu
+        if let Some(id_wil_filter) = filter.wilayah_id {
+            query = query.filter(transaksi_sampah::Column::WilayahId.eq(id_wil_filter));
+        }
+    }
+
+    // FILTER TANGGAL
+    if let (Some(mulai), Some(akhir)) = (filter.tanggal_mulai, filter.tanggal_akhir) {
+        let start = format!("{} 00:00:00", mulai);
+        let end = format!("{} 23:59:59", akhir);
+        query = query.filter(transaksi_sampah::Column::Tanggal.between(start, end));
+    }
+
+    // Urutkan dari transaksi terbaru ke terlama
+    query = query.order_by_desc(transaksi_sampah::Column::Tanggal);
+
+    let hasil_eksekusi = query.into_model::<TransaksiLengkap>().all(&db).await;
+
+    match hasil_eksekusi {
+        Ok(data) => Json(serde_json::json!({ "status": "sukses", "total_data": data.len(), "data": data })),
+        Err(e) => Json(serde_json::json!({ "status": "error", "pesan": format!("Gagal mengambil data untuk export: {}", e) })),
     }
 }
 
