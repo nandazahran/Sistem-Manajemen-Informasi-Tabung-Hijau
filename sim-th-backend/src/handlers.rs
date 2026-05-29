@@ -18,7 +18,7 @@ use lettre::transport::smtp::authentication::Credentials;
 use rand::RngExt;
 use utoipa::ToSchema;
 
-use crate::entities::{user,wilayah,kategori_sampah, transaksi_sampah, tabungan_sampah, kontak};
+use crate::entities::{user, wilayah, kategori_sampah, transaksi_sampah, tabungan_sampah, kontak, rekening_wilayah};
 
 // Struct khusus untuk menerima data Register
 #[derive(Deserialize,ToSchema)]
@@ -69,6 +69,9 @@ pub struct ResponPesan {
 pub struct InputWilayah {
     pub nama: String,
     pub status: String,
+    pub nomor_rekening: Option<String>,
+    pub nama_bank: Option<String>,
+    pub atas_nama: Option<String>,
 }
 
 // Ini adalah isi dari KTP Digital-nya
@@ -890,10 +893,25 @@ pub async fn tambah_wilayah(
     };
 
     match wilayah_baru.insert(&db).await {
-        Ok(_) => Json(ResponPesan {
-            status: "sukses".to_string(),
-            pesan: format!("Wilayah '{}' berhasil ditambahkan ke sistem.", payload.nama),
-        }),
+        Ok(w) => {
+            // Jika ada data rekening yang dikirim, masukkan ke tabel rekening_wilayah
+            if let (Some(rek), Some(bank), Some(nama)) = (payload.nomor_rekening.clone(), payload.nama_bank.clone(), payload.atas_nama.clone()) {
+                let rekening_baru = rekening_wilayah::ActiveModel {
+                    wilayah_id: Set(w.id),
+                    no_rekening: Set(rek),
+                    nama_bank: Set(bank),
+                    atas_nama: Set(nama),
+                    is_utama: Set(true), // Berikan default "Utama" 
+                    ..Default::default()
+                };
+                let _ = rekening_baru.insert(&db).await;
+            }
+            
+            Json(ResponPesan {
+                status: "sukses".to_string(),
+                pesan: format!("Wilayah '{}' berhasil ditambahkan ke sistem.", payload.nama),
+            })
+        },
         Err(_) => Json(ResponPesan {
             status: "gagal".to_string(),
             pesan: "Gagal menambahkan wilayah. Nama wilayah mungkin sudah ada.".to_string(),
@@ -931,14 +949,36 @@ pub async fn lihat_wilayah(
     };
 
     match query.all(&db).await {
-        Ok(data) => (
-            StatusCode::OK,
-            Json(serde_json::json!({
-                "status": "sukses",
-                "role_pengakses": role_user,
-                "data": data
-            }))
-        ),
+        Ok(data) => {
+            // GABUNGKAN WILAYAH DENGAN DATA REKENINGNYA
+            let mut hasil_gabungan = Vec::new();
+            for w in data {
+                let rek = rekening_wilayah::Entity::find()
+                    .filter(rekening_wilayah::Column::WilayahId.eq(w.id))
+                    .filter(rekening_wilayah::Column::IsUtama.eq(true))
+                    .one(&db)
+                    .await
+                    .unwrap_or(None);
+                
+                hasil_gabungan.push(serde_json::json!({
+                    "id": w.id,
+                    "nama": w.nama,
+                    "status": w.status,
+                    "nomor_rekening": rek.as_ref().map(|r| r.no_rekening.clone()),
+                    "nama_bank": rek.as_ref().map(|r| r.nama_bank.clone()),
+                    "atas_nama": rek.as_ref().map(|r| r.atas_nama.clone()),
+                }));
+            }
+
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "status": "sukses",
+                    "role_pengakses": role_user,
+                    "data": hasil_gabungan
+                }))
+            )
+        },
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({
@@ -979,10 +1019,40 @@ pub async fn update_wilayah(
             data_aktif.status = Set(payload.status.clone());
 
             match data_aktif.update(&db).await {
-                Ok(_) => Json(ResponPesan {
-                    status: "sukses".to_string(),
-                    pesan: format!("Wilayah ID {} berhasil diupdate. Nama: '{}', Status: '{}'.", wilayah_id, payload.nama, payload.status),
-                }),
+                    Ok(_) => {
+                        // Update atau Insert data rekening wilayah
+                        if let (Some(rek), Some(bank), Some(nama)) = (payload.nomor_rekening.clone(), payload.nama_bank.clone(), payload.atas_nama.clone()) {
+                            let cek_rekening = rekening_wilayah::Entity::find()
+                                .filter(rekening_wilayah::Column::WilayahId.eq(wilayah_id))
+                                .filter(rekening_wilayah::Column::IsUtama.eq(true))
+                                .one(&db)
+                                .await
+                                .unwrap_or(None);
+
+                            if let Some(rek_lama) = cek_rekening {
+                                let mut rek_aktif: rekening_wilayah::ActiveModel = rek_lama.into();
+                                rek_aktif.no_rekening = Set(rek);
+                                rek_aktif.nama_bank = Set(bank);
+                                rek_aktif.atas_nama = Set(nama);
+                                let _ = rek_aktif.update(&db).await;
+                            } else {
+                                let rekening_baru = rekening_wilayah::ActiveModel {
+                                    wilayah_id: Set(wilayah_id),
+                                    no_rekening: Set(rek),
+                                    nama_bank: Set(bank),
+                                    atas_nama: Set(nama),
+                                    is_utama: Set(true),
+                                    ..Default::default()
+                                };
+                                let _ = rekening_baru.insert(&db).await;
+                            }
+                        }
+
+                        Json(ResponPesan {
+                            status: "sukses".to_string(),
+                            pesan: format!("Wilayah ID {} berhasil diupdate. Nama: '{}', Status: '{}'.", wilayah_id, payload.nama, payload.status),
+                        })
+                    },
                 Err(e) => Json(ResponPesan {
                     status: "gagal".to_string(),
                     pesan: format!("Gagal mengupdate wilayah: {}", e),
