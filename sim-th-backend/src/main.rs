@@ -1,4 +1,4 @@
-use axum::{routing::{get, post, delete, put}, Router, middleware};
+use axum::{routing::{get, post, put}, Router, middleware};
 use sea_orm::Database;
 use std::env;
 use tower_http::cors::{CorsLayer, Any};
@@ -9,7 +9,6 @@ use utoipa_swagger_ui::SwaggerUi;
 mod handlers;
 mod entities;
 
-// 1. Daftarkan semua fungsi Auth dan struct-nya di sini
 #[derive(OpenApi)]
 #[openapi(
     paths(
@@ -41,6 +40,8 @@ mod entities;
         // Modul Transaksi
         handlers::tambah_transaksi,
         handlers::lihat_transaksi,
+        handlers::export_transaksi,
+        handlers::update_transaksi,
         handlers::hapus_transaksi,
         // Modul Tabungan
         handlers::lihat_tabungan,
@@ -71,6 +72,7 @@ mod entities;
             handlers::InputWilayah,
             handlers::InputKategori,
             handlers::InputTransaksi,
+            handlers::FilterExport,
             handlers::InputTarik,
             handlers::TransaksiLengkap,
             handlers::RekapDashboard,
@@ -147,7 +149,8 @@ async fn main() {
 
     let rute_transaksi = Router::new()
         .route("/", get(handlers::lihat_transaksi).post(handlers::tambah_transaksi))
-        .route("/{id}", delete(handlers::hapus_transaksi))
+        .route("/export", get(handlers::export_transaksi))
+        .route("/{id}", put(handlers::update_transaksi).delete(handlers::hapus_transaksi))
         .route_layer(middleware::from_fn(handlers::token_jwt));
 
     let rute_tabungan = Router::new()

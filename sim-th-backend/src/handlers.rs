@@ -18,7 +18,7 @@ use lettre::transport::smtp::authentication::Credentials;
 use rand::RngExt;
 use utoipa::ToSchema;
 
-use crate::entities::{user,wilayah,kategori_sampah, transaksi_sampah, tabungan_sampah, kontak};
+use crate::entities::{user, wilayah, kategori_sampah, transaksi_sampah, tabungan_sampah, kontak, rekening_wilayah};
 
 // Struct khusus untuk menerima data Register
 #[derive(Deserialize,ToSchema)]
@@ -69,6 +69,9 @@ pub struct ResponPesan {
 pub struct InputWilayah {
     pub nama: String,
     pub status: String,
+    pub nomor_rekening: Option<String>,
+    pub nama_bank: Option<String>,
+    pub atas_nama: Option<String>,
 }
 
 // Ini adalah isi dari KTP Digital-nya
@@ -200,28 +203,6 @@ pub struct TransaksiKategoriBiasa {
 pub struct FilterLeaderboard {
     pub tanggal_mulai: Option<String>,
     pub tanggal_akhir: Option<String>,
-}
-
-// Helper function untuk memetakan role ID ke nama Wilayah yang sesuai
-fn role_to_wilayah_name(role: &str) -> Option<String> {
-    match role {
-        "bem_faperta" => Some("BEM FAPERTA".to_string()),
-        "bem_skhb" => Some("BEM SKHB".to_string()),
-        "bem_fpik" => Some("BEM FPIK".to_string()),
-        "bem_fapet" => Some("BEM FAPET".to_string()),
-        "bem_fahutan" => Some("BEM FAHUTAN".to_string()),
-        "bem_fateta" => Some("BEM FATETA".to_string()),
-        "bem_fmipa" => Some("BEM FMIPA".to_string()),
-        "bem_fem" => Some("BEM FEM".to_string()),
-        "bem_fema" => Some("BEM FEMA".to_string()),
-        "bem_vokasi" => Some("BEM VOKASI".to_string()),
-        "bem_sb" => Some("BEM SB".to_string()),
-        "bem_fk" => Some("BEM FK".to_string()),
-        "bem_ssmi" => Some("BEM SSMI".to_string()),
-        "ormawa_ppku" => Some("Ormawa Eksekutif PPKU".to_string()),
-        // Role seperti bem_km dan dui tidak memiliki wilayah spesifik, jadi kembalikan None
-        _ => None,
-    }
 }
 
 // Fungsi Register yang sudah di-upgrade
@@ -889,10 +870,25 @@ pub async fn tambah_wilayah(
     };
 
     match wilayah_baru.insert(&db).await {
-        Ok(_) => Json(ResponPesan {
-            status: "sukses".to_string(),
-            pesan: format!("Wilayah '{}' berhasil ditambahkan ke sistem.", payload.nama),
-        }),
+        Ok(w) => {
+            // Jika ada data rekening yang dikirim, masukkan ke tabel rekening_wilayah
+            if let (Some(rek), Some(bank), Some(nama)) = (payload.nomor_rekening.clone(), payload.nama_bank.clone(), payload.atas_nama.clone()) {
+                let rekening_baru = rekening_wilayah::ActiveModel {
+                    wilayah_id: Set(w.id),
+                    no_rekening: Set(rek),
+                    nama_bank: Set(bank),
+                    atas_nama: Set(nama),
+                    is_utama: Set(true), // Berikan default "Utama" 
+                    ..Default::default()
+                };
+                let _ = rekening_baru.insert(&db).await;
+            }
+            
+            Json(ResponPesan {
+                status: "sukses".to_string(),
+                pesan: format!("Wilayah '{}' berhasil ditambahkan ke sistem.", payload.nama),
+            })
+        },
         Err(_) => Json(ResponPesan {
             status: "gagal".to_string(),
             pesan: "Gagal menambahkan wilayah. Nama wilayah mungkin sudah ada.".to_string(),
@@ -923,21 +919,43 @@ pub async fn lihat_wilayah(
     // 1. Jika bem_km -> Ambil semua baris di tabel wilayah
     // 2. Jika bukan -> Ambil yang ID-nya cocok dengan wilayah si user
     
-    let query = if role_user == "bem_km" {
+    let query = if role_user == "bem_km" || role_user == "admin" || role_user == "dui" {
         wilayah::Entity::find()
     } else {
         wilayah::Entity::find().filter(wilayah::Column::Id.eq(id_wilayah_user))
     };
 
     match query.all(&db).await {
-        Ok(data) => (
-            StatusCode::OK,
-            Json(serde_json::json!({
-                "status": "sukses",
-                "role_pengakses": role_user,
-                "data": data
-            }))
-        ),
+        Ok(data) => {
+            // GABUNGKAN WILAYAH DENGAN DATA REKENINGNYA
+            let mut hasil_gabungan = Vec::new();
+            for w in data {
+                let rek = rekening_wilayah::Entity::find()
+                    .filter(rekening_wilayah::Column::WilayahId.eq(w.id))
+                    .filter(rekening_wilayah::Column::IsUtama.eq(true))
+                    .one(&db)
+                    .await
+                    .unwrap_or(None);
+                
+                hasil_gabungan.push(serde_json::json!({
+                    "id": w.id,
+                    "nama": w.nama,
+                    "status": w.status,
+                    "nomor_rekening": rek.as_ref().map(|r| r.no_rekening.clone()),
+                    "nama_bank": rek.as_ref().map(|r| r.nama_bank.clone()),
+                    "atas_nama": rek.as_ref().map(|r| r.atas_nama.clone()),
+                }));
+            }
+
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "status": "sukses",
+                    "role_pengakses": role_user,
+                    "data": hasil_gabungan
+                }))
+            )
+        },
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({
@@ -978,10 +996,40 @@ pub async fn update_wilayah(
             data_aktif.status = Set(payload.status.clone());
 
             match data_aktif.update(&db).await {
-                Ok(_) => Json(ResponPesan {
-                    status: "sukses".to_string(),
-                    pesan: format!("Wilayah ID {} berhasil diupdate. Nama: '{}', Status: '{}'.", wilayah_id, payload.nama, payload.status),
-                }),
+                    Ok(_) => {
+                        // Update atau Insert data rekening wilayah
+                        if let (Some(rek), Some(bank), Some(nama)) = (payload.nomor_rekening.clone(), payload.nama_bank.clone(), payload.atas_nama.clone()) {
+                            let cek_rekening = rekening_wilayah::Entity::find()
+                                .filter(rekening_wilayah::Column::WilayahId.eq(wilayah_id))
+                                .filter(rekening_wilayah::Column::IsUtama.eq(true))
+                                .one(&db)
+                                .await
+                                .unwrap_or(None);
+
+                            if let Some(rek_lama) = cek_rekening {
+                                let mut rek_aktif: rekening_wilayah::ActiveModel = rek_lama.into();
+                                rek_aktif.no_rekening = Set(rek);
+                                rek_aktif.nama_bank = Set(bank);
+                                rek_aktif.atas_nama = Set(nama);
+                                let _ = rek_aktif.update(&db).await;
+                            } else {
+                                let rekening_baru = rekening_wilayah::ActiveModel {
+                                    wilayah_id: Set(wilayah_id),
+                                    no_rekening: Set(rek),
+                                    nama_bank: Set(bank),
+                                    atas_nama: Set(nama),
+                                    is_utama: Set(true),
+                                    ..Default::default()
+                                };
+                                let _ = rekening_baru.insert(&db).await;
+                            }
+                        }
+
+                        Json(ResponPesan {
+                            status: "sukses".to_string(),
+                            pesan: format!("Wilayah ID {} berhasil diupdate. Nama: '{}', Status: '{}'.", wilayah_id, payload.nama, payload.status),
+                        })
+                    },
                 Err(e) => Json(ResponPesan {
                     status: "gagal".to_string(),
                     pesan: format!("Gagal mengupdate wilayah: {}", e),
@@ -1243,7 +1291,10 @@ pub async fn tambah_transaksi(
     // Hanya BEM Wilayah yang bisa input, dan mereka wajib punya wilayah_id.
     // BEM KM/Admin tidak bisa input, mereka hanya audit.
     let id_wilayah_petugas = match petugas.role.as_str() {
-        "bem_km" | "admin" | "dui" => {
+        "dui" => {
+            return Json(ResponPesan { status: "gagal".to_string(), pesan: "Akses ditolak! Role DUI hanya dapat melihat data (Read-Only).".to_string() });
+        },
+        "bem_km" | "admin" => {
             return Json(ResponPesan { status: "gagal".to_string(), pesan: "Akses ditolak! Administrator tidak dapat menginput transaksi, hanya BEM Wilayah.".to_string() });
         },
         _ => match petugas.wilayah_id {
@@ -1410,6 +1461,70 @@ pub async fn lihat_transaksi(
     }
 }
 
+// Fungsi Export Transaksi (Mendukung Filter Tanggal & Wilayah)
+#[utoipa::path(
+    get,
+    path = "/api/transaksi/export",
+    params(
+        ("tanggal_mulai" = Option<String>, Query, description = "Filter tanggal mulai (YYYY-MM-DD)"),
+        ("tanggal_akhir" = Option<String>, Query, description = "Filter tanggal akhir (YYYY-MM-DD)"),
+        ("wilayah_id" = Option<i32>, Query, description = "Filter ID Wilayah (Hanya untuk Admin/DUI)")
+    ),
+    responses(
+        (status = 200, description = "Berhasil mengambil data transaksi untuk diexport", body = serde_json::Value),
+        (status = 500, description = "Gagal mengambil data transaksi", body = serde_json::Value)
+    ),
+    tag = "Transaksi",
+    security(("jwt_auth" = []))
+)]
+pub async fn export_transaksi(
+    State(db): State<DatabaseConnection>,
+    Extension(username_jwt): Extension<String>,
+    Query(filter): Query<FilterExport>,
+) -> Json<serde_json::Value> {
+    
+    let user_login = user::Entity::find().filter(user::Column::Username.eq(username_jwt)).one(&db).await.unwrap().unwrap();
+    let role = user_login.role;
+    let id_wil_user = user_login.wilayah_id;
+
+    let mut query = transaksi_sampah::Entity::find()
+        .column_as(kategori_sampah::Column::NamaKategori, "nama_kategori")
+        .column_as(wilayah::Column::Nama, "nama_wilayah")
+        .column_as(user::Column::Nama, "nama_petugas")
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::KategoriSampah.def())
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::Wilayah.def())
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::User.def());
+
+    // FILTER HAK AKSES WILAYAH
+    if role != "bem_km" && role != "admin" && role != "dui" {
+        if let Some(id_wil) = id_wil_user {
+            query = query.filter(transaksi_sampah::Column::WilayahId.eq(id_wil));
+        }
+    } else {
+        // Admin/DUI bisa memfilter laporan berdasarkan wilayah tertentu
+        if let Some(id_wil_filter) = filter.wilayah_id {
+            query = query.filter(transaksi_sampah::Column::WilayahId.eq(id_wil_filter));
+        }
+    }
+
+    // FILTER TANGGAL
+    if let (Some(mulai), Some(akhir)) = (filter.tanggal_mulai, filter.tanggal_akhir) {
+        let start = format!("{} 00:00:00", mulai);
+        let end = format!("{} 23:59:59", akhir);
+        query = query.filter(transaksi_sampah::Column::Tanggal.between(start, end));
+    }
+
+    // Urutkan dari transaksi terbaru ke terlama
+    query = query.order_by_desc(transaksi_sampah::Column::Tanggal);
+
+    let hasil_eksekusi = query.into_model::<TransaksiLengkap>().all(&db).await;
+
+    match hasil_eksekusi {
+        Ok(data) => Json(serde_json::json!({ "status": "sukses", "total_data": data.len(), "data": data })),
+        Err(e) => Json(serde_json::json!({ "status": "error", "pesan": format!("Gagal mengambil data untuk export: {}", e) })),
+    }
+}
+
 // 2. Fungsi Lihat Tabungan (Membaca 2 Tabel)
 #[utoipa::path(
     get,
@@ -1444,6 +1559,113 @@ pub async fn lihat_tabungan(
     }
 }
 
+// Fungsi Update / Edit Transaksi (Otomatis Penyesuaian Saldo)
+#[utoipa::path(
+    put,
+    path = "/api/transaksi/{id}",
+    request_body = InputTransaksi,
+    params(
+        ("id" = i32, Path, description = "ID Transaksi yang ingin diedit/diupdate")
+    ),
+    responses(
+        (status = 200, description = "Transaksi berhasil diperbarui dan saldo disesuaikan", body = ResponPesan),
+        (status = 403, description = "Akses ditolak: Hanya Admin/DUI/Pemilik yang bisa edit", body = ResponPesan),
+        (status = 404, description = "Transaksi atau Kategori tidak ditemukan", body = ResponPesan),
+        (status = 500, description = "Terjadi kesalahan sistem", body = ResponPesan)
+    ),
+    tag = "Transaksi",
+    security(("jwt_auth" = []))
+)]
+pub async fn update_transaksi(
+    State(db): State<DatabaseConnection>,
+    Path(transaksi_id): Path<i32>,
+    Extension(username_jwt): Extension<String>,
+    Json(payload): Json<InputTransaksi>,
+) -> Json<ResponPesan> {
+    
+    // 1. Cari data transaksi lama
+    let pencarian_transaksi = transaksi_sampah::Entity::find_by_id(transaksi_id).one(&db).await;
+    let data_trx_lama = match pencarian_transaksi {
+        Ok(Some(t)) => t,
+        _ => return Json(ResponPesan { status: "gagal".to_string(), pesan: format!("Transaksi ID {} tidak ditemukan.", transaksi_id) }),
+    };
+
+    // 2. Cek Hak Akses (Otorisasi)
+    let user_login = user::Entity::find().filter(user::Column::Username.eq(username_jwt)).one(&db).await.unwrap().unwrap();
+    
+    if user_login.role == "dui" {
+        return Json(ResponPesan {
+            status: "gagal".to_string(),
+            pesan: "Akses ditolak! Role DUI hanya memiliki hak akses untuk melihat data (Read-Only).".to_string(),
+        });
+    }
+
+    if user_login.role != "bem_km" && user_login.role != "admin" {
+        return Json(ResponPesan {
+            status: "gagal".to_string(),
+            pesan: "Akses ditolak! Hanya Administrator (BEM KM / Admin) yang dapat mengedit transaksi untuk alasan keamanan.".to_string(),
+        });
+    }
+
+    // 3. Ambil Harga Kategori Baru
+    let pencarian_kategori = kategori_sampah::Entity::find_by_id(payload.kategori_id).one(&db).await;
+    let kategori = match pencarian_kategori {
+        Ok(Some(k)) => k,
+        _ => return Json(ResponPesan { status: "gagal".to_string(), pesan: "Kategori sampah tidak ditemukan di sistem!".to_string() }),
+    };
+
+    // 4. Hitung Nilai Baru & Hitung Selisih dengan Nilai Lama
+    let kalkulasi_total_nilai_baru = (payload.berat_gram * kategori.harga_per_kg) / 1000;
+    let selisih_nilai = kalkulasi_total_nilai_baru - data_trx_lama.total_nilai;
+    let id_wilayah = data_trx_lama.wilayah_id;
+    let tanggal_lama = data_trx_lama.tanggal;
+
+    let tanggal_parsed = if let Some(ref tgl) = payload.tanggal {
+        NaiveDateTime::parse_from_str(&format!("{} 00:00:00", tgl), "%Y-%m-%d %H:%M:%S").unwrap_or(tanggal_lama)
+    } else {
+        tanggal_lama
+    };
+
+    // 5. Update Record Transaksi di Tabel
+    let mut trx_aktif: transaksi_sampah::ActiveModel = data_trx_lama.into();
+    trx_aktif.berat = Set(payload.berat_gram);
+    trx_aktif.total_nilai = Set(kalkulasi_total_nilai_baru);
+    trx_aktif.kategori_id = Set(payload.kategori_id);
+    trx_aktif.poin_kualitas = Set(payload.poin_kualitas);
+    trx_aktif.catatan = Set(payload.catatan);
+    trx_aktif.tanggal = Set(tanggal_parsed);
+
+    if let Err(e) = trx_aktif.update(&db).await {
+        return Json(ResponPesan { status: "gagal".to_string(), pesan: format!("Gagal menyimpan perubahan transaksi: {}", e) });
+    }
+
+    // 6. Penyesuaian Otomatis Dompet (Tabungan)
+    // Jika selisih_nilai positif (menguntungkan), tambah saldo. Jika negatif (merugikan), kurangi saldo.
+    if selisih_nilai != 0 {
+        let pencarian_dompet = tabungan_sampah::Entity::find().filter(tabungan_sampah::Column::WilayahId.eq(id_wilayah)).one(&db).await.unwrap();
+
+        if let Some(dompet_lama) = pencarian_dompet {
+            let mut dompet_aktif: tabungan_sampah::ActiveModel = dompet_lama.into();
+            let saldo_sekarang = dompet_aktif.saldo.clone().unwrap();
+            dompet_aktif.saldo = Set(saldo_sekarang + selisih_nilai);
+            let _ = dompet_aktif.update(&db).await;
+        } else if selisih_nilai > 0 { // Just in case, buat dompet baru kalau belum ada
+            let dompet_baru = tabungan_sampah::ActiveModel {
+                saldo: Set(selisih_nilai),
+                status: Set("Aktif".to_string()),
+                wilayah_id: Set(id_wilayah),
+                ..Default::default()
+            };
+            let _ = dompet_baru.insert(&db).await;
+        }
+    }
+
+    Json(ResponPesan {
+        status: "sukses".to_string(),
+        pesan: format!("Transaksi berhasil diperbarui! Saldo otomatis disesuaikan sebesar Rp {}", selisih_nilai),
+    })
+}
+
 // Fungsi Hapus Transaksi (Dilengkapi dengan Auto-Kurang Saldo)
 #[utoipa::path(
     delete,
@@ -1472,7 +1694,15 @@ pub async fn hapus_transaksi(
         Ok(Some(data_trx)) => {
             // CEK HAK AKSES: Apakah yang menghapus adalah pemilik transaksinya?
             let user_login = user::Entity::find().filter(user::Column::Username.eq(username_jwt)).one(&db).await.unwrap().unwrap();
-            if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui" {
+            
+            if user_login.role == "dui" {
+                return Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: "Akses ditolak! Role DUI hanya memiliki hak akses untuk melihat data (Read-Only).".to_string(),
+                });
+            }
+
+            if user_login.role != "bem_km" && user_login.role != "admin" {
                 if user_login.wilayah_id != Some(data_trx.wilayah_id) {
                     return Json(ResponPesan {
                         status: "gagal".to_string(),
