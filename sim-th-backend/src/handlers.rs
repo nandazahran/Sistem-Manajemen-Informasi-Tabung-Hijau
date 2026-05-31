@@ -214,6 +214,37 @@ pub struct FilterExport {
     pub wilayah_id: Option<i32>, // Admin/DUI bisa export spesifik 1 wilayah
 }
 
+// Struct untuk Input Broadcast dari Dashboard DUI
+#[derive(Deserialize, ToSchema)]
+pub struct InputBroadcastNotifikasi {
+    pub judul: String,
+    pub pesan: String,
+    pub target: Option<String>,
+}
+
+// Fungsi pembantu untuk memetakan role dari form register ke nama wilayah di database
+pub fn role_to_wilayah_name(role: &str) -> Option<String> {
+    match role {
+        "bem_faperta" => Some("BEM FAPERTA".to_string()),
+        "bem_skhb" => Some("BEM SKHB".to_string()),
+        "bem_fpik" => Some("BEM FPIK".to_string()),
+        "bem_fapet" => Some("BEM FAPET".to_string()),
+        "bem_fahutan" => Some("BEM FAHUTAN".to_string()),
+        "bem_fateta" => Some("BEM FATETA".to_string()),
+        "bem_fmipa" => Some("BEM FMIPA".to_string()),
+        "bem_fem" => Some("BEM FEM".to_string()),
+        "bem_fema" => Some("BEM FEMA".to_string()),
+        "bem_vokasi" => Some("BEM VOKASI".to_string()),
+        "bem_sb" => Some("BEM SB".to_string()),
+        "bem_fk" => Some("BEM FK".to_string()),
+        "bem_ssmi" => Some("BEM SSMI".to_string()),
+        "ormawa_ppku" => Some("Ormawa Eksekutif PPKU".to_string()), // Disesuaikan dengan frontend
+        // admin, dui, bem_km tidak terikat 1 wilayah khusus (Null)
+        "bem_km" | "admin" | "dui" => None,
+        _ => None,
+    }
+}
+
 // Fungsi Register yang sudah di-upgrade
 #[utoipa::path(
     post,
@@ -2343,7 +2374,8 @@ async fn handle_socket(mut socket: WebSocket, mut rx: tokio::sync::broadcast::Re
     // Terus tunggu pesan masuk dari channel internal kita
     while let Ok(msg) = rx.recv().await {
         // Jika ada pesan, teruskan ke Frontend
-        if socket.send(WsMessage::Text(msg)).await.is_err() {
+        // Perhatikan tambahan `.into()` untuk konversi String -> Utf8Bytes di Axum 0.8
+        if socket.send(WsMessage::Text(msg.into())).await.is_err() {
             break; // Jika gagal (misal client sudah menutup tab browser), hentikan loop
         }
     }
