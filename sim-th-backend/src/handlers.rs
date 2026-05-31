@@ -3,6 +3,7 @@ use axum::{
     http::{header, StatusCode, HeaderMap},
     middleware::Next,
     response::Response,
+    extract::ws::{WebSocketUpgrade, WebSocket, Message as WsMessage},
 };
 use axum::Extension;
 use sea_orm::{DatabaseConnection, ActiveModelTrait, EntityTrait, Set, QueryFilter, ColumnTrait, FromQueryResult, JoinType, QuerySelect, RelationTrait, ModelTrait, QueryOrder};
@@ -211,6 +212,14 @@ pub struct FilterExport {
     pub tanggal_mulai: Option<String>,
     pub tanggal_akhir: Option<String>,
     pub wilayah_id: Option<i32>, // Admin/DUI bisa export spesifik 1 wilayah
+}
+
+// Struct untuk Input Broadcast dari Dashboard DUI
+#[derive(Deserialize, ToSchema)]
+pub struct InputBroadcastNotifikasi {
+    pub judul: String,
+    pub pesan: String,
+    pub target: Option<String>,
 }
 
 // Fungsi Register yang sudah di-upgrade
@@ -1289,6 +1298,7 @@ pub async fn hapus_kategori(
 pub async fn tambah_transaksi(
     State(db): State<DatabaseConnection>,
     headers: HeaderMap, // Tangkap header untuk membaca JWT
+    Extension(tx): Extension<tokio::sync::broadcast::Sender<String>>, // Tarik channel WebSocket
     Json(payload): Json<InputTransaksi>,
 ) -> Json<ResponPesan> {
     
@@ -1411,6 +1421,14 @@ pub async fn tambah_transaksi(
                 let _ = dompet_baru.insert(&db).await;
             }
         }
+
+        // --- TAHAP 6: BROADCAST NOTIFIKASI WEBSOCKET ---
+        let pesan_notif = serde_json::json!({
+            "tipe": "transaksi",
+            "judul": "Transaksi Baru Masuk!",
+            "deskripsi": format!("Setoran baru seberat {} gram setara Rp{} berhasil dicatat.", payload.berat_gram, kalkulasi_total_nilai)
+        }).to_string();
+        let _ = tx.send(pesan_notif); // Abaikan error jika belum ada client frontend yang terhubung
 
         Json(ResponPesan {
             status: "sukses".to_string(),
@@ -2335,6 +2353,51 @@ pub async fn minta_otp_email(
             Json(ResponPesan { status: "error".to_string(), pesan: "Terjadi kesalahan sistem.".to_string() })
         ),
     }
+}
+
+// =========================================================================
+// WEBSOCKET & NOTIFIKASI HANDLERS
+// =========================================================================
+
+// Endpoint untuk menerima koneksi WebSocket dari Frontend
+pub async fn ws_notifikasi(
+    ws: WebSocketUpgrade,
+    Extension(tx): Extension<tokio::sync::broadcast::Sender<String>>,
+) -> Response {
+    let rx = tx.subscribe();
+    // Beritahu Axum untuk meng-upgrade koneksi HTTP biasa menjadi WebSocket
+    ws.on_upgrade(move |socket| handle_socket(socket, rx))
+}
+
+// Menghandle aliran pesan untuk setiap client
+async fn handle_socket(mut socket: WebSocket, mut rx: tokio::sync::broadcast::Receiver<String>) {
+    // Terus tunggu pesan masuk dari channel internal kita
+    while let Ok(msg) = rx.recv().await {
+        // Jika ada pesan, teruskan ke Frontend
+        if socket.send(WsMessage::Text(msg)).await.is_err() {
+            break; // Jika gagal (misal client sudah menutup tab browser), hentikan loop
+        }
+    }
+}
+
+// Endpoint untuk Tombol "Broadcast Notifikasi" di Dashboard DUI
+#[utoipa::path(
+    post,
+    path = "/api/notifikasi/broadcast",
+    request_body = InputBroadcastNotifikasi,
+    responses((status = 200, description = "Broadcast berhasil dikirim", body = ResponPesan)),
+    tag = "Dashboard",
+    security(("jwt_auth" = []))
+)]
+pub async fn broadcast_notifikasi(
+    Extension(tx): Extension<tokio::sync::broadcast::Sender<String>>,
+    Json(payload): Json<InputBroadcastNotifikasi>,
+) -> Json<ResponPesan> {
+    
+    let pesan_notif = serde_json::json!({ "tipe": "broadcast", "judul": payload.judul, "deskripsi": payload.pesan }).to_string();
+    let _ = tx.send(pesan_notif);
+
+    Json(ResponPesan { status: "sukses".to_string(), pesan: "Broadcast notifikasi berhasil dikirim!".to_string() })
 }
 
 // Fungsi Ubah Password dari menu Profil

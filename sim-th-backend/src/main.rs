@@ -2,6 +2,7 @@ use axum::{routing::{get, post, put}, Router, middleware};
 use sea_orm::Database;
 use std::env;
 use tower_http::cors::{CorsLayer, Any};
+use axum::Extension;
 use axum::http::{Method, header};
 use utoipa::{openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},Modify, OpenApi,};
 use utoipa_swagger_ui::SwaggerUi;
@@ -50,7 +51,8 @@ mod entities;
         handlers::lihat_dashboard,
         handlers::lihat_dashboard_wilayah,
         handlers::lihat_leaderboard,
-        handlers::lihat_aktivitas_terbaru
+        handlers::lihat_aktivitas_terbaru,
+        handlers::broadcast_notifikasi
     ),
     components(
         schemas(
@@ -77,7 +79,8 @@ mod entities;
             handlers::TransaksiLengkap,
             handlers::RekapDashboard,
             handlers::TabunganLengkap,
-            handlers::LeaderboardItem
+            handlers::LeaderboardItem,
+            handlers::InputBroadcastNotifikasi
         )
     ),
     modifiers(&SecurityAddon),
@@ -134,6 +137,9 @@ async fn main() {
         // Izinkan mereka melakukan aksi CRUD
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE]);
     
+    // Buat channel untuk WebSocket (Kapasitas maksimal antrian 100 pesan)
+    let (tx, _rx) = tokio::sync::broadcast::channel::<String>(100);
+
     // Buat wilayah
     let rute_wilayah = Router::new()
         .route("/", get(handlers::lihat_wilayah).post(handlers::tambah_wilayah))
@@ -175,6 +181,11 @@ async fn main() {
         .route("/aktifkan-totp", post(handlers::aktifkan_totp))
         .route_layer(middleware::from_fn(handlers::token_jwt));
 
+    // Rute Notifikasi (WebSocket & Broadcast)
+    let rute_notifikasi = Router::new()
+        .route("/broadcast", post(handlers::broadcast_notifikasi).route_layer(middleware::from_fn(handlers::token_jwt)))
+        .route("/ws", get(handlers::ws_notifikasi)); // Endpoint terbuka khusus WebSocket
+
     // Titipkan kunci brankas (db) ke dalam aplikasi (State)
     let app = Router::new()
         .route("/", get(|| async { "Halo Tim! Backend SIM-TH sudah menyala!" }))
@@ -190,8 +201,10 @@ async fn main() {
         .nest("/api/tabungan", rute_tabungan)
         .nest("/api/dashboard", rute_dashboard)
         .nest("/api/users", rute_user)
+        .nest("/api/notifikasi", rute_notifikasi)
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(db) // <-- Kunci dititipkan di sini
+        .layer(Extension(tx)) // <-- Titipkan transmitter WebSocket ke seluruh aplikasi
         .layer(jembatan_cors); 
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
