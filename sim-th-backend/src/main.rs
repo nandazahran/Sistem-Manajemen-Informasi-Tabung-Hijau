@@ -1,4 +1,4 @@
-use axum::{routing::{get, post, delete, put}, Router, middleware};
+use axum::{routing::{get, post, put}, Router, middleware};
 use sea_orm::Database;
 use std::env;
 use tower_http::cors::{CorsLayer, Any};
@@ -9,7 +9,6 @@ use utoipa_swagger_ui::SwaggerUi;
 mod handlers;
 mod entities;
 
-// 1. Daftarkan semua fungsi Auth dan struct-nya di sini
 #[derive(OpenApi)]
 #[openapi(
     paths(
