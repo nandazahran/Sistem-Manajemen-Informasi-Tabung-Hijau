@@ -52,7 +52,8 @@ mod entities;
         handlers::lihat_dashboard_wilayah,
         handlers::lihat_leaderboard,
         handlers::lihat_aktivitas_terbaru,
-        handlers::broadcast_notifikasi
+        handlers::broadcast_notifikasi,
+        handlers::lihat_notifikasi
     ),
     components(
         schemas(
@@ -91,7 +92,8 @@ mod entities;
         (name = "Kategori", description = "Endpoint untuk pengelolaan kategori sampah"),
         (name = "Transaksi", description = "Endpoint untuk mencatat dan mengelola transaksi sampah"),
         (name = "Tabungan", description = "Endpoint untuk melihat dan menarik saldo tabungan"),
-        (name = "Dashboard", description = "Endpoint untuk statistik dan aktivitas dashboard")
+        (name = "Dashboard", description = "Endpoint untuk statistik dan aktivitas dashboard"),
+        (name = "Notifikasi", description = "Endpoint untuk history notifikasi")
     )
 )]
 struct ApiDoc;
@@ -183,6 +185,7 @@ async fn main() {
 
     // Rute Notifikasi (WebSocket & Broadcast)
     let rute_notifikasi = Router::new()
+        .route("/", get(handlers::lihat_notifikasi).route_layer(middleware::from_fn(handlers::token_jwt)))
         .route("/broadcast", post(handlers::broadcast_notifikasi).route_layer(middleware::from_fn(handlers::token_jwt)))
         .route("/ws", get(handlers::ws_notifikasi)); // Endpoint terbuka khusus WebSocket
 

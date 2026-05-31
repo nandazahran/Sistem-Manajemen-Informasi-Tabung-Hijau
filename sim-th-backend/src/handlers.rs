@@ -19,7 +19,7 @@ use lettre::transport::smtp::authentication::Credentials;
 use rand::RngExt;
 use utoipa::ToSchema;
 
-use crate::entities::{user, wilayah, kategori_sampah, transaksi_sampah, tabungan_sampah, kontak, rekening_wilayah};
+use crate::entities::{user, wilayah, kategori_sampah, transaksi_sampah, tabungan_sampah, kontak, rekening_wilayah, notifikasi};
 
 // Struct khusus untuk menerima data Register
 #[derive(Deserialize,ToSchema)]
@@ -1425,10 +1425,24 @@ pub async fn tambah_transaksi(
         }
 
         // --- TAHAP 6: BROADCAST NOTIFIKASI WEBSOCKET ---
+        let judul_notif = format!("Setoran Baru: {}", nama_wilayah_penginput);
+        let desc_notif = format!("Setoran seberat {} gram setara Rp{} telah dicatat & menunggu audit.", payload.berat_gram, kalkulasi_total_nilai);
+        
+        // Simpan history ke database
+        let notif_baru = notifikasi::ActiveModel {
+            tipe: Set("transaksi".to_string()),
+            judul: Set(judul_notif.clone()),
+            deskripsi: Set(desc_notif.clone()),
+            target_role: Set(Some(serde_json::json!(["admin", "bem_km", "dui"]).to_string())),
+            target_wilayah_id: Set(None),
+            ..Default::default()
+        };
+        let _ = notif_baru.insert(&db).await;
+
         let pesan_notif = serde_json::json!({
             "tipe": "transaksi",
-            "judul": format!("Setoran Baru: {}", nama_wilayah_penginput),
-            "deskripsi": format!("Setoran seberat {} gram setara Rp{} telah dicatat & menunggu audit.", payload.berat_gram, kalkulasi_total_nilai),
+            "judul": judul_notif,
+            "deskripsi": desc_notif,
             "target_role": ["admin", "bem_km", "dui"] // Hanya Admin yang terima
         }).to_string();
         let _ = tx.send(pesan_notif); // Abaikan error jika belum ada client frontend yang terhubung
@@ -2416,10 +2430,22 @@ async fn handle_socket(mut socket: WebSocket, mut rx: tokio::sync::broadcast::Re
     security(("jwt_auth" = []))
 )]
 pub async fn broadcast_notifikasi(
+    State(db): State<DatabaseConnection>,
     Extension(tx): Extension<tokio::sync::broadcast::Sender<String>>,
     Json(payload): Json<InputBroadcastNotifikasi>,
 ) -> Json<ResponPesan> {
     
+    // Simpan history ke database
+    let notif_baru = notifikasi::ActiveModel {
+        tipe: Set("broadcast".to_string()),
+        judul: Set(payload.judul.clone()),
+        deskripsi: Set(payload.pesan.clone()),
+        target_role: Set(Some(serde_json::json!(["all"]).to_string())),
+        target_wilayah_id: Set(None),
+        ..Default::default()
+    };
+    let _ = notif_baru.insert(&db).await;
+
     let pesan_notif = serde_json::json!({ 
         "tipe": "broadcast", 
         "judul": payload.judul, 
@@ -2429,6 +2455,49 @@ pub async fn broadcast_notifikasi(
     let _ = tx.send(pesan_notif);
 
     Json(ResponPesan { status: "sukses".to_string(), pesan: "Broadcast notifikasi berhasil dikirim!".to_string() })
+}
+
+// Endpoint untuk mengambil history notifikasi user
+#[utoipa::path(
+    get,
+    path = "/api/notifikasi",
+    responses((status = 200, description = "Berhasil mengambil history notifikasi")),
+    tag = "Notifikasi",
+    security(("jwt_auth" = []))
+)]
+pub async fn lihat_notifikasi(
+    State(db): State<DatabaseConnection>,
+    Extension(username_jwt): Extension<String>,
+) -> Json<serde_json::Value> {
+    let user_login = user::Entity::find().filter(user::Column::Username.eq(username_jwt)).one(&db).await.unwrap().unwrap();
+    let role = user_login.role;
+    let wilayah_id = user_login.wilayah_id;
+
+    let semua_notif = notifikasi::Entity::find()
+        .order_by_desc(notifikasi::Column::Id)
+        .limit(50) // Batasi 50 notif terbaru agar cepat
+        .all(&db)
+        .await
+        .unwrap_or_default();
+
+    // Filter siapa yang berhak melihat notifikasi ini
+    let notif_tersaring: Vec<_> = semua_notif.into_iter().filter(|n| {
+        let mut should_show = false;
+        if let Some(target_role) = &n.target_role {
+            if target_role.contains("all") || target_role.contains(&role) { should_show = true; }
+        }
+        if let Some(target_wilayah) = n.target_wilayah_id {
+            if Some(target_wilayah) == wilayah_id { should_show = true; }
+        }
+        should_show
+    }).map(|n| {
+        serde_json::json!({
+            "id": n.id, "tipe": n.tipe, "judul": n.judul, "deskripsi": n.deskripsi,
+            "waktu": n.waktu, "isRead": false 
+        })
+    }).collect();
+
+    Json(serde_json::json!({ "status": "sukses", "data": notif_tersaring }))
 }
 
 // Fungsi Ubah Password dari menu Profil

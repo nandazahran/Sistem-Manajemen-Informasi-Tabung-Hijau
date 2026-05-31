@@ -4,22 +4,25 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
-#[sea_orm(table_name = "rekening_wilayah")]
+#[sea_orm(table_name = "notifikasi")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub wilayah_id: i32,
-    pub nama_bank: String,
-    pub no_rekening: String,
-    pub atas_nama: String,
-    pub is_utama: bool,
+    pub tipe: String,
+    pub judul: String,
+    #[sea_orm(column_type = "Text")]
+    pub deskripsi: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub target_role: Option<String>,
+    pub target_wilayah_id: Option<i32>,
+    pub waktu: DateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
         belongs_to = "super::wilayah::Entity",
-        from = "Column::WilayahId",
+        from = "Column::TargetWilayahId",
         to = "super::wilayah::Column::Id",
         on_update = "Cascade",
         on_delete = "Cascade"

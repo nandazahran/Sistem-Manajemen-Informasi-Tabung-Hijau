@@ -2,6 +2,7 @@
 
 pub use super::kategori_sampah::Entity as KategoriSampah;
 pub use super::kontak::Entity as Kontak;
+pub use super::notifikasi::Entity as Notifikasi;
 pub use super::rekening_wilayah::Entity as RekeningWilayah;
 pub use super::tabungan_sampah::Entity as TabunganSampah;
 pub use super::transaksi_sampah::Entity as TransaksiSampah;
