@@ -1346,12 +1346,14 @@ pub async fn tambah_transaksi(
 
     // --- TAHAP 1.5: GEMBOK KEAMANAN (CEK STATUS WILAYAH) ---
     let pencarian_wilayah = wilayah::Entity::find_by_id(id_wilayah_petugas).one(&db).await;
-    match pencarian_wilayah {
+    // Kita tangkap nama wilayahnya sekalian untuk isi pesan notifikasi
+    let nama_wilayah_penginput = match pencarian_wilayah {
         Ok(Some(w)) => {
             // Kalau ketemu, tapi statusnya bukan Aktif, tolak setorannya!
             if w.status != "Aktif" {
                 return Json(ResponPesan { status: "gagal".to_string(), pesan: format!("Setoran ditolak! Wilayah '{}' saat ini berstatus Nonaktif.", w.nama) });
             }
+            w.nama
         },
         // Ini seharusnya tidak terjadi jika data konsisten, tapi sebagai pengaman
         Ok(None) => return Json(ResponPesan { status: "gagal".to_string(), pesan: "Wilayah yang terdaftar di akun Anda tidak ditemukan di sistem.".to_string() }),
@@ -1425,8 +1427,9 @@ pub async fn tambah_transaksi(
         // --- TAHAP 6: BROADCAST NOTIFIKASI WEBSOCKET ---
         let pesan_notif = serde_json::json!({
             "tipe": "transaksi",
-            "judul": "Transaksi Baru Masuk!",
-            "deskripsi": format!("Setoran baru seberat {} gram setara Rp{} berhasil dicatat.", payload.berat_gram, kalkulasi_total_nilai)
+            "judul": format!("Setoran Baru: {}", nama_wilayah_penginput),
+            "deskripsi": format!("Setoran seberat {} gram setara Rp{} telah dicatat & menunggu audit.", payload.berat_gram, kalkulasi_total_nilai),
+            "target_role": ["admin", "bem_km", "dui"] // Hanya Admin yang terima
         }).to_string();
         let _ = tx.send(pesan_notif); // Abaikan error jika belum ada client frontend yang terhubung
 
@@ -1629,6 +1632,7 @@ pub async fn update_transaksi(
     State(db): State<DatabaseConnection>,
     Path(transaksi_id): Path<i32>,
     Extension(username_jwt): Extension<String>,
+    Extension(tx): Extension<tokio::sync::broadcast::Sender<String>>, // Tarik channel WebSocket
     Json(payload): Json<InputTransaksi>,
 ) -> Json<ResponPesan> {
     
@@ -1709,6 +1713,15 @@ pub async fn update_transaksi(
         }
     }
 
+    // BROADCAST NOTIFIKASI KE WILAYAH TERKAIT
+    let pesan_notif = serde_json::json!({
+        "tipe": "update_transaksi",
+        "judul": "Penilaian Transaksi Diperbarui",
+        "deskripsi": format!("Transaksi Anda telah dinilai/diedit oleh Admin. Saldo disesuaikan Rp {}.", selisih_nilai),
+        "target_wilayah_id": id_wilayah
+    }).to_string();
+    let _ = tx.send(pesan_notif);
+
     Json(ResponPesan {
         status: "sukses".to_string(),
         pesan: format!("Transaksi berhasil diperbarui! Saldo otomatis disesuaikan sebesar Rp {}", selisih_nilai),
@@ -1734,6 +1747,7 @@ pub async fn hapus_transaksi(
     State(db): State<DatabaseConnection>,
     Path(transaksi_id): Path<i32>, // Mengambil ID dari URL
     Extension(username_jwt): Extension<String>,
+    Extension(tx): Extension<tokio::sync::broadcast::Sender<String>>, // Tarik channel WebSocket
 ) -> Json<ResponPesan> {
     
     // 1. Cari data transaksi yang mau dihapus
@@ -1783,10 +1797,21 @@ pub async fn hapus_transaksi(
 
             // 4. Terakhir, hapus data transaksinya secara permanen dari brankas
             match data_trx.delete(&db).await {
-                Ok(_) => Json(ResponPesan {
-                    status: "sukses".to_string(),
-                    pesan: format!("Transaksi ID {} berhasil dihapus dan saldo tabungan otomatis ditarik kembali sebesar Rp {}.", transaksi_id, nilai_yang_dihapus),
-                }),
+                Ok(_) => {
+                    // BROADCAST NOTIFIKASI PEMBATALAN
+                    let pesan_notif = serde_json::json!({
+                        "tipe": "hapus_transaksi",
+                        "judul": "Transaksi Dibatalkan",
+                        "deskripsi": format!("Admin membatalkan transaksi Anda. Saldo tabungan ditarik kembali Rp {}.", nilai_yang_dihapus),
+                        "target_wilayah_id": id_wilayah
+                    }).to_string();
+                    let _ = tx.send(pesan_notif);
+
+                    Json(ResponPesan {
+                        status: "sukses".to_string(),
+                        pesan: format!("Transaksi ID {} berhasil dihapus dan saldo tabungan otomatis ditarik kembali sebesar Rp {}.", transaksi_id, nilai_yang_dihapus),
+                    })
+                },
                 Err(e) => Json(ResponPesan {
                     status: "gagal".to_string(),
                     pesan: format!("Gagal menghapus transaksi dari database: {}", e),
@@ -2395,7 +2420,12 @@ pub async fn broadcast_notifikasi(
     Json(payload): Json<InputBroadcastNotifikasi>,
 ) -> Json<ResponPesan> {
     
-    let pesan_notif = serde_json::json!({ "tipe": "broadcast", "judul": payload.judul, "deskripsi": payload.pesan }).to_string();
+    let pesan_notif = serde_json::json!({ 
+        "tipe": "broadcast", 
+        "judul": payload.judul, 
+        "deskripsi": payload.pesan,
+        "target_role": ["all"] // Semua user akan mendapatkannya
+    }).to_string();
     let _ = tx.send(pesan_notif);
 
     Json(ResponPesan { status: "sukses".to_string(), pesan: "Broadcast notifikasi berhasil dikirim!".to_string() })

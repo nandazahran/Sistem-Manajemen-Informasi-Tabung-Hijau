@@ -8,6 +8,11 @@ function DashboardLayout({ children }) {
   const [namaProfil, setNamaProfil] = useState('Memuat...');
   const [roleProfil, setRoleProfil] = useState('User');
   const [isBEMWilayah, setIsBEMWilayah] = useState(false);
+  
+  // State untuk Data Asli & Notifikasi
+  const [rawRole, setRawRole] = useState(null);
+  const [wilayahId, setWilayahId] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const fetchProfil = async () => {
@@ -40,6 +45,8 @@ function DashboardLayout({ children }) {
             const isNotAdmin = myUser.role !== 'bem_km' && myUser.role !== 'admin' && myUser.role !== 'dui';
             setIsBEMWilayah(isNotAdmin); 
             setRoleProfil(displayedRole);
+            setRawRole(myUser.role);
+            setWilayahId(myUser.wilayah_id);
           }
         }
       } catch (error) {
@@ -48,6 +55,55 @@ function DashboardLayout({ children }) {
     };
     fetchProfil();
   }, []);
+
+  // MENDENGARKAN WEBSOCKET NOTIFIKASI
+  useEffect(() => {
+    if (!rawRole) return; // Tunggu sampai data user terbaca
+
+    // Ambil data notif lama dari LocalStorage
+    const savedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
+    setUnreadCount(savedNotifs.filter(n => !n.isRead).length);
+
+    const wsUrl = import.meta.env.VITE_API_URL.replace(/^http/, 'ws') + '/notifikasi/ws';
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      const notifBaru = JSON.parse(event.data);
+      let shouldShow = false;
+
+      // LOGIKA FILTER NOTIFIKASI SESUAI KASUS TADI
+      if (notifBaru.target_role && notifBaru.target_role.includes('all')) shouldShow = true;
+      if (notifBaru.target_role && notifBaru.target_role.includes(rawRole)) shouldShow = true;
+      if (notifBaru.target_wilayah_id && notifBaru.target_wilayah_id === wilayahId) shouldShow = true;
+
+      if (shouldShow) {
+        const notifFormat = {
+          id: Date.now(),
+          waktu: new Date().toLocaleString(),
+          isRead: false,
+          ...notifBaru
+        };
+        const updateNotifs = [notifFormat, ...JSON.parse(localStorage.getItem('notifikasi_th') || '[]')];
+        localStorage.setItem('notifikasi_th', JSON.stringify(updateNotifs));
+        setUnreadCount(prev => prev + 1);
+
+        // Beri tahu halaman lain (khususnya NotifikasiPage) bahwa ada notif baru!
+        window.dispatchEvent(new Event('notifikasi_baru'));
+      }
+    };
+
+    // Listener jika notifikasi ditandai "Sudah Dibaca" dari halaman NotifikasiPage
+    const syncUnreadCount = () => {
+      const updatedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
+      setUnreadCount(updatedNotifs.filter(n => !n.isRead).length);
+    };
+    window.addEventListener('notifikasi_read', syncUnreadCount);
+
+    return () => {
+      ws.close(); // Matikan koneksi jika pindah tab/layout
+      window.removeEventListener('notifikasi_read', syncUnreadCount);
+    };
+  }, [rawRole, wilayahId]);
 
   const menuItems = [
     { name: 'Dashboard', path: '/dashboard', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', show: true },
@@ -121,7 +177,9 @@ function DashboardLayout({ children }) {
           <div className="flex items-center gap-6">
             <Link to="/notifikasi" className="relative p-2 rounded-full hover:bg-gray-100 transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-              <span className="absolute top-0 right-0 w-5 h-5 bg-[#F4A300] text-white text-[11px] font-bold flex items-center justify-center rounded-full border-2 border-white">3</span>
+              {unreadCount > 0 && (
+                <span className="absolute top-0 right-0 w-5 h-5 bg-[#F4A300] text-white text-[11px] font-bold flex items-center justify-center rounded-full border-2 border-white animate-pulse">{unreadCount}</span>
+              )}
             </Link>
             <div className="h-10 w-px bg-gray-200"></div>
             <Link to="/profil" className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity">
