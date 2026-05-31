@@ -202,6 +202,28 @@ pub struct FilterLeaderboard {
     pub tanggal_akhir: Option<String>,
 }
 
+// Helper function untuk memetakan role ID ke nama Wilayah yang sesuai
+fn role_to_wilayah_name(role: &str) -> Option<String> {
+    match role {
+        "bem_faperta" => Some("BEM FAPERTA".to_string()),
+        "bem_skhb" => Some("BEM SKHB".to_string()),
+        "bem_fpik" => Some("BEM FPIK".to_string()),
+        "bem_fapet" => Some("BEM FAPET".to_string()),
+        "bem_fahutan" => Some("BEM FAHUTAN".to_string()),
+        "bem_fateta" => Some("BEM FATETA".to_string()),
+        "bem_fmipa" => Some("BEM FMIPA".to_string()),
+        "bem_fem" => Some("BEM FEM".to_string()),
+        "bem_fema" => Some("BEM FEMA".to_string()),
+        "bem_vokasi" => Some("BEM VOKASI".to_string()),
+        "bem_sb" => Some("BEM SB".to_string()),
+        "bem_fk" => Some("BEM FK".to_string()),
+        "bem_ssmi" => Some("BEM SSMI".to_string()),
+        "ormawa_ppku" => Some("Ormawa Eksekutif PPKU".to_string()),
+        // Role seperti bem_km dan dui tidak memiliki wilayah spesifik, jadi kembalikan None
+        _ => None,
+    }
+}
+
 // Fungsi Register yang sudah di-upgrade
 #[utoipa::path(
     post,
@@ -219,49 +241,26 @@ pub async fn register(
     Json(payload): Json<InputRegister>,
 ) -> (StatusCode, Json<ResponPesan>) {
     
-    // 1. VALIDASI WILAYAH: Pastikan wilayah_id valid dan ada di database
-    // Khusus bem_km, wilayah_id boleh kosong (None). 
-    // Selain itu, wajib isi dan wajib ada di tabel wilayah.
-    if payload.role != "bem_km" {
-        match payload.wilayah_id {
-            Some(id) => {
-                // Cek ke tabel wilayah apakah ID tersebut eksis
-                let cek_wilayah = wilayah::Entity::find_by_id(id).one(&db).await;
-                
-                match cek_wilayah {
-                    Ok(None) => {
-                        return (
-                            StatusCode::BAD_REQUEST,
-                            Json(ResponPesan {
-                                status: "gagal".to_string(),
-                                pesan: format!("ID Wilayah {} tidak ditemukan di sistem!", id),
-                            })
-                        );
-                    }
-                    Err(_) => {
-                        return (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            Json(ResponPesan {
-                                status: "error".to_string(),
-                                pesan: "Terjadi kesalahan saat memvalidasi wilayah.".to_string(),
-                            })
-                        );
-                    }
-                    _ => {} // Wilayah ditemukan, lanjut proses
-                }
-            },
-            None => {
-                // Jika role fakultas tapi tidak kirim wilayah_id
+    // 1. LOGIKA BARU: Tentukan wilayah_id secara otomatis di backend
+    let wilayah_id_otomatis: Option<i32> = if let Some(nama_wilayah) = role_to_wilayah_name(&payload.role) {
+        // Jika role-nya adalah BEM Wilayah, cari ID wilayah berdasarkan namanya
+        match wilayah::Entity::find().filter(wilayah::Column::Nama.eq(nama_wilayah.clone())).one(&db).await {
+            Ok(Some(w)) => Some(w.id),
+            _ => {
+                // Jika wilayah belum dibuat di Pengaturan Data, kirim error
                 return (
                     StatusCode::BAD_REQUEST,
                     Json(ResponPesan {
                         status: "gagal".to_string(),
-                        pesan: format!("Role '{}' wajib menyertakan ID Wilayah.", payload.role),
+                        pesan: format!("Wilayah '{}' belum terdaftar di sistem. Silakan buat melalui menu Pengaturan Data oleh Admin.", nama_wilayah),
                     })
                 );
             }
         }
-    }
+    } else {
+        // Jika role-nya admin (bem_km, dui), wilayah_id-nya null
+        None
+    };
 
     // 2. PROSES HASHING PASSWORD
     let password_acak = match hash(&payload.password, DEFAULT_COST) {
@@ -283,7 +282,7 @@ pub async fn register(
         nama: Set(payload.nama.clone()),
         role: Set(payload.role.clone()),
         status: Set("Aktif".to_string()),
-        wilayah_id: Set(payload.wilayah_id),
+        wilayah_id: Set(wilayah_id_otomatis), // Gunakan ID yang ditemukan otomatis
         ..Default::default()
     };
 
