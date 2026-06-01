@@ -3,7 +3,7 @@ import DashboardLayout from '../components/DashboardLayout';
 
 function AktivitasPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [filterWaktu, setFilterWaktu] = useState('Filter');
+  const [filterWaktu, setFilterWaktu] = useState('Semua Waktu'); // Nilai awal disamakan
   const [aktivitasData, setAktivitasData] = useState([]);
   
   const filterOptions = ['Semua Waktu', 'Hari Ini', 'Kemarin', '7 Hari Terakhir', 'Bulan Ini'];
@@ -46,35 +46,35 @@ function AktivitasPage() {
         </div>
       </div>
 
-      {/* FILTER CARD WRAPPER (Sesuai Gambar 1) */}
-      <div className="bg-white p-4 rounded-[1.5rem] shadow-sm border border-gray-100 flex gap-4 mb-8">
+      {/* FILTER CARD WRAPPER */}
+      <div className="bg-white p-4 rounded-[2rem] shadow-sm border border-gray-100 mb-8 flex flex-col md:flex-row gap-4 items-center">
         {/* Searchbar */}
-        <div className="relative flex-1">
+        <div className="relative flex-1 w-full">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           <input 
             type="text" 
             placeholder="Cari aktivitas..." 
-            className="w-full h-12 bg-[#F5EFE6] px-14 rounded-xl border border-transparent focus:border-[#0B4D1E]/20 focus:outline-none focus:ring-0 font-medium text-[#0B4D1E] transition-all" 
+            className="w-full bg-[#F5EFE6] px-14 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-shadow" 
           />
         </div>
         
-        {/* DROPDOWN FILTER WAKTU */}
-        <div className="relative min-w-[160px]">
-          <button 
+        {/* DROPDOWN FILTER WAKTU (KONSISTEN) */}
+        <div className="relative w-full md:w-64">
+          <div 
             onClick={() => setIsFilterOpen(!isFilterOpen)} 
-            className="w-full h-12 bg-white px-6 rounded-xl border-2 border-[#0B4D1E] text-[#0B4D1E] font-extrabold hover:bg-[#F5EFE6] transition-colors flex items-center justify-center gap-2"
+            className="bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors h-[56px]"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-            {filterWaktu}
-          </button>
+            <span className="truncate">{filterWaktu}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </div>
           
           {isFilterOpen && (
-            <div className="absolute top-full right-0 mt-3 w-56 bg-white border border-gray-100 shadow-2xl rounded-2xl overflow-hidden z-50">
+            <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 shadow-xl rounded-xl z-50 overflow-hidden py-1">
               {filterOptions.map(opt => (
                 <div 
                   key={opt} 
                   onClick={() => { setFilterWaktu(opt); setIsFilterOpen(false); }} 
-                  className={`px-5 py-3.5 cursor-pointer text-sm font-bold transition-colors ${filterWaktu === opt ? 'bg-[#E8F5E9] text-[#2E7D32]' : 'text-[#0B4D1E] hover:bg-[#F5EFE6]'}`}
+                  className={`px-5 py-2.5 cursor-pointer text-sm font-bold transition-colors ${filterWaktu === opt ? 'bg-[#0B4D1E] text-white' : 'text-[#0B4D1E] hover:bg-[#0B4D1E] hover:text-white'}`}
                 >
                   {opt}
                 </div>
@@ -84,7 +84,7 @@ function AktivitasPage() {
         </div>
       </div>
 
-      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 mb-6">
+      <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-6">
         <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-8">Semua Aktivitas</h3>
         <div className="relative border-l-2 border-gray-100 ml-6 space-y-10">
           {aktivitasData.map((akt, idx) => (

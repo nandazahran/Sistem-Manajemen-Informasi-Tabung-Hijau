@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import DuiLayout from '../../components/DuiLayout'; // Pastikan path ini sesuai
+import DuiLayout from '../../components/DuiLayout';
 
 function DuiMonitoringPage() {
   // State untuk Filter & Search
@@ -9,9 +9,23 @@ function DuiMonitoringPage() {
   const [filterTahun, setFilterTahun] = useState('2026');
   const [filterStatus, setFilterStatus] = useState('Semua Status');
 
+  // State untuk Toggle Custom Dropdown
+  const [isWilayahOpen, setIsWilayahOpen] = useState(false);
+  const [isBulanOpen, setIsBulanOpen] = useState(false);
+  const [isTahunOpen, setIsTahunOpen] = useState(false);
+  const [isStatusOpen, setIsStatusOpen] = useState(false);
+
   // State untuk Modal Detail
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedWilayah, setSelectedWilayah] = useState(null);
+
+  // Function buat nutup dropdown lain pas satu dibuka
+  const closeAllDropdowns = () => {
+    setIsWilayahOpen(false);
+    setIsBulanOpen(false);
+    setIsTahunOpen(false);
+    setIsStatusOpen(false);
+  };
 
   // Dummy Data Sesuai Gambar
   const monitoringData = [
@@ -64,47 +78,85 @@ function DuiMonitoringPage() {
         </div>
       </div>
 
-      {/* FILTER & SEARCHBAR */}
-      <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-8">
+      {/* FILTER & SEARCHBAR KONSISTEN */}
+      <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 mb-8">
         {/* Input Search */}
         <div className="relative mb-6">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           <input type="text" placeholder="Cari wilayah..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#F5EFE6] px-14 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-all" />
         </div>
 
-        {/* Dropdown Filters */}
+        {/* Dropdown Filters (Custom UI) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          
+          {/* Wilayah */}
           <div className="relative">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-            <select value={filterWilayah} onChange={(e) => setFilterWilayah(e.target.value)} className="w-full bg-[#F5EFE6] text-[#0B4D1E] font-medium pl-14 pr-5 py-4 rounded-2xl outline-none cursor-pointer appearance-none">
-              <option>Semua Wilayah</option><option>BEM FATETA</option><option>BEM FAPET</option><option>BEM FEM</option>
-            </select>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+            <div onClick={() => { closeAllDropdowns(); setIsWilayahOpen(!isWilayahOpen); }} className="bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors h-[56px]">
+              <span className="truncate">{filterWilayah}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </div>
+            {isWilayahOpen && (
+              <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 shadow-xl rounded-xl z-50 overflow-hidden py-1 max-h-48 overflow-y-auto custom-scrollbar">
+                {['Semua Wilayah', 'BEM FATETA', 'BEM FAPET', 'BEM FEM', 'BEM FAHUTAN', 'BEM FPIK', 'BEM FMIPA', 'BEM FEMA', 'BEM FESB'].map(opt => (
+                  <div key={opt} onClick={() => { setFilterWilayah(opt); setIsWilayahOpen(false); }} className={`px-5 py-2.5 cursor-pointer text-sm font-medium transition-colors ${filterWilayah === opt ? 'bg-[#0B4D1E] text-white' : 'text-[#0B4D1E] hover:bg-gray-100'}`}>
+                    {opt}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
+          {/* Bulan */}
           <div className="relative">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-            <select value={filterBulan} onChange={(e) => setFilterBulan(e.target.value)} className="w-full bg-[#F5EFE6] text-[#0B4D1E] font-medium pl-14 pr-5 py-4 rounded-2xl outline-none cursor-pointer appearance-none">
-              <option>Semua Bulan</option><option>Januari</option><option>Februari</option>
-            </select>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+            <div onClick={() => { closeAllDropdowns(); setIsBulanOpen(!isBulanOpen); }} className="bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors h-[56px]">
+              <span className="truncate">{filterBulan}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </div>
+            {isBulanOpen && (
+              <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 shadow-xl rounded-xl z-50 overflow-hidden py-1 max-h-48 overflow-y-auto custom-scrollbar">
+                {['Semua Bulan', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni'].map(opt => (
+                  <div key={opt} onClick={() => { setFilterBulan(opt); setIsBulanOpen(false); }} className={`px-5 py-2.5 cursor-pointer text-sm font-medium transition-colors ${filterBulan === opt ? 'bg-[#0B4D1E] text-white' : 'text-[#0B4D1E] hover:bg-gray-100'}`}>
+                    {opt}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
+          {/* Tahun */}
           <div className="relative">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-            <select value={filterTahun} onChange={(e) => setFilterTahun(e.target.value)} className="w-full bg-[#F5EFE6] text-[#0B4D1E] font-medium pl-14 pr-5 py-4 rounded-2xl outline-none cursor-pointer appearance-none">
-              <option>2026</option><option>2025</option>
-            </select>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+            <div onClick={() => { closeAllDropdowns(); setIsTahunOpen(!isTahunOpen); }} className="bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors h-[56px]">
+              <span className="truncate">{filterTahun}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </div>
+            {isTahunOpen && (
+              <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 shadow-xl rounded-xl z-50 overflow-hidden py-1">
+                {['2026', '2025'].map(opt => (
+                  <div key={opt} onClick={() => { setFilterTahun(opt); setIsTahunOpen(false); }} className={`px-5 py-2.5 cursor-pointer text-sm font-medium transition-colors ${filterTahun === opt ? 'bg-[#0B4D1E] text-white' : 'text-[#0B4D1E] hover:bg-gray-100'}`}>
+                    {opt}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
+          {/* Status */}
           <div className="relative">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full bg-[#F5EFE6] text-[#0B4D1E] font-medium pl-14 pr-5 py-4 rounded-2xl outline-none cursor-pointer appearance-none">
-              <option>Semua Status</option><option>Aktif</option><option>Nonaktif</option>
-            </select>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+            <div onClick={() => { closeAllDropdowns(); setIsStatusOpen(!isStatusOpen); }} className="bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors h-[56px]">
+              <span className="truncate">{filterStatus}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </div>
+            {isStatusOpen && (
+              <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 shadow-xl rounded-xl z-50 overflow-hidden py-1">
+                {['Semua Status', 'Aktif', 'Nonaktif'].map(opt => (
+                  <div key={opt} onClick={() => { setFilterStatus(opt); setIsStatusOpen(false); }} className={`px-5 py-2.5 cursor-pointer text-sm font-medium transition-colors ${filterStatus === opt ? 'bg-[#0B4D1E] text-white' : 'text-[#0B4D1E] hover:bg-gray-100'}`}>
+                    {opt}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+
         </div>
       </div>
 
@@ -139,7 +191,8 @@ function DuiMonitoringPage() {
                     </span>
                   </td>
                   <td className="px-8 py-5 flex justify-center">
-                    <button onClick={() => handleViewDetail(w)} className="p-2 text-[#0B4D1E] bg-[#EAE5DA] hover:bg-[#0B4D1E] hover:text-white rounded-full transition-all">
+                    {/* REVISI: Ikon button aksi tanpa background bulet, hover rounded-lg krem */}
+                    <button onClick={() => handleViewDetail(w)} className="p-2 text-gray-400 hover:text-[#0B4D1E] hover:bg-[#EAE5DA] rounded-lg transition-all" title="Detail Wilayah">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                     </button>
                   </td>
