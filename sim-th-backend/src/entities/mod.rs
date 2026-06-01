@@ -4,6 +4,8 @@ pub mod prelude;
 
 pub mod kategori_sampah;
 pub mod kontak;
+pub mod notifikasi;
+pub mod rekening_wilayah;
 pub mod tabungan_sampah;
 pub mod transaksi_sampah;
 pub mod user;

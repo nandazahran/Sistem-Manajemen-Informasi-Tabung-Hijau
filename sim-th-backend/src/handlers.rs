@@ -3,6 +3,7 @@ use axum::{
     http::{header, StatusCode, HeaderMap},
     middleware::Next,
     response::Response,
+    extract::ws::{WebSocketUpgrade, WebSocket, Message as WsMessage},
 };
 use axum::Extension;
 use sea_orm::{DatabaseConnection, ActiveModelTrait, EntityTrait, Set, QueryFilter, ColumnTrait, FromQueryResult, JoinType, QuerySelect, RelationTrait, ModelTrait, QueryOrder};
@@ -18,7 +19,7 @@ use lettre::transport::smtp::authentication::Credentials;
 use rand::RngExt;
 use utoipa::ToSchema;
 
-use crate::entities::{user,wilayah,kategori_sampah, transaksi_sampah, tabungan_sampah, kontak};
+use crate::entities::{user, wilayah, kategori_sampah, transaksi_sampah, tabungan_sampah, kontak, rekening_wilayah, notifikasi};
 
 // Struct khusus untuk menerima data Register
 #[derive(Deserialize,ToSchema)]
@@ -69,6 +70,9 @@ pub struct ResponPesan {
 pub struct InputWilayah {
     pub nama: String,
     pub status: String,
+    pub nomor_rekening: Option<String>,
+    pub nama_bank: Option<String>,
+    pub atas_nama: Option<String>,
 }
 
 // Ini adalah isi dari KTP Digital-nya
@@ -202,6 +206,45 @@ pub struct FilterLeaderboard {
     pub tanggal_akhir: Option<String>,
 }
 
+// Struct untuk Filter Export Transaksi
+#[derive(Deserialize, ToSchema)]
+pub struct FilterExport {
+    pub tanggal_mulai: Option<String>,
+    pub tanggal_akhir: Option<String>,
+    pub wilayah_id: Option<i32>, // Admin/DUI bisa export spesifik 1 wilayah
+}
+
+// Struct untuk Input Broadcast dari Dashboard DUI
+#[derive(Deserialize, ToSchema)]
+pub struct InputBroadcastNotifikasi {
+    pub judul: String,
+    pub pesan: String,
+    pub target: Option<String>,
+}
+
+// Fungsi pembantu untuk memetakan role dari form register ke nama wilayah di database
+pub fn role_to_wilayah_name(role: &str) -> Option<String> {
+    match role {
+        "bem_faperta" => Some("BEM FAPERTA".to_string()),
+        "bem_skhb" => Some("BEM SKHB".to_string()),
+        "bem_fpik" => Some("BEM FPIK".to_string()),
+        "bem_fapet" => Some("BEM FAPET".to_string()),
+        "bem_fahutan" => Some("BEM FAHUTAN".to_string()),
+        "bem_fateta" => Some("BEM FATETA".to_string()),
+        "bem_fmipa" => Some("BEM FMIPA".to_string()),
+        "bem_fem" => Some("BEM FEM".to_string()),
+        "bem_fema" => Some("BEM FEMA".to_string()),
+        "bem_vokasi" => Some("BEM VOKASI".to_string()),
+        "bem_sb" => Some("BEM SB".to_string()),
+        "bem_fk" => Some("BEM FK".to_string()),
+        "bem_ssmi" => Some("BEM SSMI".to_string()),
+        "ormawa_ppku" => Some("Ormawa Eksekutif PPKU".to_string()), // Disesuaikan dengan frontend
+        // admin, dui, bem_km tidak terikat 1 wilayah khusus (Null)
+        "bem_km" | "admin" | "dui" => None,
+        _ => None,
+    }
+}
+
 // Fungsi Register yang sudah di-upgrade
 #[utoipa::path(
     post,
@@ -219,49 +262,26 @@ pub async fn register(
     Json(payload): Json<InputRegister>,
 ) -> (StatusCode, Json<ResponPesan>) {
     
-    // 1. VALIDASI WILAYAH: Pastikan wilayah_id valid dan ada di database
-    // Khusus bem_km, wilayah_id boleh kosong (None). 
-    // Selain itu, wajib isi dan wajib ada di tabel wilayah.
-    if payload.role != "bem_km" {
-        match payload.wilayah_id {
-            Some(id) => {
-                // Cek ke tabel wilayah apakah ID tersebut eksis
-                let cek_wilayah = wilayah::Entity::find_by_id(id).one(&db).await;
-                
-                match cek_wilayah {
-                    Ok(None) => {
-                        return (
-                            StatusCode::BAD_REQUEST,
-                            Json(ResponPesan {
-                                status: "gagal".to_string(),
-                                pesan: format!("ID Wilayah {} tidak ditemukan di sistem!", id),
-                            })
-                        );
-                    }
-                    Err(_) => {
-                        return (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            Json(ResponPesan {
-                                status: "error".to_string(),
-                                pesan: "Terjadi kesalahan saat memvalidasi wilayah.".to_string(),
-                            })
-                        );
-                    }
-                    _ => {} // Wilayah ditemukan, lanjut proses
-                }
-            },
-            None => {
-                // Jika role fakultas tapi tidak kirim wilayah_id
+    // 1. LOGIKA BARU: Tentukan wilayah_id secara otomatis di backend
+    let wilayah_id_otomatis: Option<i32> = if let Some(nama_wilayah) = role_to_wilayah_name(&payload.role) {
+        // Jika role-nya adalah BEM Wilayah, cari ID wilayah berdasarkan namanya
+        match wilayah::Entity::find().filter(wilayah::Column::Nama.eq(nama_wilayah.clone())).one(&db).await {
+            Ok(Some(w)) => Some(w.id),
+            _ => {
+                // Jika wilayah belum dibuat di Pengaturan Data, kirim error
                 return (
                     StatusCode::BAD_REQUEST,
                     Json(ResponPesan {
                         status: "gagal".to_string(),
-                        pesan: format!("Role '{}' wajib menyertakan ID Wilayah.", payload.role),
+                        pesan: format!("Wilayah '{}' belum terdaftar di sistem. Silakan buat melalui menu Pengaturan Data oleh Admin.", nama_wilayah),
                     })
                 );
             }
         }
-    }
+    } else {
+        // Jika role-nya admin (bem_km, dui), wilayah_id-nya null
+        None
+    };
 
     // 2. PROSES HASHING PASSWORD
     let password_acak = match hash(&payload.password, DEFAULT_COST) {
@@ -283,7 +303,7 @@ pub async fn register(
         nama: Set(payload.nama.clone()),
         role: Set(payload.role.clone()),
         status: Set("Aktif".to_string()),
-        wilayah_id: Set(payload.wilayah_id),
+        wilayah_id: Set(wilayah_id_otomatis), // Gunakan ID yang ditemukan otomatis
         ..Default::default()
     };
 
@@ -890,10 +910,25 @@ pub async fn tambah_wilayah(
     };
 
     match wilayah_baru.insert(&db).await {
-        Ok(_) => Json(ResponPesan {
-            status: "sukses".to_string(),
-            pesan: format!("Wilayah '{}' berhasil ditambahkan ke sistem.", payload.nama),
-        }),
+        Ok(w) => {
+            // Jika ada data rekening yang dikirim, masukkan ke tabel rekening_wilayah
+            if let (Some(rek), Some(bank), Some(nama)) = (payload.nomor_rekening.clone(), payload.nama_bank.clone(), payload.atas_nama.clone()) {
+                let rekening_baru = rekening_wilayah::ActiveModel {
+                    wilayah_id: Set(w.id),
+                    no_rekening: Set(rek),
+                    nama_bank: Set(bank),
+                    atas_nama: Set(nama),
+                    is_utama: Set(true), // Berikan default "Utama" 
+                    ..Default::default()
+                };
+                let _ = rekening_baru.insert(&db).await;
+            }
+            
+            Json(ResponPesan {
+                status: "sukses".to_string(),
+                pesan: format!("Wilayah '{}' berhasil ditambahkan ke sistem.", payload.nama),
+            })
+        },
         Err(_) => Json(ResponPesan {
             status: "gagal".to_string(),
             pesan: "Gagal menambahkan wilayah. Nama wilayah mungkin sudah ada.".to_string(),
@@ -931,14 +966,36 @@ pub async fn lihat_wilayah(
     };
 
     match query.all(&db).await {
-        Ok(data) => (
-            StatusCode::OK,
-            Json(serde_json::json!({
-                "status": "sukses",
-                "role_pengakses": role_user,
-                "data": data
-            }))
-        ),
+        Ok(data) => {
+            // GABUNGKAN WILAYAH DENGAN DATA REKENINGNYA
+            let mut hasil_gabungan = Vec::new();
+            for w in data {
+                let rek = rekening_wilayah::Entity::find()
+                    .filter(rekening_wilayah::Column::WilayahId.eq(w.id))
+                    .filter(rekening_wilayah::Column::IsUtama.eq(true))
+                    .one(&db)
+                    .await
+                    .unwrap_or(None);
+                
+                hasil_gabungan.push(serde_json::json!({
+                    "id": w.id,
+                    "nama": w.nama,
+                    "status": w.status,
+                    "nomor_rekening": rek.as_ref().map(|r| r.no_rekening.clone()),
+                    "nama_bank": rek.as_ref().map(|r| r.nama_bank.clone()),
+                    "atas_nama": rek.as_ref().map(|r| r.atas_nama.clone()),
+                }));
+            }
+
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "status": "sukses",
+                    "role_pengakses": role_user,
+                    "data": hasil_gabungan
+                }))
+            )
+        },
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({
@@ -979,10 +1036,40 @@ pub async fn update_wilayah(
             data_aktif.status = Set(payload.status.clone());
 
             match data_aktif.update(&db).await {
-                Ok(_) => Json(ResponPesan {
-                    status: "sukses".to_string(),
-                    pesan: format!("Wilayah ID {} berhasil diupdate. Nama: '{}', Status: '{}'.", wilayah_id, payload.nama, payload.status),
-                }),
+                    Ok(_) => {
+                        // Update atau Insert data rekening wilayah
+                        if let (Some(rek), Some(bank), Some(nama)) = (payload.nomor_rekening.clone(), payload.nama_bank.clone(), payload.atas_nama.clone()) {
+                            let cek_rekening = rekening_wilayah::Entity::find()
+                                .filter(rekening_wilayah::Column::WilayahId.eq(wilayah_id))
+                                .filter(rekening_wilayah::Column::IsUtama.eq(true))
+                                .one(&db)
+                                .await
+                                .unwrap_or(None);
+
+                            if let Some(rek_lama) = cek_rekening {
+                                let mut rek_aktif: rekening_wilayah::ActiveModel = rek_lama.into();
+                                rek_aktif.no_rekening = Set(rek);
+                                rek_aktif.nama_bank = Set(bank);
+                                rek_aktif.atas_nama = Set(nama);
+                                let _ = rek_aktif.update(&db).await;
+                            } else {
+                                let rekening_baru = rekening_wilayah::ActiveModel {
+                                    wilayah_id: Set(wilayah_id),
+                                    no_rekening: Set(rek),
+                                    nama_bank: Set(bank),
+                                    atas_nama: Set(nama),
+                                    is_utama: Set(true),
+                                    ..Default::default()
+                                };
+                                let _ = rekening_baru.insert(&db).await;
+                            }
+                        }
+
+                        Json(ResponPesan {
+                            status: "sukses".to_string(),
+                            pesan: format!("Wilayah ID {} berhasil diupdate. Nama: '{}', Status: '{}'.", wilayah_id, payload.nama, payload.status),
+                        })
+                    },
                 Err(e) => Json(ResponPesan {
                     status: "gagal".to_string(),
                     pesan: format!("Gagal mengupdate wilayah: {}", e),
@@ -1211,6 +1298,7 @@ pub async fn hapus_kategori(
 pub async fn tambah_transaksi(
     State(db): State<DatabaseConnection>,
     headers: HeaderMap, // Tangkap header untuk membaca JWT
+    Extension(tx): Extension<tokio::sync::broadcast::Sender<String>>, // Tarik channel WebSocket
     Json(payload): Json<InputTransaksi>,
 ) -> Json<ResponPesan> {
     
@@ -1258,12 +1346,14 @@ pub async fn tambah_transaksi(
 
     // --- TAHAP 1.5: GEMBOK KEAMANAN (CEK STATUS WILAYAH) ---
     let pencarian_wilayah = wilayah::Entity::find_by_id(id_wilayah_petugas).one(&db).await;
-    match pencarian_wilayah {
+    // Kita tangkap nama wilayahnya sekalian untuk isi pesan notifikasi
+    let nama_wilayah_penginput = match pencarian_wilayah {
         Ok(Some(w)) => {
             // Kalau ketemu, tapi statusnya bukan Aktif, tolak setorannya!
             if w.status != "Aktif" {
                 return Json(ResponPesan { status: "gagal".to_string(), pesan: format!("Setoran ditolak! Wilayah '{}' saat ini berstatus Nonaktif.", w.nama) });
             }
+            w.nama
         },
         // Ini seharusnya tidak terjadi jika data konsisten, tapi sebagai pengaman
         Ok(None) => return Json(ResponPesan { status: "gagal".to_string(), pesan: "Wilayah yang terdaftar di akun Anda tidak ditemukan di sistem.".to_string() }),
@@ -1333,6 +1423,29 @@ pub async fn tambah_transaksi(
                 let _ = dompet_baru.insert(&db).await;
             }
         }
+
+        // --- TAHAP 6: BROADCAST NOTIFIKASI WEBSOCKET ---
+        let judul_notif = format!("Setoran Baru: {}", nama_wilayah_penginput);
+        let desc_notif = format!("Setoran seberat {} gram setara Rp{} telah dicatat & menunggu audit.", payload.berat_gram, kalkulasi_total_nilai);
+        
+        // Simpan history ke database
+        let notif_baru = notifikasi::ActiveModel {
+            tipe: Set("transaksi".to_string()),
+            judul: Set(judul_notif.clone()),
+            deskripsi: Set(desc_notif.clone()),
+            target_role: Set(Some(serde_json::json!(["admin", "bem_km", "dui"]).to_string())),
+            target_wilayah_id: Set(None),
+            ..Default::default()
+        };
+        let _ = notif_baru.insert(&db).await;
+
+        let pesan_notif = serde_json::json!({
+            "tipe": "transaksi",
+            "judul": judul_notif,
+            "deskripsi": desc_notif,
+            "target_role": ["admin", "bem_km", "dui"] // Hanya Admin yang terima
+        }).to_string();
+        let _ = tx.send(pesan_notif); // Abaikan error jika belum ada client frontend yang terhubung
 
         Json(ResponPesan {
             status: "sukses".to_string(),
@@ -1414,6 +1527,70 @@ pub async fn lihat_transaksi(
     }
 }
 
+// Fungsi Export Transaksi (Mendukung Filter Tanggal & Wilayah)
+#[utoipa::path(
+    get,
+    path = "/api/transaksi/export",
+    params(
+        ("tanggal_mulai" = Option<String>, Query, description = "Filter tanggal mulai (YYYY-MM-DD)"),
+        ("tanggal_akhir" = Option<String>, Query, description = "Filter tanggal akhir (YYYY-MM-DD)"),
+        ("wilayah_id" = Option<i32>, Query, description = "Filter ID Wilayah (Hanya untuk Admin/DUI)")
+    ),
+    responses(
+        (status = 200, description = "Berhasil mengambil data transaksi untuk diexport", body = serde_json::Value),
+        (status = 500, description = "Gagal mengambil data transaksi", body = serde_json::Value)
+    ),
+    tag = "Transaksi",
+    security(("jwt_auth" = []))
+)]
+pub async fn export_transaksi(
+    State(db): State<DatabaseConnection>,
+    Extension(username_jwt): Extension<String>,
+    Query(filter): Query<FilterExport>,
+) -> Json<serde_json::Value> {
+    
+    let user_login = user::Entity::find().filter(user::Column::Username.eq(username_jwt)).one(&db).await.unwrap().unwrap();
+    let role = user_login.role;
+    let id_wil_user = user_login.wilayah_id;
+
+    let mut query = transaksi_sampah::Entity::find()
+        .column_as(kategori_sampah::Column::NamaKategori, "nama_kategori")
+        .column_as(wilayah::Column::Nama, "nama_wilayah")
+        .column_as(user::Column::Nama, "nama_petugas")
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::KategoriSampah.def())
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::Wilayah.def())
+        .join(JoinType::InnerJoin, transaksi_sampah::Relation::User.def());
+
+    // FILTER HAK AKSES WILAYAH
+    if role != "bem_km" && role != "admin" && role != "dui" {
+        if let Some(id_wil) = id_wil_user {
+            query = query.filter(transaksi_sampah::Column::WilayahId.eq(id_wil));
+        }
+    } else {
+        // Admin/DUI bisa memfilter laporan berdasarkan wilayah tertentu
+        if let Some(id_wil_filter) = filter.wilayah_id {
+            query = query.filter(transaksi_sampah::Column::WilayahId.eq(id_wil_filter));
+        }
+    }
+
+    // FILTER TANGGAL
+    if let (Some(mulai), Some(akhir)) = (filter.tanggal_mulai, filter.tanggal_akhir) {
+        let start = format!("{} 00:00:00", mulai);
+        let end = format!("{} 23:59:59", akhir);
+        query = query.filter(transaksi_sampah::Column::Tanggal.between(start, end));
+    }
+
+    // Urutkan dari transaksi terbaru ke terlama
+    query = query.order_by_desc(transaksi_sampah::Column::Tanggal);
+
+    let hasil_eksekusi = query.into_model::<TransaksiLengkap>().all(&db).await;
+
+    match hasil_eksekusi {
+        Ok(data) => Json(serde_json::json!({ "status": "sukses", "total_data": data.len(), "data": data })),
+        Err(e) => Json(serde_json::json!({ "status": "error", "pesan": format!("Gagal mengambil data untuk export: {}", e) })),
+    }
+}
+
 // 2. Fungsi Lihat Tabungan (Membaca 2 Tabel)
 #[utoipa::path(
     get,
@@ -1469,6 +1646,7 @@ pub async fn update_transaksi(
     State(db): State<DatabaseConnection>,
     Path(transaksi_id): Path<i32>,
     Extension(username_jwt): Extension<String>,
+    Extension(tx): Extension<tokio::sync::broadcast::Sender<String>>, // Tarik channel WebSocket
     Json(payload): Json<InputTransaksi>,
 ) -> Json<ResponPesan> {
     
@@ -1549,6 +1727,15 @@ pub async fn update_transaksi(
         }
     }
 
+    // BROADCAST NOTIFIKASI KE WILAYAH TERKAIT
+    let pesan_notif = serde_json::json!({
+        "tipe": "update_transaksi",
+        "judul": "Penilaian Transaksi Diperbarui",
+        "deskripsi": format!("Transaksi Anda telah dinilai/diedit oleh Admin. Saldo disesuaikan Rp {}.", selisih_nilai),
+        "target_wilayah_id": id_wilayah
+    }).to_string();
+    let _ = tx.send(pesan_notif);
+
     Json(ResponPesan {
         status: "sukses".to_string(),
         pesan: format!("Transaksi berhasil diperbarui! Saldo otomatis disesuaikan sebesar Rp {}", selisih_nilai),
@@ -1574,6 +1761,7 @@ pub async fn hapus_transaksi(
     State(db): State<DatabaseConnection>,
     Path(transaksi_id): Path<i32>, // Mengambil ID dari URL
     Extension(username_jwt): Extension<String>,
+    Extension(tx): Extension<tokio::sync::broadcast::Sender<String>>, // Tarik channel WebSocket
 ) -> Json<ResponPesan> {
     
     // 1. Cari data transaksi yang mau dihapus
@@ -1623,10 +1811,21 @@ pub async fn hapus_transaksi(
 
             // 4. Terakhir, hapus data transaksinya secara permanen dari brankas
             match data_trx.delete(&db).await {
-                Ok(_) => Json(ResponPesan {
-                    status: "sukses".to_string(),
-                    pesan: format!("Transaksi ID {} berhasil dihapus dan saldo tabungan otomatis ditarik kembali sebesar Rp {}.", transaksi_id, nilai_yang_dihapus),
-                }),
+                Ok(_) => {
+                    // BROADCAST NOTIFIKASI PEMBATALAN
+                    let pesan_notif = serde_json::json!({
+                        "tipe": "hapus_transaksi",
+                        "judul": "Transaksi Dibatalkan",
+                        "deskripsi": format!("Admin membatalkan transaksi Anda. Saldo tabungan ditarik kembali Rp {}.", nilai_yang_dihapus),
+                        "target_wilayah_id": id_wilayah
+                    }).to_string();
+                    let _ = tx.send(pesan_notif);
+
+                    Json(ResponPesan {
+                        status: "sukses".to_string(),
+                        pesan: format!("Transaksi ID {} berhasil dihapus dan saldo tabungan otomatis ditarik kembali sebesar Rp {}.", transaksi_id, nilai_yang_dihapus),
+                    })
+                },
                 Err(e) => Json(ResponPesan {
                     status: "gagal".to_string(),
                     pesan: format!("Gagal menghapus transaksi dari database: {}", e),
@@ -2193,6 +2392,112 @@ pub async fn minta_otp_email(
             Json(ResponPesan { status: "error".to_string(), pesan: "Terjadi kesalahan sistem.".to_string() })
         ),
     }
+}
+
+// =========================================================================
+// WEBSOCKET & NOTIFIKASI HANDLERS
+// =========================================================================
+
+// Endpoint untuk menerima koneksi WebSocket dari Frontend
+pub async fn ws_notifikasi(
+    ws: WebSocketUpgrade,
+    Extension(tx): Extension<tokio::sync::broadcast::Sender<String>>,
+) -> Response {
+    let rx = tx.subscribe();
+    // Beritahu Axum untuk meng-upgrade koneksi HTTP biasa menjadi WebSocket
+    ws.on_upgrade(move |socket| handle_socket(socket, rx))
+}
+
+// Menghandle aliran pesan untuk setiap client
+async fn handle_socket(mut socket: WebSocket, mut rx: tokio::sync::broadcast::Receiver<String>) {
+    // Terus tunggu pesan masuk dari channel internal kita
+    while let Ok(msg) = rx.recv().await {
+        // Jika ada pesan, teruskan ke Frontend
+        // Perhatikan tambahan `.into()` untuk konversi String -> Utf8Bytes di Axum 0.8
+        if socket.send(WsMessage::Text(msg.into())).await.is_err() {
+            break; // Jika gagal (misal client sudah menutup tab browser), hentikan loop
+        }
+    }
+}
+
+// Endpoint untuk Tombol "Broadcast Notifikasi" di Dashboard DUI
+#[utoipa::path(
+    post,
+    path = "/api/notifikasi/broadcast",
+    request_body = InputBroadcastNotifikasi,
+    responses((status = 200, description = "Broadcast berhasil dikirim", body = ResponPesan)),
+    tag = "Dashboard",
+    security(("jwt_auth" = []))
+)]
+pub async fn broadcast_notifikasi(
+    State(db): State<DatabaseConnection>,
+    Extension(tx): Extension<tokio::sync::broadcast::Sender<String>>,
+    Json(payload): Json<InputBroadcastNotifikasi>,
+) -> Json<ResponPesan> {
+    
+    // Simpan history ke database
+    let notif_baru = notifikasi::ActiveModel {
+        tipe: Set("broadcast".to_string()),
+        judul: Set(payload.judul.clone()),
+        deskripsi: Set(payload.pesan.clone()),
+        target_role: Set(Some(serde_json::json!(["all"]).to_string())),
+        target_wilayah_id: Set(None),
+        ..Default::default()
+    };
+    let _ = notif_baru.insert(&db).await;
+
+    let pesan_notif = serde_json::json!({ 
+        "tipe": "broadcast", 
+        "judul": payload.judul, 
+        "deskripsi": payload.pesan,
+        "target_role": ["all"] // Semua user akan mendapatkannya
+    }).to_string();
+    let _ = tx.send(pesan_notif);
+
+    Json(ResponPesan { status: "sukses".to_string(), pesan: "Broadcast notifikasi berhasil dikirim!".to_string() })
+}
+
+// Endpoint untuk mengambil history notifikasi user
+#[utoipa::path(
+    get,
+    path = "/api/notifikasi",
+    responses((status = 200, description = "Berhasil mengambil history notifikasi")),
+    tag = "Notifikasi",
+    security(("jwt_auth" = []))
+)]
+pub async fn lihat_notifikasi(
+    State(db): State<DatabaseConnection>,
+    Extension(username_jwt): Extension<String>,
+) -> Json<serde_json::Value> {
+    let user_login = user::Entity::find().filter(user::Column::Username.eq(username_jwt)).one(&db).await.unwrap().unwrap();
+    let role = user_login.role;
+    let wilayah_id = user_login.wilayah_id;
+
+    let semua_notif = notifikasi::Entity::find()
+        .order_by_desc(notifikasi::Column::Id)
+        .limit(50) // Batasi 50 notif terbaru agar cepat
+        .all(&db)
+        .await
+        .unwrap_or_default();
+
+    // Filter siapa yang berhak melihat notifikasi ini
+    let notif_tersaring: Vec<_> = semua_notif.into_iter().filter(|n| {
+        let mut should_show = false;
+        if let Some(target_role) = &n.target_role {
+            if target_role.contains("all") || target_role.contains(&role) { should_show = true; }
+        }
+        if let Some(target_wilayah) = n.target_wilayah_id {
+            if Some(target_wilayah) == wilayah_id { should_show = true; }
+        }
+        should_show
+    }).map(|n| {
+        serde_json::json!({
+            "id": n.id, "tipe": n.tipe, "judul": n.judul, "deskripsi": n.deskripsi,
+            "waktu": n.waktu, "isRead": false 
+        })
+    }).collect();
+
+    Json(serde_json::json!({ "status": "sukses", "data": notif_tersaring }))
 }
 
 // Fungsi Ubah Password dari menu Profil

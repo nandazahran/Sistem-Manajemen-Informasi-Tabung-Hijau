@@ -28,24 +28,49 @@ function NotifikasiPage() {
             read: index >= 3 // 3 aktivitas terbaru ditandai sebagai belum dibaca
           }));
 
+          // --- INTEGRASI WEBSOCKET ---
+          // Ambil notifikasi dari LocalStorage dan format agar cocok dengan UI saat ini
+          const savedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
+          const mappedSavedNotifs = savedNotifs.map(n => ({
+            id: n.id,
+            type: n.tipe === 'transaksi' ? 'check' : n.tipe === 'hapus_transaksi' ? 'alert' : n.tipe === 'update_transaksi' ? 'wallet' : 'up',
+            title: n.judul,
+            desc: n.deskripsi,
+            time: n.waktu,
+            read: n.isRead
+          }));
+
           // Tambahkan notifikasi sistem default di awal
           mappedNotif.unshift({
             id: 'sys-1', type: 'up', title: 'Sistem Notifikasi Aktif', desc: 'Notifikasi berjalan real-time dengan database', time: 'Baru saja', read: false
           });
 
-          setNotifikasi(mappedNotif);
+          // Gabungkan notifikasi real-time terbaru di urutan paling atas!
+          setNotifikasi([...mappedSavedNotifs, ...mappedNotif]);
         }
       } catch (error) {
         console.error("Gagal mengambil data notifikasi:", error);
       }
     };
     fetchNotifikasi();
+
+    // Dengarkan event 'notifikasi_baru' dari DashboardLayout agar langsung ter-refresh otomatis
+    window.addEventListener('notifikasi_baru', fetchNotifikasi);
+    return () => window.removeEventListener('notifikasi_baru', fetchNotifikasi);
   }, []);
 
   const unreadCount = notifikasi.filter(n => !n.read).length;
 
   const markAllAsRead = () => {
     setNotifikasi(notifikasi.map(n => ({ ...n, read: true })));
+    
+    // Update LocalStorage agar tersimpan sebagai "Sudah Dibaca"
+    const savedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
+    const updatedSaved = savedNotifs.map(n => ({ ...n, isRead: true }));
+    localStorage.setItem('notifikasi_th', JSON.stringify(updatedSaved));
+    
+    // Panggil event agar angka lonceng di layout ikut di-reset jadi 0
+    window.dispatchEvent(new Event('notifikasi_read'));
   };
 
   const displayedNotif = activeTab === 'semua' ? notifikasi : notifikasi.filter(n => !n.read);
