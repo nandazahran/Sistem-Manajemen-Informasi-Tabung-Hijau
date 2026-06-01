@@ -5,6 +5,8 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+
+// Rute BEM Wilayah
 import DashboardPage from './pages/DashboardPage'
 import InputTransaksiPage from './pages/InputTransaksiPage'
 import RiwayatTransaksiPage from './pages/RiwayatTransaksiPage'
@@ -12,32 +14,36 @@ import BukuTabunganPage from './pages/BukuTabunganPage'
 import LeaderboardPage from './pages/LeaderboardPage'
 import LaporanPage from './pages/LaporanPage'
 import ProfilPage from './pages/ProfilPage'
-import NotifikasiPage from './pages/NotifikasiPage';
-import AktivitasPage from './pages/AktivitasPage';
-import OtpPage from './pages/OtpPage';
-import ResetPasswordAuthPage from './pages/ResetPasswordAuthPage';
-import AktivitasAdminPage from './pages/Admin/AktivitasAdminPage';
-import RiwayatHargaPage from './pages/Admin/RiwayatHargaPage';
-import AdminDashboardPage from './pages/admin/AdminDashboardPage';
-import KelolaTransaksiPage from './pages/admin/KelolaTransaksiPage';
-import AdminRiwayatTransaksiPage from './pages/admin/RiwayatTransaksiPage'; // Import Admin
-import KelolaUserPage from './pages/admin/KelolaUserPage';
-import KelolaWilayahPage from './pages/admin/KelolaWilayahPage';
-import KelolaKategoriPage from './pages/admin/KelolaKategoriPage';
-import AdminLeaderboardPage from './pages/admin/LeaderboardPage'; // Nama Alias
-import AdminLaporanPage from './pages/admin/LaporanPage'; // Nama Alias
-import AdminProfilPage from './pages/admin/ProfilPage';
-// Rute DUI
-import DuiDashboardPage from './pages/dui/DuiDashboardPage';
-import DuiMonitoringPage from './pages/dui/DuiMonitoringPage';
-// Rute Tambahan DUI
-import DuiLeaderboardPage from './pages/dui/DuiLeaderboardPage';
-import DuiLaporanPage from './pages/dui/DuiLaporanPage';
-import DuiAktivitasPage from './pages/dui/DuiAktivitasPage';
-import DuiProfilPage from './pages/dui/DuiProfilPage';
-import DuiNotifikasiPage from './pages/dui/DuiNotifikasiPage';
+import NotifikasiPage from './pages/NotifikasiPage'
+import AktivitasPage from './pages/AktivitasPage'
+import PengaturanDataPage from './pages/PengaturanDataPage'
 
-import PengaturanDataPage from './pages/PengaturanDataPage';
+// Rute Auth
+import OtpPage from './pages/OtpPage'
+import ResetPasswordAuthPage from './pages/ResetPasswordAuthPage'
+
+// Rute Admin
+import AdminDashboardPage from './pages/admin/AdminDashboardPage'
+import KelolaTransaksiPage from './pages/admin/KelolaTransaksiPage'
+import AdminRiwayatTransaksiPage from './pages/admin/RiwayatTransaksiPage'
+import KelolaUserPage from './pages/admin/KelolaUserPage'
+import KelolaWilayahPage from './pages/admin/KelolaWilayahPage'
+import KelolaKategoriPage from './pages/admin/KelolaKategoriPage'
+import AdminLeaderboardPage from './pages/admin/LeaderboardPage'
+import AdminLaporanPage from './pages/admin/LaporanPage'
+import AdminProfilPage from './pages/admin/ProfilPage'
+import AktivitasAdminPage from './pages/Admin/AktivitasAdminPage' 
+import RiwayatHargaPage from './pages/Admin/RiwayatHargaPage' 
+import AdminNotifikasiPage from './pages/admin/AdminNotifikasiPage' // <--- IMPORT BARU ADMIN NOTIF
+
+// Rute DUI
+import DuiDashboardPage from './pages/dui/DuiDashboardPage'
+import DuiMonitoringPage from './pages/dui/DuiMonitoringPage'
+import DuiLeaderboardPage from './pages/dui/DuiLeaderboardPage'
+import DuiLaporanPage from './pages/dui/DuiLaporanPage'
+import DuiAktivitasPage from './pages/dui/DuiAktivitasPage'
+import DuiProfilPage from './pages/dui/DuiProfilPage'
+import DuiNotifikasiPage from './pages/dui/DuiNotifikasiPage'
 
 function App() {
   return (
@@ -59,6 +65,7 @@ function App() {
         <Route path="/profil" element={<ProfilPage />} />
         <Route path="/notifikasi" element={<NotifikasiPage />} />
         <Route path="/aktivitas" element={<AktivitasPage />} />
+        <Route path="/pengaturan" element={<PengaturanDataPage />} />
         
         {/* Rute Auth */}
         <Route path="/otp" element={<OtpPage />} />
@@ -76,15 +83,8 @@ function App() {
         <Route path="/admin/profil" element={<AdminProfilPage />} />
         <Route path="/admin/aktivitas" element={<AktivitasAdminPage />} />
         <Route path="/admin/riwayat-harga" element={<RiwayatHargaPage />} />  
+        <Route path="/admin/notifikasi" element={<AdminNotifikasiPage />} /> {/* <--- RUTE BARU ADMIN NOTIF */}
 
-        {/* Rute Tambahan dari Teman Kelompok */}
-        <Route path="/pengaturan" element={<PengaturanDataPage />} />
-
-        {/* Rute DUI */}
-        <Route path="/dui/dashboard" element={<DuiDashboardPage />} /> 
-        {/* Rute DUI */}
-        <Route path="/dui/dashboard" element={<DuiDashboardPage />} />
-        <Route path="/dui/monitoring" element={<DuiMonitoringPage />} /> 
         {/* Rute DUI */}
         <Route path="/dui/dashboard" element={<DuiDashboardPage />} />
         <Route path="/dui/monitoring" element={<DuiMonitoringPage />} />

@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
-import { jsPDF } from "jspdf";
-import "jspdf-autotable";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx"; // jsPDF & jspdf-autotable udah dihapus karena cuma butuh Excel
 
 function LaporanPage() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -10,8 +8,7 @@ function LaporanPage() {
   const [selectedMonth, setSelectedMonth] = useState('Semua Periode');
   
   // State untuk Modal Export
-  const [exportFormat, setExportFormat] = useState('PDF');
-  const [exportPeriode, setExportPeriode] = useState('Mei 2026');
+  const [exportPeriode, setExportPeriode] = useState('Mei - Jun 2026');
   const [isExportPeriodeOpen, setIsExportPeriodeOpen] = useState(false);
   
   const [exportData, setExportData] = useState({
@@ -25,8 +22,25 @@ function LaporanPage() {
   const [dataTrx, setDataTrx] = useState([]);
   const [saldoTotal, setSaldoTotal] = useState(0);
 
-  const bulanList = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
-  const periodeOptions = ['Semua Periode', 'Mei 2026', 'April 2026', 'Maret 2026'];
+  // Opsi Filter 2 Bulanan (Sesuai Gambar 2 & 6)
+  const periodeOptions = [
+    'Jan - Feb 2026', 'Mar - Apr 2026', 
+    'Mei - Jun 2026', 'Jul - Ags 2026', 
+    'Sep - Okt 2026', 'Nov - Des 2026'
+  ];
+
+  // Helper function buat konversi tanggal ke format 2 bulanan
+  const getPeriode = (isoString) => {
+    const d = new Date(isoString);
+    const m = d.getMonth();
+    const y = d.getFullYear();
+    if (m <= 1) return `Jan - Feb ${y}`;
+    if (m <= 3) return `Mar - Apr ${y}`;
+    if (m <= 5) return `Mei - Jun ${y}`;
+    if (m <= 7) return `Jul - Ags ${y}`;
+    if (m <= 9) return `Sep - Okt ${y}`;
+    return `Nov - Des ${y}`;
+  };
 
   // Ambil Data dari Backend
   useEffect(() => {
@@ -52,11 +66,10 @@ function LaporanPage() {
     fetchData();
   }, []);
 
-  // Filter data sesuai bulan yang dipilih
+  // Filter data sesuai periode 2 bulan yang dipilih
   const filteredData = dataTrx.filter(t => {
     if (selectedMonth === 'Semua Periode') return true;
-    const date = new Date(t.tanggal);
-    return `${bulanList[date.getMonth()]} ${date.getFullYear()}` === selectedMonth;
+    return getPeriode(t.tanggal) === selectedMonth;
   });
 
   const totalBerat = filteredData.reduce((sum, t) => sum + t.berat, 0) / 1000;
@@ -66,33 +79,24 @@ function LaporanPage() {
   const handleExport = () => {
     let dataToExport = dataTrx;
     if (exportPeriode !== 'Semua Periode') {
-      dataToExport = dataTrx.filter(t => {
-        const date = new Date(t.tanggal);
-        return `${bulanList[date.getMonth()]} ${date.getFullYear()}` === exportPeriode;
-      });
+      dataToExport = dataTrx.filter(t => getPeriode(t.tanggal) === exportPeriode);
     }
 
-    if (exportFormat === 'Excel') {
-      const worksheet = XLSX.utils.json_to_sheet(dataToExport.map(t => ({
-        "ID Transaksi": t.id,
-        "Tanggal": new Date(t.tanggal).toLocaleDateString('id-ID'),
-        "Wilayah": t.nama_wilayah,
-        "Kategori": t.nama_kategori,
-        "Berat (kg)": t.berat / 1000,
-        "Total Nilai (Rp)": t.total_nilai,
-        "Petugas": t.nama_petugas,
-        "Status": t.status
-      })));
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Data Laporan");
-      XLSX.writeFile(workbook, `Laporan_Transaksi_SIMTH_${exportPeriode.replace(' ', '_')}.xlsx`);
-    } else {
-      const doc = new jsPDF();
-      doc.text(`Laporan Transaksi - ${exportPeriode}`, 14, 15);
-      const tableData = dataToExport.map(t => [new Date(t.tanggal).toLocaleDateString('id-ID'), t.nama_wilayah, t.nama_kategori, `${t.berat / 1000} kg`, `Rp ${t.total_nilai.toLocaleString('id-ID')}`, t.status]);
-      doc.autoTable({ head: [['Tanggal', 'Wilayah', 'Kategori', 'Berat', 'Nilai', 'Status']], body: tableData, startY: 20 });
-      doc.save(`Laporan_Transaksi_SIMTH_${exportPeriode.replace(' ', '_')}.pdf`);
-    }
+    // Export hanya format Excel
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport.map(t => ({
+      "ID Transaksi": t.id,
+      "Tanggal": new Date(t.tanggal).toLocaleDateString('id-ID'),
+      "Wilayah": t.nama_wilayah,
+      "Kategori": t.nama_kategori,
+      "Berat (kg)": t.berat / 1000,
+      "Total Nilai (Rp)": t.total_nilai,
+      "Petugas": t.nama_petugas,
+      "Status": t.status
+    })));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Data Laporan");
+    XLSX.writeFile(workbook, `Laporan_SIMTH_${exportPeriode.replace(/ /g, '')}.xlsx`);
+    
     setIsExportModalOpen(false);
   };
 
@@ -110,6 +114,7 @@ function LaporanPage() {
         </div>
         
         <div className="flex items-center gap-4">
+          {/* Main Filter Dropdown (2 Bulanan) */}
           <div className="relative">
             <button 
               onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
@@ -119,11 +124,11 @@ function LaporanPage() {
               {selectedMonth}
             </button>
             {isMonthPickerOpen && (
-              <div className="absolute top-full mt-3 right-0 w-64 bg-white p-4 rounded-[2rem] shadow-2xl border border-gray-100 z-50 grid grid-cols-3 gap-2">
-                <button onClick={() => { setSelectedMonth('Semua Periode'); setIsMonthPickerOpen(false); }} className="col-span-3 py-2 rounded-xl text-xs font-bold bg-[#0B4D1E] text-white hover:bg-[#083a16] transition-all mb-2">Semua Periode</button>
-                {bulanList.map(bln => (
-                  <button key={bln} onClick={() => { setSelectedMonth(`${bln} 2026`); setIsMonthPickerOpen(false); }} className="py-2 rounded-xl text-xs font-bold bg-[#F5EFE6] text-[#0B4D1E] hover:bg-[#F4A300] hover:text-white transition-all">
-                    {bln}
+              <div className="absolute top-full mt-3 right-0 w-80 bg-white p-4 rounded-[2rem] shadow-2xl border border-gray-100 z-50 grid grid-cols-2 gap-3">
+                <button onClick={() => { setSelectedMonth('Semua Periode'); setIsMonthPickerOpen(false); }} className="col-span-2 py-3 rounded-xl text-xs font-bold bg-[#0B4D1E] text-white hover:bg-[#083a16] transition-all mb-2">Semua Periode</button>
+                {periodeOptions.map(opt => (
+                  <button key={opt} onClick={() => { setSelectedMonth(opt); setIsMonthPickerOpen(false); }} className={`py-3 rounded-xl text-xs font-bold transition-all ${selectedMonth === opt ? 'bg-[#0B4D1E] text-white' : 'bg-[#F5EFE6] text-[#0B4D1E] hover:bg-[#F4A300] hover:text-white'}`}>
+                    {opt}
                   </button>
                 ))}
               </div>
@@ -192,7 +197,7 @@ function LaporanPage() {
                   
                   {isExportPeriodeOpen && (
                     <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 shadow-xl rounded-2xl overflow-hidden z-50">
-                      {periodeOptions.map((opt) => (
+                      {['Semua Periode', ...periodeOptions].map((opt) => (
                         <div key={opt} onClick={() => { setExportPeriode(opt); setIsExportPeriodeOpen(false); }} className="px-5 py-4 hover:bg-[#F5EFE6] cursor-pointer text-sm font-bold text-[#0B4D1E] transition-colors">
                           {opt}
                         </div>
@@ -202,7 +207,7 @@ function LaporanPage() {
                 </div>
               </div>
 
-              {/* CHECKBOXES */}
+              {/* CHECKBOXES DATA */}
               <div>
                 <label className="block text-sm font-bold text-[#0B4D1E] mb-3">Data yang Diexport</label>
                 <div className="bg-[#F5EFE6] p-6 rounded-[2rem] space-y-5">
@@ -211,9 +216,8 @@ function LaporanPage() {
                       <input 
                         type="checkbox" 
                         checked={exportData[key]} 
-                        onChange={(e) => setExportData({...exportData, [key]: e.target.value === 'true' ? false : true})} 
-                        onClick={() => setExportData({...exportData, [key]: !exportData[key]})}
-                        className="w-6 h-6 text-[#0A8895] bg-white border-gray-300 rounded focus:ring-[#0A8895] cursor-pointer accent-[#0A8895]" 
+                        onChange={() => setExportData({...exportData, [key]: !exportData[key]})}
+                        className="w-5 h-5 text-[#125B2A] bg-white border-gray-300 rounded focus:ring-[#125B2A] cursor-pointer accent-[#125B2A]" 
                       />
                       <span className="text-sm font-bold text-[#0B4D1E] capitalize group-hover:text-[#F4A300] transition-colors">
                         {key.replace(/([A-Z])/g, ' $1').trim()}
@@ -223,30 +227,19 @@ function LaporanPage() {
                 </div>
               </div>
 
-              {/* TOGGLE EXCEL / PDF */}
+              {/* FORMAT FILE CUMA EXCEL SESUAI GAMBAR 6 */}
               <div>
                 <label className="block text-sm font-bold text-[#0B4D1E] mb-3">Format File</label>
-                <div className="flex gap-4">
-                  <button 
-                    onClick={() => setExportFormat('PDF')} 
-                    className={`flex-1 py-4 rounded-2xl font-bold transition-all duration-300 ${exportFormat === 'PDF' ? 'bg-[#F4A300] text-white shadow-md' : 'bg-[#F5EFE6] text-gray-500 hover:bg-[#EAE5DA]'}`}
-                  >
-                    PDF
-                  </button>
-                  <button 
-                    onClick={() => setExportFormat('Excel')} 
-                    className={`flex-1 py-4 rounded-2xl font-bold transition-all duration-300 ${exportFormat === 'Excel' ? 'bg-[#F4A300] text-white shadow-md' : 'bg-[#F5EFE6] text-gray-500 hover:bg-[#EAE5DA]'}`}
-                  >
-                    Excel
-                  </button>
+                <div className="w-full bg-[#F4A300] text-white py-4 rounded-2xl font-bold flex justify-center shadow-sm cursor-default">
+                  Excel
                 </div>
               </div>
             </div>
 
-            {/* BUTTON SUBMIT */}
-            <button onClick={handleExport} className="w-full bg-[#0B4D1E] text-white py-5 rounded-2xl font-bold mt-10 hover:bg-[#083a16] hover:shadow-lg hover:-translate-y-1 transition-all flex items-center justify-center gap-3">
+            {/* BUTTON SUBMIT WARNA HIJAU */}
+            <button onClick={handleExport} className="w-full bg-[#125B2A] text-white py-5 rounded-2xl font-bold mt-10 hover:bg-[#0B4D1E] hover:shadow-lg hover:-translate-y-1 transition-all flex items-center justify-center gap-3">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-              Export {exportFormat} Sekarang
+              Export EXCEL
             </button>
           </div>
         </div>

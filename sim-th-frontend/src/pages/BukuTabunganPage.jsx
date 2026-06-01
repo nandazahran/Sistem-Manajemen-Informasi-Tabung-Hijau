@@ -1,24 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
-import { jsPDF } from "jspdf";
-import "jspdf-autotable";
-import * as XLSX from "xlsx";
 
 function BukuTabunganPage() {
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const navigate = useNavigate();
   
-  // State untuk Modal Export
-  const [exportFormat, setExportFormat] = useState('PDF');
-  const [exportData, setExportData] = useState({
-    saldo: true,
-    riwayat: true,
-    grafik: true
-  });
-  
-  // State Dropdown Periode dalam Modal
-  const [exportPeriode, setExportPeriode] = useState('');
-  const [isPeriodeOpen, setIsPeriodeOpen] = useState(false);
-  const periodeOptions = ['Semua Periode', 'Mei 2026', 'April 2026', 'Maret 2026'];
+  // State Modal Detail
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [selectedPemasukan, setSelectedPemasukan] = useState(null);
 
   // State Data Real
   const [saldo, setSaldo] = useState(0);
@@ -66,51 +55,36 @@ function BukuTabunganPage() {
   }, []);
 
   const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+  
+  const formatTanggal = (isoString) => {
+    if (!isoString) return '-';
+    const date = new Date(isoString);
+    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
 
-  const handleExport = () => {
-    if (exportFormat === 'Excel') {
-      const worksheet = XLSX.utils.json_to_sheet(riwayatPemasukan.map(t => ({
-        "ID Transaksi": t.id,
-        "Tanggal": new Date(t.tanggal).toLocaleDateString('id-ID'),
-        "Kategori Setoran": t.nama_kategori,
-        "Nominal Pemasukan (Rp)": t.total_nilai,
-        "Wilayah": t.nama_wilayah,
-        "Petugas": t.nama_petugas
-      })));
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Buku Tabungan");
-      XLSX.writeFile(workbook, `Buku_Tabungan_${namaWilayah.replace(' ', '_')}.xlsx`);
-    } else {
-      const doc = new jsPDF();
-      doc.text(`Buku Tabungan - ${namaWilayah}`, 14, 15);
-      doc.text(`Total Saldo Saat Ini: Rp ${saldo.toLocaleString('id-ID')}`, 14, 22);
-      
-      const tableData = riwayatPemasukan.map(t => [new Date(t.tanggal).toLocaleDateString('id-ID'), `Setoran ${t.nama_kategori}`, `Rp ${t.total_nilai.toLocaleString('id-ID')}`, t.nama_petugas]);
-      doc.autoTable({ head: [['Tanggal', 'Keterangan', 'Pemasukan (Rp)', 'Petugas']], body: tableData, startY: 30 });
-      doc.save(`Buku_Tabungan_${namaWilayah.replace(' ', '_')}.pdf`);
-    }
-    setIsExportModalOpen(false);
+  const openDetail = (item) => {
+    setSelectedPemasukan(item);
+    setIsDetailOpen(true);
   };
 
   return (
     <DashboardLayout>
+      <style>{`@keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+      
+      {/* BANNER 1: TITLE */}
       <div className="bg-[#0B4D1E] rounded-[2rem] p-10 flex items-center justify-between shadow-sm mt-2 mb-6 text-white">
         <div className="flex items-center gap-5">
           <div className="bg-[#F4A300] p-4 rounded-2xl">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477-4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
           </div>
           <div>
             <h2 className="text-3xl font-extrabold mb-1">Buku Tabungan</h2>
             <p className="text-green-100/80 font-medium">Rekap pendapatan dari sampah wilayah</p>
           </div>
         </div>
-        {/* Tombol pemicu Modal Export */}
-        <button onClick={() => setIsExportModalOpen(true)} className="bg-[#F4A300] text-white px-8 py-4 rounded-2xl font-bold flex items-center gap-2 hover:bg-[#d68e00] hover:-translate-y-1 transition-all shadow-md">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-          Export Laporan
-        </button>
       </div>
 
+      {/* BANNER 2: SALDO */}
       <div className="bg-gradient-to-r from-[#0B4D1E] to-[#146b2d] p-10 rounded-[2rem] text-white shadow-sm mb-6 flex justify-between items-center relative overflow-hidden">
         <div className="absolute right-0 top-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4"></div>
         <div className="z-10">
@@ -124,7 +98,7 @@ function BukuTabunganPage() {
         </div>
       </div>
 
-      {/* Bagian Bawah Singkat */}
+      {/* GRAFIK PERKEMBANGAN SALDO */}
       <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-6 hover:-translate-y-1 transition-all duration-300">
         <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-6">Perkembangan Saldo</h3>
         <div className="w-full h-64 bg-gray-50 rounded-2xl border border-dashed border-gray-200 flex items-center justify-center">
@@ -132,31 +106,36 @@ function BukuTabunganPage() {
         </div>
       </div>
 
+      {/* RIWAYAT PEMASUKAN */}
       <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-6 hover:-translate-y-1 transition-all duration-300">
         <div className="flex justify-between items-center mb-6">
           <h3 className="font-extrabold text-xl text-[#0B4D1E]">Riwayat Pemasukan</h3>
-          <button className="text-sm font-bold text-[#0B4D1E] hover:text-[#F4A300]">Lihat Semua →</button>
+          <button onClick={() => navigate('/riwayat-transaksi')} className="text-sm font-bold text-[#0B4D1E] hover:text-[#F4A300] transition-colors">Lihat Semua →</button>
         </div>
         <div className="space-y-4">
           {riwayatPemasukan.map((item, idx) => (
-            <div key={idx} className="flex justify-between items-center bg-[#F5EFE6] p-4 rounded-2xl hover:bg-white hover:shadow-md transition-all cursor-pointer border border-transparent hover:border-gray-100">
+            <div key={idx} onClick={() => openDetail(item)} className="flex justify-between items-center bg-[#F5EFE6] p-4 rounded-2xl hover:bg-white hover:shadow-md transition-all cursor-pointer border border-transparent hover:border-gray-200 group">
               <div className="flex items-center gap-4">
-                <div className="bg-green-100 p-2.5 rounded-xl text-[#0B4D1E]">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7M5 19l7-7 7 7" /></svg>
+                <div className="bg-green-100 p-2.5 rounded-xl text-[#125B2A] group-hover:bg-[#125B2A] group-hover:text-white transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19L19 5M19 5v10M19 5H9" /></svg>
                 </div>
-                <div><p className="font-bold text-[#0B4D1E]">Setoran {item.nama_kategori}</p><p className="text-xs text-gray-500">Oleh: {item.nama_petugas}</p></div>
+                <div>
+                  <p className="font-bold text-[#0B4D1E] group-hover:text-[#F4A300] transition-colors">Setoran {item.nama_kategori}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{formatTanggal(item.tanggal)}</p>
+                </div>
               </div>
-              <div className="font-extrabold text-[#0B4D1E]">+ {formatRp(item.total_nilai)}</div>
+              <div className="font-extrabold text-green-600">+ {formatRp(item.total_nilai)}</div>
             </div>
           ))}
           {riwayatPemasukan.length === 0 && <p className="text-center text-sm font-bold text-gray-400 py-4">Belum ada pemasukan tabungan.</p>}
         </div>
       </div>
 
+      {/* INFORMASI SUMMARY */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
           <p className="text-gray-500 font-medium text-sm mb-1">Pemasukan Bulan Ini</p>
-          <h3 className="text-3xl font-extrabold text-[#0B4D1E]">{formatRp(pemasukanBulanIni)}</h3>
+          <h3 className="text-3xl font-extrabold text-green-600">{formatRp(pemasukanBulanIni)}</h3>
         </div>
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
           <p className="text-gray-500 font-medium text-sm mb-1">Rata-rata per Transaksi</p>
@@ -168,90 +147,54 @@ function BukuTabunganPage() {
         </div>
       </div>
 
-      {/* FLOATING MODAL EXPORT LAPORAN */}
-      {isExportModalOpen && (
+      {/* MODAL DETAIL PEMASUKAN */}
+      {isDetailOpen && selectedPemasukan && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-opacity">
-          <div className="bg-white w-full max-w-[420px] rounded-[2rem] p-8 shadow-2xl relative animate-fade-in-up">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl relative animate-fade-in-up border border-gray-100">
             
+            {/* Header Modal */}
             <div className="flex justify-between items-center mb-8">
-              <div className="flex items-center gap-3">
-                <div className="bg-[#FDF6EA] border border-[#F4A300]/20 p-2.5 rounded-xl text-[#F4A300]">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              <div className="flex items-center gap-4">
+                <div className="bg-green-100 p-3 rounded-full text-[#125B2A]">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19L19 5M19 5v10M19 5H9" /></svg>
                 </div>
-                <h3 className="text-xl font-extrabold text-[#0B4D1E]">Export Buku Tabungan</h3>
+                <h3 className="text-2xl font-extrabold text-[#0B4D1E]">Detail Pemasukan</h3>
               </div>
-              <button onClick={() => setIsExportModalOpen(false)} className="text-gray-400 hover:text-[#0B4D1E] transition-colors p-1">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              <button onClick={() => setIsDetailOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
-            <div className="space-y-6">
-              {/* Combo Box Periode */}
-              <div>
-                <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Pilih Periode</label>
-                <div className="relative">
-                  <input 
-                    type="text" 
-                    value={exportPeriode} 
-                    onChange={(e) => { setExportPeriode(e.target.value); setIsPeriodeOpen(true); }}
-                    onFocus={() => setIsPeriodeOpen(true)}
-                    placeholder="Semua Periode" 
-                    className="w-full bg-[#F5EFE6] px-5 py-4 rounded-2xl font-bold text-[#0B4D1E] outline-none"
-                  />
-                  {/* Arrow Indicator */}
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-[#0B4D1E]">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                  </div>
-                  {/* Dropdown Options */}
-                  {isPeriodeOpen && (
-                    <ul className="absolute z-10 w-full mt-2 bg-white border border-gray-100 shadow-lg rounded-2xl overflow-hidden max-h-40 overflow-y-auto">
-                      {periodeOptions.filter(o => o.toLowerCase().includes(exportPeriode.toLowerCase())).map((opt, i) => (
-                        <li key={i} onClick={() => { setExportPeriode(opt); setIsPeriodeOpen(false); }} className="px-5 py-3 hover:bg-[#F5EFE6] cursor-pointer text-sm font-bold text-[#0B4D1E] transition-colors">
-                          {opt}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+            {/* List Detail */}
+            <div className="space-y-5">
+              <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                <p className="text-gray-500 font-medium text-sm">Tanggal Setoran</p>
+                <p className="font-extrabold text-[#0B4D1E]">{formatTanggal(selectedPemasukan.tanggal)}</p>
               </div>
-
-              {/* Data yang Diexport (Checkboxes) */}
-              <div>
-                <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Data yang Diexport</label>
-                <div className="bg-[#F5EFE6] p-5 rounded-2xl space-y-4">
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input type="checkbox" checked={exportData.saldo} onChange={(e) => setExportData({...exportData, saldo: e.target.checked})} className="w-5 h-5 text-[#0B4D1E] bg-white border-gray-300 rounded focus:ring-[#0B4D1E] cursor-pointer" />
-                    <span className="text-sm font-bold text-[#0B4D1E] group-hover:text-[#F4A300] transition-colors">Saldo Tabungan</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input type="checkbox" checked={exportData.riwayat} onChange={(e) => setExportData({...exportData, riwayat: e.target.checked})} className="w-5 h-5 text-[#0B4D1E] bg-white border-gray-300 rounded focus:ring-[#0B4D1E] cursor-pointer" />
-                    <span className="text-sm font-bold text-[#0B4D1E] group-hover:text-[#F4A300] transition-colors">Riwayat Pemasukan</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input type="checkbox" checked={exportData.grafik} onChange={(e) => setExportData({...exportData, grafik: e.target.checked})} className="w-5 h-5 text-[#0B4D1E] bg-white border-gray-300 rounded focus:ring-[#0B4D1E] cursor-pointer" />
-                    <span className="text-sm font-bold text-[#0B4D1E] group-hover:text-[#F4A300] transition-colors">Grafik Perkembangan</span>
-                  </label>
-                </div>
+              <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                <p className="text-gray-500 font-medium text-sm">Kategori Sampah</p>
+                <span className="bg-[#EAE5DA] text-[#0B4D1E] px-4 py-1.5 rounded-full font-bold text-xs">{selectedPemasukan.nama_kategori}</span>
               </div>
-
-              {/* Format File Toggle */}
-              <div>
-                <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Format File</label>
-                <div className="flex gap-4">
-                  <button onClick={() => setExportFormat('PDF')} className={`flex-1 py-3.5 rounded-2xl font-bold transition-all ${exportFormat === 'PDF' ? 'bg-[#F4A300] text-white shadow-md' : 'bg-[#F5EFE6] text-gray-500 hover:bg-[#EAE5DA]'}`}>
-                    PDF
-                  </button>
-                  <button onClick={() => setExportFormat('Excel')} className={`flex-1 py-3.5 rounded-2xl font-bold transition-all ${exportFormat === 'Excel' ? 'bg-[#F4A300] text-white shadow-md' : 'bg-[#F5EFE6] text-gray-500 hover:bg-[#EAE5DA]'}`}>
-                    Excel
-                  </button>
+              <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                <p className="text-gray-500 font-medium text-sm">Berat Sampah</p>
+                <p className="font-extrabold text-[#0B4D1E] text-base">{(selectedPemasukan.berat || selectedPemasukan.berat_gram || 0) / 1000} kg</p>
+              </div>
+              <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                <p className="text-gray-500 font-medium text-sm">Saldo Bertambah</p>
+                <p className="font-extrabold text-green-600 text-lg">+ {formatRp(selectedPemasukan.total_nilai)}</p>
+              </div>
+              
+              <div className="pt-2 pb-2">
+                <p className="text-gray-500 font-medium text-sm mb-3">Catatan Transaksi</p>
+                <div className="bg-[#F5EFE6] p-5 rounded-2xl">
+                  <p className="font-bold text-[#0B4D1E] text-sm leading-relaxed">{selectedPemasukan.catatan || 'Tidak ada catatan untuk setoran ini.'}</p>
                 </div>
               </div>
             </div>
 
-            {/* Action Button */}
-            <button onClick={handleExport} className="w-full bg-[#0B4D1E] text-white py-4 rounded-2xl font-bold mt-8 flex items-center justify-center gap-2 hover:bg-[#083a16] hover:-translate-y-1 hover:shadow-lg transition-all">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-              Export {exportFormat}
+            {/* Tombol Tutup */}
+            <button onClick={() => setIsDetailOpen(false)} className="w-full bg-[#125B2A] text-white py-4 rounded-2xl font-bold mt-6 hover:bg-[#0B4D1E] shadow-md transition-all">
+              Tutup
             </button>
           </div>
         </div>

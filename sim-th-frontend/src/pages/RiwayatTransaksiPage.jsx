@@ -3,17 +3,40 @@ import DashboardLayout from '../components/DashboardLayout';
 
 function RiwayatTransaksiPage() {
   const [search, setSearch] = useState('');
-  const [filterKategori, setFilterKategori] = useState('');
-  const [filterBulan, setFilterBulan] = useState('');
-  const [filterTahun, setFilterTahun] = useState(2026);
-  const [selectedTrx, setSelectedTrx] = useState(null); 
   
-  // State untuk buka-tutup custom picker bulan
+  // State untuk filter custom
+  const [filterKategori, setFilterKategori] = useState('Semua Kategori');
+  const [isKategoriOpen, setIsKategoriOpen] = useState(false);
+  
+  const [filterBulan, setFilterBulan] = useState('-------- ----');
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
-  const bulanList = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
-
+  
+  const [filterTahun, setFilterTahun] = useState(2026);
+  
+  const [selectedTrx, setSelectedTrx] = useState(null); 
   const [riwayatData, setRiwayatData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Opsi Filter
+  const kategoriOptions = ['Semua Kategori', 'Plastik', 'Kertas', 'Logam', 'Kaca'];
+  const periodeOptions = [
+    'Jan - Feb 2026', 'Mar - Apr 2026', 
+    'Mei - Jun 2026', 'Jul - Ags 2026', 
+    'Sep - Okt 2026', 'Nov - Des 2026'
+  ];
+
+  // Helper fungsi untuk konversi ISO Date ke format "Bulan - Bulan Tahun"
+  const getPeriode = (isoString) => {
+    const d = new Date(isoString);
+    const m = d.getMonth();
+    const y = d.getFullYear();
+    if (m <= 1) return `Jan - Feb ${y}`;
+    if (m <= 3) return `Mar - Apr ${y}`;
+    if (m <= 5) return `Mei - Jun ${y}`;
+    if (m <= 7) return `Jul - Ags ${y}`;
+    if (m <= 9) return `Sep - Okt ${y}`;
+    return `Nov - Des ${y}`;
+  };
 
   useEffect(() => {
     const fetchRiwayat = async () => {
@@ -44,13 +67,22 @@ function RiwayatTransaksiPage() {
     return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
-  // Filter data
+  // Filter Data Gabungan
   const filteredData = riwayatData.filter(item => {
     const matchSearch = search === '' || 
                         item.nama_kategori.toLowerCase().includes(search.toLowerCase()) || 
-                        (item.catatan && item.catatan.toLowerCase().includes(search.toLowerCase()));
-    const matchKategori = filterKategori === '' || item.nama_kategori === filterKategori;
-    return matchSearch && matchKategori;
+                        (item.catatan && item.catatan.toLowerCase().includes(search.toLowerCase())) ||
+                        formatTanggal(item.tanggal).toLowerCase().includes(search.toLowerCase());
+    
+    const matchKategori = filterKategori === 'Semua Kategori' || item.nama_kategori === filterKategori;
+    
+    const itemPeriode = getPeriode(item.tanggal);
+    const itemTahun = new Date(item.tanggal).getFullYear();
+    
+    // Jika user belum milih bulan (masih "-------- ----"), filter cuma berdasarkan tahun
+    const matchWaktu = filterBulan === '-------- ----' ? (itemTahun === filterTahun) : (itemPeriode === filterBulan);
+
+    return matchSearch && matchKategori && matchWaktu;
   });
 
   const totalTransaksi = filteredData.length;
@@ -70,42 +102,73 @@ function RiwayatTransaksiPage() {
       </div>
 
       <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-8">
+        
+        {/* ROW 1: SEARCHBAR BESAR */}
         <label className="block text-sm font-bold text-[#0B4D1E] mb-3">Pencarian</label>
         <div className="relative mb-6">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-          <input type="text" value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Cari kategori, tanggal, catatan... (contoh: plastik, 7 Mei)" className="w-full bg-[#F5EFE6] border-none px-14 py-4 rounded-2xl focus:ring-2 focus:ring-[#0B4D1E] font-medium outline-none" />
+          <input 
+            type="text" 
+            value={search} 
+            onChange={(e)=>setSearch(e.target.value)} 
+            placeholder="Cari kategori, tanggal, catatan... (contoh: plastik, 7 Mei)" 
+            className="w-full bg-[#F5EFE6] border-none px-14 py-4 rounded-2xl focus:ring-2 focus:ring-[#0B4D1E] font-medium outline-none text-[#0B4D1E] transition-shadow" 
+          />
         </div>
 
+        {/* ROW 2: GRID FILTER 3 KOLOM */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Kategori dengan Panah */}
+          
+          {/* 1. CUSTOM FILTER KATEGORI */}
           <div>
             <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Kategori</label>
             <div className="relative">
-              <select value={filterKategori} onChange={(e)=>setFilterKategori(e.target.value)} className="w-full bg-[#F5EFE6] border-none px-5 py-4 pr-12 rounded-2xl font-bold text-[#0B4D1E] appearance-none cursor-pointer outline-none">
-                <option value="">Semua Kategori</option>
-                <option value="Plastik">Plastik</option>
-                <option value="Kertas">Kertas</option>
-                <option value="Logam">Logam</option>
-              </select>
-              <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none text-[#0B4D1E]">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-              </div>
+              <button 
+                onClick={() => {setIsKategoriOpen(!isKategoriOpen); setIsMonthPickerOpen(false);}} 
+                className="w-full bg-[#F5EFE6] border-none px-5 py-4 rounded-2xl font-bold text-[#0B4D1E] flex justify-between items-center transition-colors hover:bg-[#EAE5DA]"
+              >
+                {filterKategori}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0B4D1E]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              
+              {isKategoriOpen && (
+                <div className="absolute top-full mt-2 left-0 w-full bg-white border border-gray-100 shadow-xl rounded-2xl overflow-hidden z-30">
+                  {kategoriOptions.map(opt => (
+                    <div 
+                      key={opt} 
+                      onClick={() => { setFilterKategori(opt); setIsKategoriOpen(false); }} 
+                      className={`px-5 py-3 cursor-pointer text-sm font-bold transition-colors ${filterKategori === opt ? 'bg-[#0B4D1E] text-white' : 'text-[#0B4D1E] hover:bg-[#F5EFE6]'}`}
+                    >
+                      {opt}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Bulan (Custom Grid 4x3) */}
+          {/* 2. CUSTOM FILTER BULAN (2 Bulanan) */}
           <div>
             <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Bulan</label>
             <div className="relative">
-              <div onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)} className="w-full bg-[#F5EFE6] border-none px-5 py-4 rounded-2xl font-bold text-[#0B4D1E] cursor-pointer flex justify-between items-center">
-                {filterBulan || '-------- ----'}
+              <button 
+                onClick={() => {setIsMonthPickerOpen(!isMonthPickerOpen); setIsKategoriOpen(false);}} 
+                className="w-full bg-[#F5EFE6] border-none px-5 py-4 rounded-2xl font-bold text-[#0B4D1E] flex justify-between items-center transition-colors hover:bg-[#EAE5DA]"
+              >
+                {filterBulan}
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0B4D1E]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              </div>
+              </button>
+              
               {isMonthPickerOpen && (
-                <div className="absolute top-full mt-2 left-0 w-full bg-white p-4 rounded-2xl shadow-xl border border-gray-100 z-20 grid grid-cols-4 gap-2">
-                  {bulanList.map((bln) => (
-                    <button key={bln} onClick={() => { setFilterBulan(bln); setIsMonthPickerOpen(false); }} className={`py-2 rounded-xl text-sm font-bold transition-colors ${filterBulan === bln ? 'bg-[#0B4D1E] text-white' : 'bg-[#F5EFE6] text-[#0B4D1E] hover:bg-[#F4A300] hover:text-white'}`}>
-                      {bln}
+                <div className="absolute top-full mt-2 left-0 w-full bg-white p-4 rounded-3xl shadow-2xl border border-gray-100 z-30 grid grid-cols-2 gap-2">
+                  <button onClick={() => { setFilterBulan('-------- ----'); setIsMonthPickerOpen(false); }} className="col-span-2 py-3 rounded-xl text-xs font-bold bg-[#0B4D1E] text-white hover:bg-[#083a16] transition-all mb-1">Reset Bulan</button>
+                  {periodeOptions.map((opt) => (
+                    <button 
+                      key={opt} 
+                      onClick={() => { setFilterBulan(opt); setIsMonthPickerOpen(false); setFilterTahun(parseInt(opt.slice(-4))); }} 
+                      className={`py-3 rounded-xl text-xs font-bold transition-colors ${filterBulan === opt ? 'bg-[#0B4D1E] text-white' : 'bg-[#F5EFE6] text-[#0B4D1E] hover:bg-[#F4A300] hover:text-white'}`}
+                    >
+                      {opt}
                     </button>
                   ))}
                 </div>
@@ -113,17 +176,36 @@ function RiwayatTransaksiPage() {
             </div>
           </div>
 
-          {/* Tahun (Custom Arrow Up/Down) */}
+          {/* 3. TAHUN (Custom Arrow) */}
           <div>
             <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Tahun</label>
-            <div className="w-full bg-[#F5EFE6] border-none px-5 py-2.5 rounded-2xl flex justify-between items-center">
-              <span className="font-bold text-[#0B4D1E] text-lg">{filterTahun}</span>
+            <div className="w-full bg-[#F5EFE6] border-none px-5 py-2.5 rounded-2xl flex justify-between items-center h-[56px]">
+              <span className="font-extrabold text-[#0B4D1E] text-lg">{filterTahun}</span>
               <div className="flex flex-col">
                 <button onClick={() => setFilterTahun(filterTahun + 1)} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" /></svg></button>
                 <button onClick={() => setFilterTahun(filterTahun - 1)} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg></button>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* KARTU RINGKASAN */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col justify-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+          <p className="text-gray-400 font-medium text-sm mb-1">Total Transaksi</p>
+          <h3 className="text-4xl font-extrabold text-[#0B4D1E]">{totalTransaksi}</h3>
+          <p className="text-xs text-gray-400 mt-2">Berdasarkan pencarian & filter</p>
+        </div>
+        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col justify-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+          <p className="text-gray-400 font-medium text-sm mb-1">Total Berat</p>
+          <h3 className="text-4xl font-extrabold text-[#0B4D1E]">{totalBerat} kg</h3>
+          <p className="text-xs text-gray-400 mt-2">Berdasarkan pencarian & filter</p>
+        </div>
+        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col justify-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+          <p className="text-gray-400 font-medium text-sm mb-1">Total Nilai</p>
+          <h3 className="text-4xl font-extrabold text-green-600">{formatRp(totalNilai)}</h3>
+          <p className="text-xs text-gray-400 mt-2">Berdasarkan pencarian & filter</p>
         </div>
       </div>
 
@@ -161,74 +243,56 @@ function RiwayatTransaksiPage() {
         </table>
       </div>
 
-      {/* Kartu Ringkasan (Tambah Efek Hover) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col justify-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-          <p className="text-gray-400 font-medium text-sm mb-1">Total Transaksi</p>
-          <h3 className="text-4xl font-extrabold text-[#0B4D1E]">{totalTransaksi}</h3>
-          <p className="text-xs text-gray-400 mt-2">Semua data</p>
-        </div>
-        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col justify-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-          <p className="text-gray-400 font-medium text-sm mb-1">Total Berat</p>
-          <h3 className="text-4xl font-extrabold text-[#0B4D1E]">{totalBerat} kg</h3>
-          <p className="text-xs text-gray-400 mt-2">Semua data</p>
-        </div>
-        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col justify-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-          <p className="text-gray-400 font-medium text-sm mb-1">Total Nilai</p>
-          <h3 className="text-4xl font-extrabold text-[#0B4D1E]">{formatRp(totalNilai)}</h3>
-          <p className="text-xs text-gray-400 mt-2">Semua data</p>
-        </div>
-      </div>
-
       {/* FLOATING MODAL DETAIL TRANSAKSI */}
       {selectedTrx && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-opacity">
-          <div className="bg-white w-full max-w-lg rounded-[2rem] p-8 shadow-2xl relative animate-fade-in-up">
-            <div className="flex justify-between items-center mb-8">
-              <div className="flex items-center gap-3">
-                <div className="bg-[#EAE5DA] p-2.5 rounded-full text-[#0B4D1E]">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-10 shadow-2xl relative animate-fade-in-up border border-gray-100">
+            <div className="flex justify-between items-center mb-10">
+              <div className="flex items-center gap-4">
+                <div className="bg-[#EAE5DA] p-4 rounded-2xl text-[#0B4D1E] border border-[#0B4D1E]/10">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                 </div>
                 <h3 className="text-2xl font-extrabold text-[#0B4D1E]">Detail Transaksi</h3>
               </div>
-              <button onClick={() => setSelectedTrx(null)} className="text-gray-400 hover:text-[#0B4D1E] transition-colors p-1">
+              <button onClick={() => setSelectedTrx(null)} className="text-gray-400 hover:text-gray-600 transition-colors p-1">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
             <div className="space-y-6">
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
-                <p className="text-gray-500 font-medium text-sm">Tanggal & Wilayah</p>
-                <p className="font-bold text-[#0B4D1E]">{formatTanggal(selectedTrx.tanggal)} • {selectedTrx.nama_wilayah}</p>
+                <p className="text-gray-500 font-medium text-sm">Tanggal</p>
+                <p className="font-extrabold text-[#0B4D1E]">{formatTanggal(selectedTrx.tanggal)}</p>
               </div>
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
-                <p className="text-gray-500 font-medium text-sm">Kategori Sampah</p>
-                <span className="bg-[#F5EFE6] text-[#0B4D1E] px-4 py-1.5 rounded-full font-bold text-xs">{selectedTrx.nama_kategori}</span>
+                <p className="text-gray-500 font-medium text-sm">Wilayah</p>
+                <p className="font-extrabold text-[#0B4D1E]">{selectedTrx.nama_wilayah}</p>
               </div>
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
-                <p className="text-gray-500 font-medium text-sm">Berat Sampah</p>
+                <p className="text-gray-500 font-medium text-sm">Kategori</p>
+                <span className="bg-[#E8F5E9] text-[#2E7D32] px-4 py-1.5 rounded-full font-bold text-xs">{selectedTrx.nama_kategori}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                <p className="text-gray-500 font-medium text-sm">Berat</p>
                 <p className="font-extrabold text-[#0B4D1E] text-lg">{selectedTrx.berat / 1000} kg</p>
               </div>
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
                 <p className="text-gray-500 font-medium text-sm">Nilai Ekonomi</p>
-                <p className="font-extrabold text-[#0B4D1E] text-lg">{formatRp(selectedTrx.total_nilai)}</p>
+                <p className="font-extrabold text-green-600 text-lg">{formatRp(selectedTrx.total_nilai)}</p>
+              </div>
+              <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                <p className="text-gray-500 font-medium text-sm">Petugas</p>
+                <p className="font-extrabold text-[#0B4D1E]">{selectedTrx.nama_petugas}</p>
               </div>
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
                 <p className="text-gray-500 font-medium text-sm">Status</p>
                 <span className="text-green-600 bg-green-100 px-3 py-1.5 rounded-full font-bold text-xs">{selectedTrx.status}</span>
               </div>
               
-              <div className="pt-2">
-                <p className="text-gray-500 font-medium text-sm mb-3">Catatan</p>
-                <div className="w-full bg-[#F5EFE6] p-5 rounded-2xl text-[#0B4D1E] font-medium text-sm border border-gray-100">
-                  {selectedTrx.catatan || 'Tidak ada catatan.'}
-                </div>
-              </div>
+              {/* Box Catatan Dihapus di Modal Detail ini karena nggak ada di Gambar 1 */}
             </div>
-
-            <button onClick={() => setSelectedTrx(null)} className="w-full bg-[#0B4D1E] text-white py-4 rounded-2xl font-bold mt-8 hover:bg-[#083a16] hover:shadow-lg hover:-translate-y-1 transition-all">
-              Tutup
-            </button>
+            
+            {/* Tombol Tutup Besar di bawah (Opsional, tapi gua buang karena di header udah ada X) */}
           </div>
         </div>
       )}

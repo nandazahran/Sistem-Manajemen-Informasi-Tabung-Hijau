@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 
 function LeaderboardPage() {
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  
+  // State untuk buka-tutup tabel
   const [isExpanded, setIsExpanded] = useState(false);
   
   const periodeList = [
@@ -15,55 +17,41 @@ function LeaderboardPage() {
   ];
 
   const [filterPeriode, setFilterPeriode] = useState(periodeList[2]); // Default Mei-Jun
-  const [leaderboardData, setLeaderboardData] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  
+  // Data statis
+  const leaderboardData = [
+    { rank: 1, wilayah: 'BEM FATETA', kpi: 925, input: '385 kg', nilai: 'Rp 1.250.000', trend: 'up' },
+    { rank: 2, wilayah: 'BEM FAPET', kpi: 890, input: '360 kg', nilai: 'Rp 1.180.000', trend: 'up' },
+    { rank: 3, wilayah: 'BEM FEM', kpi: 875, input: '340 kg', nilai: 'Rp 1.100.000', trend: 'flat' },
+    { rank: 4, wilayah: 'BEM FAHUTAN', kpi: 820, input: '310 kg', nilai: 'Rp 950.000', trend: 'down' },
+    { rank: 5, wilayah: 'BEM FPIK', kpi: 780, input: '285 kg', nilai: 'Rp 850.000', trend: 'flat' },
+    { rank: 6, wilayah: 'BEM FMIPA', kpi: 750, input: '260 kg', nilai: 'Rp 780.000', trend: 'up' },
+    { rank: 7, wilayah: 'BEM FEMA', kpi: 720, input: '240 kg', nilai: 'Rp 720.000', trend: 'down' },
+    { rank: 8, wilayah: 'BEM FESB', kpi: 680, input: '210 kg', nilai: 'Rp 650.000', trend: 'flat' },
+  ];
 
-  useEffect(() => {
-    const fetchLeaderboard = async () => {
-      setIsLoading(true);
-      try {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/leaderboard?tanggal_mulai=${filterPeriode.start}&tanggal_akhir=${filterPeriode.end}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const resData = await response.json();
-        if (resData.status === 'sukses') {
-          setLeaderboardData(resData.data);
-        }
-      } catch (error) {
-        console.error("Gagal mengambil leaderboard", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchLeaderboard();
-  }, [filterPeriode]);
-
-  const displayedLeaderboard = isExpanded ? leaderboardData : leaderboardData.slice(0, 5);
-  const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
-
-  const juara1 = leaderboardData[0] || null;
-  const juara2 = leaderboardData[1] || null;
-  const juara3 = leaderboardData[2] || null;
+  // LOGIKA TABEL: Kalau isExpanded = true nampilin semua, kalau false nampilin 5 doang dari atas
+  const visibleData = isExpanded ? leaderboardData : leaderboardData.slice(0, 5); 
 
   return (
     <DashboardLayout>
-      <div className="bg-[#0B4D1E] rounded-[2rem] p-10 flex items-center justify-between shadow-sm mt-2 mb-8">
-        <div className="flex items-center gap-4 text-white">
-          <div className="bg-[#F4A300] p-3 rounded-2xl">
+      {/* BANNER & FILTER 2 BULANAN */}
+      <div className="bg-[#0B4D1E] rounded-[2rem] p-10 flex flex-col md:flex-row items-start md:items-center justify-between shadow-sm mt-2 mb-8">
+        <div className="flex items-center gap-5 text-white mb-6 md:mb-0">
+          <div className="bg-[#F4A300] p-4 rounded-2xl">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
           </div>
           <div>
-            <h2 className="text-3xl font-extrabold mb-1">Leaderboard KPI</h2>
-            <p className="text-green-100/80 font-medium">Peringkat kinerja pengelolaan sampah wilayah</p>
+            <h2 className="text-3xl font-extrabold mb-1">Leaderboard KPI Wilayah</h2>
+            <p className="text-green-100/80 font-medium">Peringkat kinerja wilayah berdasarkan KPI</p>
           </div>
         </div>
 
-        {/* FULL CLICKABLE BUTTON FILTER */}
+        {/* CUSTOM DROPDOWN FILTER 2 BULANAN */}
         <div className="relative">
           <button 
             onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
-            className="bg-[#F4A300] text-white px-6 py-3.5 rounded-2xl flex items-center gap-3 font-bold shadow-md hover:bg-[#d68e00] transition-all"
+            className="bg-[#F4A300] text-white px-6 py-4 rounded-2xl flex items-center gap-3 font-bold shadow-md hover:bg-[#d68e00] transition-all"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
             {filterPeriode.label}
@@ -85,90 +73,107 @@ function LeaderboardPage() {
         </div>
       </div>
 
-      {/* TOP 3 PODIUM DENGAN ANIMASI HOVER */}
-      <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 mb-8">
-        <div className="flex justify-center items-end gap-6 h-72">
+      {/* TOP 3 PODIUM */}
+      <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-8">
+        <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-8">Top 3 Wilayah</h3>
+        <div className="flex flex-col md:flex-row justify-center items-end gap-4 h-72 px-4 mb-10">
           
-          {/* Posisi 2 */}
-          <div className="w-48 bg-[#F5EFE6] rounded-t-[2.5rem] h-52 relative flex flex-col items-center justify-end pb-8 border border-gray-200 hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 group cursor-pointer">
-            <div className="absolute -top-7 bg-gray-400 p-2.5 rounded-full border-4 border-white shadow-md group-hover:scale-110 transition-transform">
+          {/* #2 Rank (Silver) */}
+          <div className="w-full md:w-1/3 bg-[#E2E8F0] rounded-t-3xl h-[75%] flex flex-col items-center justify-center text-[#0B4D1E] relative shadow-lg hover:-translate-y-2 transition-transform cursor-pointer">
+            <div className="absolute -top-6 bg-white p-2 rounded-full shadow-sm">
               <span className="text-xl">🥈</span>
             </div>
-            <h4 className="text-4xl font-extrabold text-[#0B4D1E]">2</h4>
-            <p className="font-bold text-[#0B4D1E] mt-1 text-center">{juara2 ? juara2.nama_wilayah : '-'}</p>
-            <p className="text-2xl font-extrabold text-[#0B4D1E] mt-2">{juara2 ? juara2.poin_kpi : 0} <span className="text-xs font-medium">poin</span></p>
+            <h2 className="text-4xl font-extrabold mb-1">#2</h2>
+            <p className="font-bold text-lg">{leaderboardData[1].wilayah}</p>
+            <p className="text-sm font-medium opacity-90 mt-1">KPI: {leaderboardData[1].kpi}</p>
           </div>
-
-          {/* Posisi 1 (Paling Tinggi) */}
-          <div className="w-56 bg-[#FDF6EA] rounded-t-[2.5rem] h-64 relative flex flex-col items-center justify-end pb-10 border-2 border-[#F4A300] hover:-translate-y-3 hover:shadow-2xl transition-all duration-300 group cursor-pointer z-10 shadow-lg">
-            <div className="absolute -top-10 bg-[#F4A300] p-4 rounded-2xl border-4 border-white shadow-md group-hover:scale-110 transition-transform">
+          
+          {/* #1 Rank (Emas) */}
+          <div className="w-full md:w-1/3 bg-[#F4A300] rounded-t-3xl h-full flex flex-col items-center justify-center text-white relative shadow-2xl z-10 hover:-translate-y-3 transition-transform cursor-pointer">
+            <div className="absolute -top-8 bg-white p-3 rounded-full shadow-md">
               <span className="text-3xl">🏆</span>
             </div>
-            <h4 className="text-5xl font-extrabold text-[#F4A300]">1</h4>
-            <p className="font-bold text-[#0B4D1E] text-lg mt-1 text-center">{juara1 ? juara1.nama_wilayah : '-'}</p>
-            <p className="text-3xl font-extrabold text-[#0B4D1E] mt-2">{juara1 ? juara1.poin_kpi : 0} <span className="text-sm font-medium">poin</span></p>
+            <h2 className="text-5xl font-extrabold mb-1">#1</h2>
+            <p className="font-bold text-xl">{leaderboardData[0].wilayah}</p>
+            <p className="text-sm font-medium opacity-90 mt-1">KPI: {leaderboardData[0].kpi}</p>
           </div>
-
-          {/* Posisi 3 (YOU) */}
-          <div className="w-48 bg-white rounded-t-[2.5rem] h-44 relative flex flex-col items-center justify-end pb-8 border-2 border-[#F4A300] hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 group cursor-pointer">
-            <div className="absolute -top-7 bg-[#CD7F32] p-2.5 rounded-full border-4 border-white shadow-md group-hover:scale-110 transition-transform">
+          
+          {/* #3 Rank (Bronze) */}
+          <div className="w-full md:w-1/3 bg-[#CD7F32] rounded-t-3xl h-[60%] flex flex-col items-center justify-center text-white relative shadow-lg hover:-translate-y-2 transition-transform cursor-pointer">
+            <div className="absolute -top-6 bg-white p-2 rounded-full shadow-sm">
               <span className="text-xl">🥉</span>
             </div>
-            <h4 className="text-4xl font-extrabold text-[#F4A300]">3</h4>
-            <p className="font-bold text-[#0B4D1E] mt-1 text-center">{juara3 ? juara3.nama_wilayah : '-'}</p>
-            <span className="bg-transparent text-transparent text-[10px] px-3 py-0.5 rounded-full mb-1 font-bold select-none">-</span>
-            <p className="text-2xl font-extrabold text-[#0B4D1E]">{juara3 ? juara3.poin_kpi : 0} <span className="text-xs font-medium">poin</span></p>
+            <h2 className="text-4xl font-extrabold mb-1">#3</h2>
+            <p className="font-bold text-lg">{leaderboardData[2].wilayah}</p>
+            <p className="text-sm font-medium opacity-90 mt-1">KPI: {leaderboardData[2].kpi}</p>
           </div>
+
         </div>
       </div>
 
-      {/* TABEL PERINGKAT */}
-      <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden mb-8">
-        <table className="w-full text-left">
-          <thead className="bg-[#F5EFE6] text-[#0B4D1E]">
-            <tr>
-              <th className="px-8 py-5 font-bold">Peringkat</th>
-              <th className="px-8 py-5 font-bold">Wilayah</th>
-              <th className="px-8 py-5 font-bold">Poin KPI</th>
-              <th className="px-8 py-5 font-bold">Total Berat</th>
-              <th className="px-8 py-5 font-bold">Nilai Ekonomi</th>
-              <th className="px-8 py-5 font-bold">Perubahan</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {displayedLeaderboard.map((item) => (
-              <tr key={item.peringkat} className="hover:bg-gray-50 transition-colors">
-                <td className="px-8 py-5 font-bold text-gray-500">#{item.peringkat}</td>
-                <td className="px-8 py-5 font-bold text-[#0B4D1E]">{item.nama_wilayah}</td>
-                <td className="px-8 py-5 font-extrabold text-[#0B4D1E] text-xl">{item.poin_kpi}</td>
-                <td className="px-8 py-5 text-gray-600 font-medium">{item.total_berat_gram / 1000} kg</td>
-                <td className="px-8 py-5 font-bold text-[#0B4D1E]">{formatRp(item.total_rupiah)}</td>
-                <td className="px-8 py-5">
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600">
-                    -
-                  </span>
-                </td>
+      {/* RANKING LENGKAP TABLE */}
+      <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden mb-8 flex flex-col">
+        <div className="p-6 pb-2">
+          <h3 className="font-extrabold text-xl text-[#0B4D1E]">Ranking Lengkap</h3>
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-transparent text-[#0B4D1E]">
+              <tr>
+                <th className="px-8 py-5 font-bold">Rank</th>
+                <th className="px-8 py-5 font-bold">Wilayah</th>
+                <th className="px-8 py-5 font-bold">KPI</th>
+                <th className="px-8 py-5 font-bold">Total Input</th>
+                <th className="px-8 py-5 font-bold">Nilai Ekonomi</th>
+                <th className="px-8 py-5 font-bold text-center">Trend</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="p-4 bg-gray-50 border-t border-gray-100 text-center">
-          <button onClick={() => setIsExpanded(!isExpanded)} className="text-[#0B4D1E] font-bold hover:text-[#F4A300] flex items-center gap-2 mx-auto">
-             {isExpanded ? 'Tutup Peringkat ↑' : 'Lihat Semua Peringkat ↓'}
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {visibleData.map((w) => (
+                <tr key={w.rank} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-8 py-5">
+                    <div className="w-8 h-8 bg-[#F5EFE6] rounded-full flex items-center justify-center font-extrabold text-[#0B4D1E]">{w.rank}</div>
+                  </td>
+                  <td className="px-8 py-5 font-extrabold text-[#0B4D1E]">{w.wilayah}</td>
+                  <td className="px-8 py-5 font-extrabold text-[#F4A300]">{w.kpi}</td>
+                  <td className="px-8 py-5 font-bold text-[#0B4D1E]">{w.input}</td>
+                  <td className="px-8 py-5 font-extrabold text-green-600">{w.nilai}</td>
+                  <td className="px-8 py-5 flex justify-center">
+                    {w.trend === 'up' && <div className="p-1.5 bg-green-100 text-green-600 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg></div>}
+                    {w.trend === 'down' && <div className="p-1.5 bg-red-100 text-red-600 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg></div>}
+                    {w.trend === 'flat' && <div className="p-1.5 bg-gray-100 text-gray-500 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" /></svg></div>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        {/* TOMBOL EXPAND (UDAH DIBENERIN) */}
+        <div className="p-4 bg-gray-50 border-t border-gray-100 transition-colors hover:bg-gray-100 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+          <button className="text-[#0B4D1E] font-bold text-sm flex items-center justify-center gap-2 w-full outline-none">
+            {isExpanded ? 'Tutup Peringkat' : 'Tampilkan Lebih Banyak'}
+            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+            </svg>
           </button>
         </div>
       </div>
 
-      <div className="bg-[#EAE5DA] p-8 rounded-3xl mb-8 border border-[#0B4D1E]/10">
-        <h3 className="font-extrabold text-[#0B4D1E] flex items-center gap-2 mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg> Cara Menghitung Poin KPI
+      {/* CARDS INFORMATION KPI BREAKDOWN */}
+      <div className="bg-[#EAE5DA] p-8 rounded-[2rem] border border-[#0B4D1E]/10 mb-8 shadow-sm">
+        <h3 className="font-extrabold text-xl text-[#0B4D1E] flex items-center gap-3 mb-6">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg> 
+          Cara Menghitung Poin KPI
         </h3>
-        <ul className="text-sm text-[#0B4D1E]/80 space-y-2 font-medium">
+        <ul className="text-[15px] text-[#0B4D1E]/90 space-y-3 font-bold">
           <li>• Total input berat sampah secara relatif (Maksimal 40 Poin)</li>
           <li>• Total nilai ekonomi/pendapatan secara relatif (Maksimal 30 Poin)</li>
           <li>• Kualitas pemilahan sampah: Bersih/Terpilah (Maksimal 30 Poin)</li>
         </ul>
       </div>
+
     </DashboardLayout>
   );
 }

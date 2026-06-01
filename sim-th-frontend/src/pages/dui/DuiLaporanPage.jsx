@@ -6,8 +6,11 @@ function DuiLaporanPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
-  const [exportFormat, setExportFormat] = useState('XLSX');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // State Custom Dropdown di Modal Export
+  const [isPeriodeOpen, setIsPeriodeOpen] = useState(false);
+  const [exportPeriode, setExportPeriode] = useState('Mei - Jun 2026');
 
   const rekapData = [
     { id: 1, wilayah: 'BEM FATETA', totalTx: 124, berat: '385 kg', nilai: 'Rp 1.250k', kpi: 925 },
@@ -25,6 +28,8 @@ function DuiLaporanPage() {
   const pieData = [{ name: 'FATETA', value: 385 }, { name: 'FAPET', value: 360 }, { name: 'FEM', value: 340 }, { name: 'FAHUTAN', value: 310 }, { name: 'Lainnya', value: 495 }];
   const COLORS = ['#125B2A', '#F4A300', '#8FA57A', '#517D3B', '#D1D5DB'];
 
+  const periodeOptions = ['Jan - Feb 2026', 'Mar - Apr 2026', 'Mei - Jun 2026', 'Jul - Ags 2026', 'Sep - Okt 2026', 'Nov - Des 2026'];
+
   return (
     <DuiLayout>
       <style>{`@keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }`}</style>
@@ -33,7 +38,7 @@ function DuiLaporanPage() {
       <div className="bg-[#0B4D1E] rounded-[2rem] p-10 flex flex-col md:flex-row items-start md:items-center justify-between shadow-sm mt-2 mb-8">
         <div className="flex items-center gap-5 text-white mb-6 md:mb-0">
           <div className="bg-[#F4A300] p-4 rounded-2xl"><svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div>
-          <div><h2 className="text-3xl font-extrabold mb-1">Laporan Sistem</h2><p className="text-green-100/80 font-medium">Dashboard analitik dan pelaporan komprehensif</p></div>
+          <div><h2 className="text-3xl font-extrabold mb-1">Laporan</h2><p className="text-green-100/80 font-medium">Dashboard analitik dan pelaporan komprehensif</p></div>
         </div>
         <button onClick={() => setIsExportOpen(true)} className="bg-[#F4A300] text-white px-8 py-3.5 rounded-2xl font-bold flex items-center gap-2 hover:bg-[#d68e00] transition-all shadow-md">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Export Laporan
@@ -117,61 +122,71 @@ function DuiLaporanPage() {
         </table>
       </div>
 
-      {/* MODAL EXPORT LAPORAN */}
+      {/* MODAL EXPORT LAPORAN (SESUAI GAMBAR 1 BEM WILAYAH) */}
       {isExportOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl relative animate-fade-in-up border border-gray-100">
+            
+            {/* Header */}
             <div className="flex justify-between items-center mb-8">
-              <div className="flex items-center gap-3">
-                <div className="bg-[#FDF6EA] p-3 rounded-2xl text-[#F4A300]">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              <div className="flex items-center gap-4">
+                <div className="bg-[#FFF8E1] p-3 rounded-full text-[#F4A300]">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                 </div>
-                <h3 className="text-2xl font-extrabold text-[#0B4D1E]">Export Laporan</h3>
+                <h3 className="text-xl font-extrabold text-[#0B4D1E]">Export Laporan</h3>
               </div>
-              <button onClick={() => setIsExportOpen(false)} className="text-[#0B4D1E] hover:text-red-500 transition-colors">
+              <button onClick={() => setIsExportOpen(false)} className="text-gray-500 hover:text-[#0B4D1E] transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             
-            <form onSubmit={(e) => { e.preventDefault(); setIsExportOpen(false); alert('Laporan berhasil didownload!'); }} className="space-y-6">
-              {/* Periode */}
+            <form onSubmit={(e) => { e.preventDefault(); setIsExportOpen(false); alert('Laporan format Excel berhasil didownload!'); }} className="space-y-6">
+              
+              {/* Dropdown Periode (2 Bulanan) */}
               <div>
-                <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Periode Laporan</label>
+                <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Pilih Periode</label>
                 <div className="relative">
-                  <select className="w-full bg-[#F5EFE6] px-5 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none appearance-none cursor-pointer">
-                    <option>Mei 2026</option><option>April 2026</option>
-                  </select>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute right-4 top-1/2 transform -translate-y-1/2 text-[#0B4D1E] pointer-events-none" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                  <div onClick={() => setIsPeriodeOpen(!isPeriodeOpen)} className="w-full bg-[#F5EFE6] px-5 py-4 rounded-2xl font-bold text-[#0B4D1E] cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors">
+                    {exportPeriode}
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0B4D1E]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  </div>
+                  {isPeriodeOpen && (
+                    <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 shadow-xl rounded-xl z-50 overflow-hidden py-1">
+                      {periodeOptions.map(opt => (
+                        <div key={opt} onClick={() => { setExportPeriode(opt); setIsPeriodeOpen(false); }} className={`px-5 py-2.5 cursor-pointer text-sm font-bold transition-colors ${exportPeriode === opt ? 'bg-[#0B4D1E] text-white' : 'text-[#0B4D1E] hover:bg-gray-100'}`}>
+                          {opt}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Format File */}
+              {/* Data Export Checkboxes Khusus DUI */}
               <div>
-                <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Format File</label>
-                <div className="flex gap-4">
-                  <button type="button" onClick={() => setExportFormat('XLSX')} className={`flex-1 py-4 rounded-2xl font-bold transition-all ${exportFormat === 'XLSX' ? 'bg-[#125B2A] text-white shadow-md' : 'bg-[#F5EFE6] text-gray-500 hover:bg-[#EAE5DA]'}`}>XLSX (Excel)</button>
-                  <button type="button" onClick={() => setExportFormat('PDF')} className={`flex-1 py-4 rounded-2xl font-bold transition-all ${exportFormat === 'PDF' ? 'bg-[#125B2A] text-white shadow-md' : 'bg-[#F5EFE6] text-gray-500 hover:bg-[#EAE5DA]'}`}>PDF</button>
-                </div>
-              </div>
-
-              {/* Data Export Checkboxes */}
-              <div>
-                <label className="block text-sm font-bold text-[#0B4D1E] mb-3">Pilih Data yang akan diexport</label>
-                <div className="space-y-3">
+                <label className="block text-sm font-bold text-[#0B4D1E] mb-3">Data yang Diexport</label>
+                <div className="bg-[#F5EFE6] p-5 rounded-2xl space-y-4">
                   {['Tren Sampah per Kategori', 'Nilai Ekonomi per Wilayah', 'Kontribusi Wilayah', 'Rekap Transaksi'].map((item) => (
-                    <label key={item} className="flex items-center gap-4 cursor-pointer bg-[#F5EFE6] p-4 rounded-2xl group hover:bg-[#EAE5DA] transition-colors">
-                      <input type="checkbox" defaultChecked className="w-5 h-5 text-[#0A8895] bg-white border-gray-300 rounded cursor-pointer accent-[#0A8895]" />
+                    <label key={item} className="flex items-center gap-4 cursor-pointer group">
+                      <input type="checkbox" defaultChecked className="w-5 h-5 text-[#125B2A] bg-white border-gray-300 rounded cursor-pointer accent-[#125B2A]" />
                       <span className="text-sm font-bold text-[#0B4D1E]">{item}</span>
                     </label>
                   ))}
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-4 mt-8 pt-2">
-                <button type="button" onClick={() => setIsExportOpen(false)} className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-4 rounded-2xl font-bold hover:bg-[#EAE5DA] transition-all">Batal</button>
-                <button type="submit" className="flex-1 bg-[#125B2A] text-white py-4 rounded-2xl font-bold hover:bg-[#0B4D1E] shadow-md flex items-center justify-center gap-2 transition-all">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Download
+              {/* Format File Button (Cuma Excel) */}
+              <div>
+                <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Format File</label>
+                <div className="w-full bg-[#F4A300] text-white py-4 rounded-2xl font-extrabold text-center shadow-sm">
+                  Excel
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <div className="pt-2">
+                <button type="submit" className="w-full bg-[#125B2A] text-white py-4 rounded-2xl font-extrabold hover:bg-[#0B4D1E] shadow-md flex items-center justify-center gap-2 transition-all">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Export EXCEL
                 </button>
               </div>
             </form>

@@ -5,8 +5,15 @@ function AdminLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
 
-  // MENU KHUSUS ADMIN (BEM-KM)
+  // Data Dummy Dropdown Notif
+  const notifDropdown = [
+    { id: 1, title: 'Transaksi baru dari BEM FATETA', desc: 'Plastik 25kg', time: '5 menit lalu', unread: true },
+    { id: 2, title: 'User baru ditambahkan', desc: 'BEM FAPET berhasil ditambahkan', time: '10 menit lalu', unread: true },
+    { id: 3, title: 'Harga kategori diperbarui', desc: 'Plastik: Rp 4.500/kg', time: '1 jam lalu', unread: false },
+  ];
+
   const adminMenuItems = [
     { name: 'Dashboard', path: '/admin/dashboard', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
     { name: 'Kelola Transaksi', path: '/admin/kelola-transaksi', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
@@ -32,8 +39,7 @@ function AdminLayout({ children }) {
   return (
     <div className="min-h-screen bg-[#F5EFE6] flex font-sans animate-fade-in">
       
-      {/* SIDEBAR ADMIN */}
-      <aside className={`w-72 bg-[#0B4D1E] text-white flex flex-col fixed h-full z-40 transition-transform duration-500 ease-in-out overflow-y-auto ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`w-72 bg-[#0B4D1E] text-white flex flex-col fixed h-full z-40 transition-transform duration-500 ease-in-out overflow-y-auto custom-scrollbar ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-8 flex items-center gap-3">
           <div className="bg-[#F4A300] p-2 rounded-lg">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
@@ -64,7 +70,6 @@ function AdminLayout({ children }) {
         </div>
       </aside>
 
-      {/* AREA KONTEN ADMIN */}
       <div className={`flex-1 flex flex-col transition-all duration-500 ease-in-out ${isSidebarOpen ? 'ml-72' : 'ml-0'}`}>
         <header className="h-24 bg-white flex items-center justify-between px-10 sticky top-0 z-30 shadow-sm border-b border-gray-100">
           <div className="flex items-center gap-6 flex-1">
@@ -84,15 +89,45 @@ function AdminLayout({ children }) {
 
           <div className="flex items-center gap-6">
             
-            {/* INI BAGIAN TOMBOL NOTIFIKASINYA YANG UDAH DIBENERIN (BISA DI-KLIK) */}
-            <button onClick={() => navigate('/admin/notifikasi')} className="relative p-2 rounded-full hover:bg-gray-100 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-              <span className="absolute top-0 right-0 w-5 h-5 bg-[#F4A300] text-white text-[11px] font-bold flex items-center justify-center rounded-full border-2 border-white">2</span>
-            </button>
-            
+            {/* WRAPPER NOTIFIKASI DROPDOWN */}
+            <div className="relative">
+              <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="relative p-2 rounded-full hover:bg-gray-100 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                <span className="absolute top-0 right-0 w-5 h-5 bg-[#F4A300] text-white text-[11px] font-bold flex items-center justify-center rounded-full border-2 border-white">2</span>
+              </button>
+
+              {isNotifOpen && (
+                <div className="absolute top-full right-0 mt-4 w-80 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-fade-in-up">
+                  <div className="p-5 border-b border-gray-100">
+                    <h3 className="font-extrabold text-[#0B4D1E] text-lg">Notifikasi</h3>
+                    <p className="text-gray-400 text-xs font-medium mt-1">2 belum dibaca</p>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                    {notifDropdown.map((item) => (
+                      <div key={item.id} className="p-5 border-b border-gray-50 hover:bg-[#FDF6EA] cursor-pointer flex gap-4 transition-colors">
+                        <div className="mt-1.5 flex-shrink-0">
+                          {item.unread ? <div className="w-2.5 h-2.5 rounded-full bg-[#F4A300]"></div> : <div className="w-2.5 h-2.5"></div>}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-[#0B4D1E]">{item.title}</p>
+                          <p className="text-xs text-gray-500 mt-1 font-medium">{item.desc}</p>
+                          <p className="text-[10px] text-gray-400 mt-1.5 font-bold">{item.time}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="p-4 text-center bg-white border-t border-gray-100 hover:bg-gray-50 transition-colors">
+                    <button onClick={() => { setIsNotifOpen(false); navigate('/admin/notifikasi'); }} className="text-[#0B4D1E] font-bold text-sm hover:text-[#F4A300] flex items-center justify-center gap-2 w-full transition-colors">
+                      Lihat Semua Notifikasi 
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="h-10 w-px bg-gray-200"></div>
             
-            {/* PROFIL ADMIN */}
             <Link to="/admin/profil" className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity">
               <div className="text-right">
                 <p className="font-extrabold text-[#0B4D1E] text-sm">Admin SIM-TH</p>

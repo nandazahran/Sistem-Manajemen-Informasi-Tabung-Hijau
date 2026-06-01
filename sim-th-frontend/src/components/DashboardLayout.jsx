@@ -5,53 +5,32 @@ function DashboardLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [namaProfil, setNamaProfil] = useState('Memuat...');
-  const [roleProfil, setRoleProfil] = useState('User');
-  const [isBEMWilayah, setIsBEMWilayah] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+
+  // Data Dummy Dropdown Notif
+  const notifDropdown = [
+    { id: 1, title: 'Transaksi baru dari BEM FATETA', desc: 'Plastik 25kg', time: '5 menit lalu', unread: true },
+    { id: 2, title: 'User baru ditambahkan', desc: 'BEM FAPET berhasil ditambahkan', time: '10 menit lalu', unread: true },
+    { id: 3, title: 'Harga kategori diperbarui', desc: 'Plastik: Rp 4.500/kg', time: '1 jam lalu', unread: false },
+  ];
+  
+  // BYPASS: State awal langsung kita setting seakan-olah udah login sebagai BEM
+  const [namaProfil, setNamaProfil] = useState('BEM KM IPB Dummy');
+  const [roleProfil, setRoleProfil] = useState('BEM Wilayah');
+  const [isBEMWilayah, setIsBEMWilayah] = useState(true);
 
   useEffect(() => {
-    const fetchProfil = async () => {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (!token) return;
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const username = payload.sub;
-
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/users`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await res.json();
-
-        if (data.status === 'sukses') {
-          // Cari user yang sesuai dengan username yang login
-          const myUser = data.data.find(u => u.username === username);
-          if (myUser) {
-            setNamaProfil(myUser.nama); // Menampilkan Nama Lengkap dari Database
-            // Cek role yang sebenarnya (bukan sekedar ngecek username)
-            let displayedRole = 'BEM Wilayah';
-            if (myUser.role === 'dui') {
-              displayedRole = 'Direktorat Umum dan Infrastruktur';
-            } else if (myUser.role === 'bem_km') {
-              displayedRole = 'BEM KM IPB';
-            } else if (myUser.role === 'admin') {
-              displayedRole = 'Administrator';
-            }
-            
-            const isNotAdmin = myUser.role !== 'bem_km' && myUser.role !== 'admin' && myUser.role !== 'dui';
-            setIsBEMWilayah(isNotAdmin); 
-            setRoleProfil(displayedRole);
-          }
-        }
-      } catch (error) {
-        console.error("Gagal memuat profil layout:", error);
-      }
-    };
+    // ===== START SEMENTARA DIMATIIN UNTUK BYPASS LOGIN =====
+    /*
+    const fetchProfil = async () => { ... }
     fetchProfil();
-  }, []);
+    */
+    // ===== END SEMENTARA DIMATIIN UNTUK BYPASS LOGIN =====
+  }, [navigate]);
 
   const menuItems = [
     { name: 'Dashboard', path: '/dashboard', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', show: true },
-    { name: 'Input Transaksi', path: '/input-transaksi', icon: 'M12 4v16m8-8H4', show: !isBEMWilayah },
+    { name: 'Input Transaksi', path: '/input-transaksi', icon: 'M12 4v16m8-8H4', show: isBEMWilayah },
     { name: 'Riwayat Transaksi', path: '/riwayat', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', show: true },
     { name: 'Buku Tabungan', path: '/tabungan', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253', show: true },
     { name: 'Leaderboard KPI', path: '/leaderboard', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z', show: true },
@@ -67,9 +46,7 @@ function DashboardLayout({ children }) {
   };
 
   return (
-    // Tambahin animate-fade-in disini biar layarnya gak nge-blink kasar
     <div className="min-h-screen bg-[#F5EFE6] flex font-sans animate-fade-in">
-      
       <aside className={`w-72 bg-[#0B4D1E] text-white flex flex-col fixed h-full z-40 transition-transform duration-500 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-8 flex items-center gap-3">
           <div className="bg-[#F4A300] p-2 rounded-lg">
@@ -119,10 +96,44 @@ function DashboardLayout({ children }) {
           </div>
 
           <div className="flex items-center gap-6">
-            <Link to="/notifikasi" className="relative p-2 rounded-full hover:bg-gray-100 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-              <span className="absolute top-0 right-0 w-5 h-5 bg-[#F4A300] text-white text-[11px] font-bold flex items-center justify-center rounded-full border-2 border-white">3</span>
-            </Link>
+            
+            {/* WRAPPER NOTIFIKASI DROPDOWN */}
+            <div className="relative">
+              <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="relative p-2 rounded-full hover:bg-gray-100 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                <span className="absolute top-0 right-0 w-5 h-5 bg-[#F4A300] text-white text-[11px] font-bold flex items-center justify-center rounded-full border-2 border-white">2</span>
+              </button>
+
+              {isNotifOpen && (
+                <div className="absolute top-full right-0 mt-4 w-80 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-fade-in-up">
+                  <div className="p-5 border-b border-gray-100">
+                    <h3 className="font-extrabold text-[#0B4D1E] text-lg">Notifikasi</h3>
+                    <p className="text-gray-400 text-xs font-medium mt-1">2 belum dibaca</p>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                    {notifDropdown.map((item) => (
+                      <div key={item.id} className="p-5 border-b border-gray-50 hover:bg-[#FDF6EA] cursor-pointer flex gap-4 transition-colors">
+                        <div className="mt-1.5 flex-shrink-0">
+                          {item.unread ? <div className="w-2.5 h-2.5 rounded-full bg-[#F4A300]"></div> : <div className="w-2.5 h-2.5"></div>}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-[#0B4D1E]">{item.title}</p>
+                          <p className="text-xs text-gray-500 mt-1 font-medium">{item.desc}</p>
+                          <p className="text-[10px] text-gray-400 mt-1.5 font-bold">{item.time}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="p-4 text-center bg-white border-t border-gray-100 hover:bg-gray-50 transition-colors">
+                    <button onClick={() => { setIsNotifOpen(false); navigate('/notifikasi'); }} className="text-[#0B4D1E] font-bold text-sm hover:text-[#F4A300] flex items-center justify-center gap-2 w-full transition-colors">
+                      Lihat Semua Notifikasi 
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="h-10 w-px bg-gray-200"></div>
             <Link to="/profil" className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity">
               <div className="text-right">
@@ -136,8 +147,6 @@ function DashboardLayout({ children }) {
           </div>
         </header>
 
-        {/* INI KUNCI ANIMASINYA BRO! 
-            animate-page-transition bikin setiap konten yang masuk langsung sliding naik dari bawah */}
         <main className="flex-1 px-10 pb-4 animate-page-transition">
           {children}
         </main>
