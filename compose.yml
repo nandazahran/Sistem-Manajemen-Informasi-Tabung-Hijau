@@ -1,6 +1,9 @@
 services:
+  # =========================================
+  # 1. DATABASE & BACKEND (Jalan di semua mode)
+  # =========================================
   db_sim_th:
-    image: docker.io/library/postgres:18.3-alpine3.22
+    image: docker.io/library/postgres:18.4-trixie
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -11,7 +14,9 @@ services:
       - pgdata:/var/lib/postgresql
 
   backend:
-    build: ./sim-th-backend
+    build: 
+      context: ./sim-th-backend
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
@@ -19,32 +24,56 @@ services:
     depends_on:
       - db_sim_th
 
-  frontend:
-    build: ./sim-th-frontend
+  # =========================================
+  # 2. FRONTEND MODE LOKAL (Untuk Developer)
+  # =========================================
+  frontend-dev:
+    profiles: ["dev"]
+    build: 
+      context: ./sim-th-frontend
+      dockerfile: Dockerfile.dev
     ports:
       - "5173:5173"
     volumes:
-      # Mount source code frontend agar HMR (Hot Module Replacement) Vite tetap jalan secara live
+      # Mount source code frontend agar HMR Vite tetap jalan secara live
       - ./sim-th-frontend:/app
-      # Mengisolasi node_modules di dalam container agar tidak bentrok dengan instalasi npm lokal (host)
+      # Mengisolasi node_modules di dalam container 
       - /app/node_modules
     environment:
-      # Beritahu Frontend letak Backend URL dari file .env utama
       - VITE_API_URL=${VITE_API_URL}
     depends_on:
       - backend
 
-  # --- CLOUDFLARE TUNNEL (Hanya untuk server) ---
+  # =========================================
+  # 3. FRONTEND MODE SERVER (Untuk deployment)
+  # =========================================
+  frontend-prod:
+    profiles: ["production"]
+    build: 
+      context: ./sim-th-frontend
+      dockerfile: Dockerfile
+      # PERBAIKAN VITE: Saat di-build menjadi file statis oleh Nginx, 
+      # Vite butuh variabel ini dilempar sebagai argumen build, bukan environment runtime.
+      args:
+        - VITE_API_URL=${VITE_API_URL}
+    ports:
+      - "8080:80"
+    # Nginx tidak butuh volume karena file sudah "matang" (statis)
+    depends_on:
+      - backend
+
+  # =========================================
+  # 4. CLOUDFLARE TUNNEL (Hanya untuk server)
+  # =========================================
   tunnel:
+    profiles: ["production"]
     image: cloudflare/cloudflared:latest
     command: tunnel run
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TOKEN:-}
     depends_on:
-      - frontend
+      - frontend-prod
       - backend
-    profiles:
-      - production # <--- Trik ajaibnya di sini!
 
 volumes:
   pgdata:
