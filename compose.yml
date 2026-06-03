@@ -39,7 +39,7 @@ services:
     image: cloudflare/cloudflared:latest
     command: tunnel run
     environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TOKEN}
+      - TUNNEL_TOKEN=${CLOUDFLARE_TOKEN:-}
     depends_on:
       - frontend
       - backend
