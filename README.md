@@ -1,85 +1,81 @@
-# 🌿 Setup Project Tabung Hijau
-Dokumen ini berisi panduan untuk menjalankan project Tabung Hijau secara lokal untuk keperluan testing.
+# 🌿 Sistem Manajemen Informasi Tabung Hijau (SIM-TH)
 
-Agar proses testing lancar di OS apapun (Windows, Mac, Linux) tanpa perlu install toolchain Rust atau konfigurasi database secara manual, bagian Backend & Database dijalankan sepenuhnya menggunakan Docker. Sementara untuk Frontend, kita menggunakan standar Node.js (Vite + React).
+Sistem Manajemen Informasi Tabung Hijau (SIM-TH) adalah platform digital terpadu yang dirancang untuk mengelola, melacak, dan menganalisis data transaksi bank sampah dari berbagai BEM Wilayah di IPB. 
 
-## 🛠️ Persyaratan Sistem (Prerequisites)
-Pastikan hal-hal berikut sudah terinstall di laptop/komputer kamu:
+Platform ini memudahkan pencatatan setoran sampah, memantau saldo tabungan wilayah, hingga menampilkan *Leaderboard KPI* secara *real-time* untuk memicu semangat kompetisi yang sehat antar wilayah dalam menjaga lingkungan.
 
-Docker/Podman (Kalau bingung langsung gunakan [Docker Desktop](https://www.docker.com/products/docker-desktop/)).
+---
 
-Node.js & npm (Minimal versi 18+ untuk menjalankan Vite).
+## 💻 Panduan Menjalankan Secara Lokal (Development)
+Untuk keperluan pengembangan (*development*) atau percobaan (*testing*) di komputer lokal, terdapat dua cara yang bisa digunakan:
 
-## 🔐 Langkah 1: Setup Environment Variables (.env)
-Project ini menggunakan file .env untuk menyimpan konfigurasi koneksi database dan URL API. Secara default, file ini tidak ikut ter-upload ke Git, jadi kamu harus membuatnya terlebih dahulu dari file contoh yang sudah disediakan.
+### Cara 1: Menggunakan Docker Sepenuhnya (Sangat Disarankan)
+Cara ini paling mudah karena kamu tidak perlu menginstal Rust, Node.js, atau mengatur konfigurasi *database* secara manual.
 
-Pindahkan/copy file `.env.example` dari folder `sim-th-backend` menjadi `.env` di **folder utama (root)** project:
+1. **Persyaratan:** Pastikan Docker Desktop (atau Podman) sudah terinstal di komputer.
+2. **Konfigurasi `.env`:** Pindahkan/copy file `.env.example` dari folder `sim-th-backend` menjadi `.env` di **folder utama (root)** project. Buka file tersebut dan ikuti arahan di dalamnya.
+3. **Jalankan Project:** Buka terminal di folder utama (root) project ini, lalu jalankan:
+   ```bash
+   docker compose up -d --build
+   ```
+   *(Catatan: Proses pertama kali memakan waktu karena akan meng-compile Rust dan Node.js).*
+4. **Akses Aplikasi:**
+   - Frontend (UI): 👉 http://localhost:5173
+   - Backend (API): 👉 http://localhost:3000
+5. **Mematikan Server:** Jika sudah selesai, bersihkan RAM dan proses dengan mengetik:
+   ```bash
+   docker compose down
+   ```
 
-Lalu Ikuti arahan dalam filenya
+### Cara 2: Menjalankan Secara Manual (Native Rust & Vite)
+Gunakan cara ini jika kamu ingin aktif melakukan *coding* agar fitur *Hot Reload* dan pesan *error compiler* tampil lebih cepat di terminal.
 
-## ⚙️ Langkah 2: Menjalankan Keseluruhan Project (Docker)
-Backend (Rust), Frontend (Vite), dan Database (PostgreSQL) dibungkus menggunakan container. Kamu tidak perlu menginstall Rust, Node.js, atau setting database sama sekali.
+1. **Persyaratan:** Pastikan kamu sudah menginstal toolchain Rust (rustup) dan Node.js.
+2. **Nyalakan Database:** Buka terminal di folder utama, dan hidupkan hanya *container database*:
+   ```bash
+   docker compose up -d db_sim_th
+   ```
+3. **Konfigurasi Backend:** 
+   Buka file `.env` di **folder utama**. Pastikan URL database mengarah ke *port forwarding* lokal (5433):
+   ```env
+   DATABASE_URL=postgres://[USER]:[PASSWORD]@localhost:5433/[DB_NAME]
+   ```
+4. **Jalankan Backend (Rust):**
+   Masuk ke folder backend, lakukan migrasi tabel database, lalu jalankan server:
+   ```bash
+   cd sim-th-backend
+   cargo run -- up
+   cargo run
+   ```
+5. **Jalankan Frontend (Vite):**
+   Buka *tab* terminal baru, masuk ke folder frontend, instal *dependencies*, dan nyalakan *server dev*:
+   ```bash
+   cd sim-th-frontend
+   npm install
+   npm run dev
+   ```
 
-### 1. Jalankan Container
-Buka terminal di folder utama (root) project ini, lalu jalankan perintah berikut:
+---
 
-```docker compose up -d --build``` *(atau `podman compose up -d --build`)*
+## 🚀 Panduan Deployment (Production)
+Sistem ini dirancang agar mudah di-*deploy* ke *server cloud* atau server mandiri (*Home Server* / VPS) dengan bantuan **Cloudflare Tunnel**. Penggunaan *tunnel* menghilangkan kebutuhan untuk mengatur *Port Forwarding* pada *router* dan mengamankan aplikasi dari akses luar yang tidak sah.
 
-(Catatan: Flag `--build` akan menyuruh Docker untuk meng-compile kode Rust dan Node.js. Proses ini memakan waktu beberapa menit saat pertama kali dijalankan, tunggu saja sampai selesai).
+1. **Siapkan Environment Variables:**
+   Di *server*, pastikan kamu sudah membuat file `.env` di folder utama. Selain kredensial standar, tambahkan Token dari konfigurasi Tunnel di *dashboard* **Cloudflare Zero Trust**:
+   ```env
+   CLOUDFLARE_TOKEN=eyJh...
+   ```
 
-### 2. Cek Status Container
-Pastikan service db, backend, dan frontend sudah berjalan dengan normal (statusnya Up):
+2. **Jalankan Profile Production:**
+   Sistem memiliki "trik" *Docker Profile*. Jalankan perintah berikut agar Backend, Frontend, Database, **dan Tunnel** menyala bersamaan:
+   ```bash
+   docker compose --profile production up -d --build
+   ```
 
-```docker compose ps``` *(atau `podman compose ps`)*
+3. **Konfigurasi Cloudflare Zero Trust:**
+   Pada menu *Public Hostname* di *dashboard* Cloudflare, lakukan perutean trafik internet masuk menuju *network* Docker lokal:
+   - Untuk UI (misal: `sim.tabunghijau.com`) -> arahkan ke URL `http://frontend:5173`
+   - Untuk API (misal: `api.tabunghijau.com`) -> arahkan ke URL `http://backend:3000`
 
-### 3. Test API
-Backend sekarang sudah berjalan dan terkoneksi ke database. API (Backend) siap di-hit di:
-
-Base URL: http://localhost:3000
-
-Contoh Test Endpoint: Buka browser atau gunakan cURL ke http://localhost:3000
-
-### 4. Buka Aplikasi Frontend (UI)
-Container frontend Vite otomatis akan dijalankan pada port 5173. Buka browser dan klik link tersebut:
-👉 http://localhost:5173
-
-## 🛑 Langkah 4: Mematikan Server
-Jika proses testing sudah selesai, jangan hanya menutup aplikasi Docker atau terminalnya.
-
-Matikan container dengan aman agar RAM dan port kalian kembali bersih dengan perintah ini di folder utama:
-
-```docker compose down``` *(atau `podman compose down`)*
-
-## 🖥️ Alternatif: Menjalankan Backend Secara Lokal (Tanpa Docker Rust)
-Jika kamu ingin mendevelop backend dengan instalasi Rust lokal (native), ikuti panduan berikut:
-
-### 1. Prasyarat
-Pastikan kamu sudah menginstall toolchain Rust melalui [rustup](https://rustup.rs/).
-
-### 2. Jalankan Database Secara Terpisah
-Nyalakan hanya container database dari folder utama:
-```sh
-# Jika menggunakan Podman, gunakan: podman compose up -d db_sim_th
-docker compose up -d db_sim_th
-```
-
-### 3. Konfigurasi `.env`
-Buka file `.env` di dalam folder `sim-th-backend`. Karena Docker compose di-set mem-forward port ke **5433**, pastikan URL database kamu mengarah ke `localhost:5433`:
-```env
-DATABASE_URL=postgres://[USER]:[PASSWORD]@localhost:5433/[DB_NAME]
-```
-*(Ganti bagian dalam kurung siku sesuai dengan isi `DB_USER`, `DB_PASSWORD`, dan `DB_NAME` kamu).*
-
-### 4. Jalankan Migrasi Database
-Sistem menggunakan SeaORM untuk migrasi. Masuk ke folder `migration` dan eksekusi migrasinya:
-```sh
-cd migration
-cargo run -- up
-cd ..
-```
-
-### 5. Jalankan Backend Server
-Di dalam folder `sim-th-backend`, jalankan server Rust kamu:
-```sh
-cargo run
-```
+4. **Selesai!** 
+   Aplikasi Tabung Hijau sekarang sudah *live* dan bisa diakses dari internet dengan aman!
