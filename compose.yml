@@ -34,5 +34,17 @@ services:
     depends_on:
       - backend
 
+  # --- CLOUDFLARE TUNNEL (Hanya untuk server) ---
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TOKEN}
+    depends_on:
+      - frontend
+      - backend
+    profiles:
+      - production # <--- Trik ajaibnya di sini!
+
 volumes:
   pgdata:
