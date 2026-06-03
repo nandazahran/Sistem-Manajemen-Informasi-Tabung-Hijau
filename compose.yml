@@ -29,8 +29,8 @@ services:
       # Mengisolasi node_modules di dalam container agar tidak bentrok dengan instalasi npm lokal (host)
       - /app/node_modules
     environment:
-      # Beritahu Frontend letak Backend URL jika dibutuhkan oleh Vite
-      - VITE_API_URL=http://localhost:3000
+      # Beritahu Frontend letak Backend URL dari file .env utama
+      - VITE_API_URL=${VITE_API_URL}
     depends_on:
       - backend
 

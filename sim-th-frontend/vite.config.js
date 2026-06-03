@@ -5,6 +5,6 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
-    include: ['recharts'] // <-- INI OBATNYA BRO, biar Vite ngenalin Recharts
+    include: ['recharts']
   }
 })

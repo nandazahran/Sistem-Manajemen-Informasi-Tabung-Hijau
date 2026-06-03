@@ -13,7 +13,7 @@ Untuk keperluan pengembangan (*development*) atau percobaan (*testing*) di kompu
 Cara ini paling mudah karena kamu tidak perlu menginstal Rust, Node.js, atau mengatur konfigurasi *database* secara manual.
 
 1. **Persyaratan:** Pastikan Docker Desktop (atau Podman) sudah terinstal di komputer.
-2. **Konfigurasi `.env`:** Pindahkan/copy file `.env.example` dari folder `sim-th-backend` menjadi `.env` di **folder utama (root)** project. Buka file tersebut dan ikuti arahan di dalamnya.
+2. **Konfigurasi `.env`:** Copy file `.env.example` yang sudah ada di **folder utama (root)** menjadi `.env` (di lokasi yang sama). Buka file tersebut dan ikuti arahan di dalamnya.
 3. **Jalankan Project:** Buka terminal di folder utama (root) project ini, lalu jalankan:
    ```bash
    docker compose up -d --build
