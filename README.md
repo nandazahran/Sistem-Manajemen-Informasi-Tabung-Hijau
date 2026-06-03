@@ -13,60 +13,40 @@ Node.js & npm (Minimal versi 18+ untuk menjalankan Vite).
 ## 🔐 Langkah 1: Setup Environment Variables (.env)
 Project ini menggunakan file .env untuk menyimpan konfigurasi koneksi database dan URL API. Secara default, file ini tidak ikut ter-upload ke Git, jadi kamu harus membuatnya terlebih dahulu dari file contoh yang sudah disediakan.
 
-Copy file `.env.example` pada folder `sim-th-backend` menjadi `.env`:
+Pindahkan/copy file `.env.example` dari folder `sim-th-backend` menjadi `.env` di **folder utama (root)** project:
 
 Lalu Ikuti arahan dalam filenya
 
-## ⚙️ Langkah 2: Menjalankan Backend & Database (Docker)
-Backend (Rust) dan Database (PostgreSQL) dibungkus menggunakan container. Kamu tidak perlu menginstall Rust atau setting database sama sekali.
+## ⚙️ Langkah 2: Menjalankan Keseluruhan Project (Docker)
+Backend (Rust), Frontend (Vite), dan Database (PostgreSQL) dibungkus menggunakan container. Kamu tidak perlu menginstall Rust, Node.js, atau setting database sama sekali.
 
 ### 1. Jalankan Container
-Buka terminal di folder `sim-th-backend` project ini, lalu jalankan perintah berikut:
+Buka terminal di folder utama (root) project ini, lalu jalankan perintah berikut:
 
 ```docker compose up -d --build``` *(atau `podman compose up -d --build`)*
 
-(Catatan: Flag `--build` akan menyuruh Docker untuk meng-compile kode Rust. Proses ini memakan waktu beberapa menit saat pertama kali dijalankan, tunggu saja sampai selesai).
+(Catatan: Flag `--build` akan menyuruh Docker untuk meng-compile kode Rust dan Node.js. Proses ini memakan waktu beberapa menit saat pertama kali dijalankan, tunggu saja sampai selesai).
 
 ### 2. Cek Status Container
-Pastikan service backend dan db sudah berjalan dengan normal (statusnya Up):
+Pastikan service db, backend, dan frontend sudah berjalan dengan normal (statusnya Up):
 
 ```docker compose ps``` *(atau `podman compose ps`)*
 
 ### 3. Test API
-Backend sekarang sudah berjalan dan terkoneksi ke database. API siap di-hit di:
+Backend sekarang sudah berjalan dan terkoneksi ke database. API (Backend) siap di-hit di:
 
 Base URL: http://localhost:3000
 
 Contoh Test Endpoint: Buka browser atau gunakan cURL ke http://localhost:3000
 
-## 💻 Langkah 3: Menjalankan Frontend (UI)
-Frontend dibangun menggunakan React dan Vite. Pastikan backend di atas sudah berjalan sebelum menjalankan frontend agar UI bisa mengambil data.
-
-### 1. Masuk ke Folder Frontend
-Buka tab terminal baru (jangan matikan terminal backend), dan masuk ke folder `sim-th-frontend` dengan cara:
-
-```cd sim-th-frontend```
-
-### 2. Install Dependencies
-Install semua package Node.js yang dibutuhkan:
-
-```npm install```
-
-### 3. Jalankan Development Server
-Start aplikasi Vite:
-
-```npm run dev```
-
-### 4. Buka Aplikasi
-Vite akan memberikan URL lokal. Buka browser dan klik link tersebut:
+### 4. Buka Aplikasi Frontend (UI)
+Container frontend Vite otomatis akan dijalankan pada port 5173. Buka browser dan klik link tersebut:
 👉 http://localhost:5173
-
-Frontend sekarang sudah jalan dan otomatis terhubung ke Backend!
 
 ## 🛑 Langkah 4: Mematikan Server
 Jika proses testing sudah selesai, jangan hanya menutup aplikasi Docker atau terminalnya.
 
-Matikan container dengan aman agar RAM dan port kalian kembali bersih dengan perintah ini di folder `sim-th-backend`:
+Matikan container dengan aman agar RAM dan port kalian kembali bersih dengan perintah ini di folder utama:
 
 ```docker compose down``` *(atau `podman compose down`)*
 
@@ -77,7 +57,7 @@ Jika kamu ingin mendevelop backend dengan instalasi Rust lokal (native), ikuti p
 Pastikan kamu sudah menginstall toolchain Rust melalui [rustup](https://rustup.rs/).
 
 ### 2. Jalankan Database Secara Terpisah
-Masuk ke folder `sim-th-backend` dan nyalakan hanya container database:
+Nyalakan hanya container database dari folder utama:
 ```sh
 # Jika menggunakan Podman, gunakan: podman compose up -d db_sim_th
 docker compose up -d db_sim_th
