@@ -45,7 +45,7 @@ services:
       - backend
 
   # =========================================
-  # 3. FRONTEND MODE SERVER (Untuk deployment)
+  # 3. FRONTEND MODE SERVER (Untuk Deployment)
   # =========================================
   frontend-prod:
     profiles: ["production"]
