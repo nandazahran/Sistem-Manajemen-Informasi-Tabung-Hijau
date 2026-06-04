@@ -31,14 +31,20 @@ Sistem ini membagi pengguna ke dalam tiga kelompok hak akses utama:
 ---
 
 ## 💻 Panduan Menjalankan Secara Lokal (Development)
-Untuk keperluan pengembangan (*development*) atau percobaan (*testing*) di komputer lokal, langkah pertama yang **wajib** dilakukan adalah mengunduh (*clone*) kode sumber *repository* ini ke komputer kamu:
+Untuk keperluan pengembangan (*development*) atau percobaan (*testing*) di komputer lokal, langkah pertama yang **wajib** dilakukan adalah mengunduh (*clone*) kode sumber *repository* ini ke komputer kamu dan menyiapkan file konfigurasi `env`-nya:
 
+1. **Clone Repository:**
 ```bash
 git clone https://github.com/nanda_zahran/Sistem-Manajemen-Informasi-Tabung-Hijau.git
 cd Sistem-Manajemen-Informasi-Tabung-Hijau
 ```
+2. **Konfigurasi Environment (.env):**
+Semua cara eksekusi membutuhkan file environment. Salin template `.env.example` yang ada di folder utama menjadi `.env`:
+```bash
+cp .env.example .env
+```
 
-Setelah berhasil masuk ke dalam folder project, terdapat dua cara yang bisa digunakan untuk menjalankannya:
+Setelah berhasil masuk ke dalam folder project dan mengkonfigurasi `.env`-nya, terdapat dua cara yang bisa digunakan untuk menjalankan sistem ini:
 
 ### Cara 1: Menggunakan Docker Sepenuhnya (Sangat Disarankan)
 Cara ini paling mudah karena kamu tidak perlu menginstal Rust, Node.js, atau mengatur konfigurasi *database* secara manual.
@@ -73,30 +79,25 @@ Gunakan cara ini jika kamu ingin aktif melakukan *coding* agar fitur *Hot Reload
    ```bash
    docker compose up -d db_sim_th
    ```
-3. **Konfigurasi Backend:** 
-   Buka file `.env` di **folder utama**. Pastikan URL database mengarah ke *port forwarding* lokal (5433):
-   ```env
-   DATABASE_URL=postgres://[USER]:[PASSWORD]@localhost:5433/[DB_NAME]
-   ```
-4. **Jalankan Backend (Rust):**
+3. **Jalankan Backend (Rust):**
    Buka **tab terminal baru**, masuk ke folder backend, lalu jalankan server (migrasi tabel akan berjalan otomatis saat server dinyalakan):
    ```bash
    cd sim-th-backend
    cargo run
    ```
-5. **Jalankan Frontend (Vite):**
+4. **Jalankan Frontend (Vite):**
    Buka *tab* terminal baru, masuk ke folder frontend, instal *dependencies*, dan nyalakan *server dev*:
    ```bash
    cd sim-th-frontend
    npm install
    npm run dev
    ```
-6. **Akses Aplikasi:**
+5. **Akses Aplikasi:**
    - Frontend (UI): 👉 http://localhost:5173
    - Backend (API): 👉 http://localhost:3000
    - Dokumentasi API (Swagger UI): 👉 http://localhost:3000/swagger-ui
 
-7. **Mematikan Server & Database:**
+6. **Mematikan Server & Database:**
    Untuk mematikan aplikasi Frontend dan Backend, cukup tekan tombol `Ctrl + C` di masing-masing terminal yang sedang berjalan.
    Sedangkan untuk mematikan *container database* yang berjalan di latar belakang, buka terminal di folder utama (root) dan jalankan:
    ```bash
