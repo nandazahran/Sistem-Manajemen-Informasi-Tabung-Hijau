@@ -1,6 +1,6 @@
 # 🌿 Sistem Manajemen Informasi Tabung Hijau (SIM-TH)
 
-Sistem Manajemen Informasi Tabung Hijau (SIM-TH) adalah platform digital terpadu yang dirancang untuk mengelola, melacak, dan menganalisis data transaksi bank sampah dari berbagai BEM Wilayah di IPB. 
+Sistem Informasi dan Manajemen Tabung Hijau (SIM-TH) adalah platform digital terpadu yang dirancang untuk mengelola, melacak, dan menganalisis data transaksi bank sampah dari berbagai BEM Wilayah di IPB. 
 
 Platform ini memudahkan pencatatan setoran sampah, memantau saldo tabungan wilayah, hingga menampilkan *Leaderboard KPI* secara *real-time* untuk memicu semangat kompetisi yang sehat antar wilayah dalam menjaga lingkungan.
 
@@ -14,9 +14,10 @@ Platform ini memudahkan pencatatan setoran sampah, memantau saldo tabungan wilay
 - **Pemulihan Akun via OTP Email:** Mendukung reset password secara mandiri dan aman menggunakan verifikasi OTP 6 digit yang dikirimkan secara otomatis ke email pengguna (Auto OTP Email).
 
 ## 👥 Pengguna Sistem (Role)
-Sistem ini membagi pengguna ke dalam dua kelompok hak akses utama:
-1. **Administrator (BEM KM / DUI / Admin):** Memiliki hak akses level-atas untuk memantau data seluruh wilayah, mengekspor laporan ke Excel/CSV, mengeksekusi penarikan dana, serta mengelola referensi data (Kategori & Wilayah).
-2. **BEM Wilayah (14 Fakultas/Sekolah):** Memiliki akses eksklusif ke wilayahnya masing-masing untuk melakukan input transaksi harian, memantau *dashboard* pertumbuhan wilayah, dan melihat posisi di *Leaderboard*.
+Sistem ini membagi pengguna ke dalam tiga kelompok hak akses utama:
+1. **Administrator (BEM KM / Admin):** Memiliki hak akses penuh (*Super Admin*) untuk memantau data seluruh wilayah, mengekspor laporan, mengeksekusi penarikan dana, mengelola pengaturan data (Kategori & Wilayah), serta berhak **mengedit/membatalkan** data transaksi.
+2. **Auditor / Pemantau (DUI):** Memiliki hak akses *Read-Only* level-atas. DUI dapat memantau data seluruh IPB, melihat *Leaderboard*, dan mengekspor laporan, namun **dilarang** memanipulasi (mengedit/menghapus) data transaksi.
+3. **BEM Wilayah (14 Fakultas/Sekolah):** Memiliki akses eksklusif ke wilayahnya masing-masing untuk melakukan input transaksi harian, memantau *dashboard* pertumbuhan wilayah, dan melihat posisinya di *Leaderboard*.
 
 ---
 
