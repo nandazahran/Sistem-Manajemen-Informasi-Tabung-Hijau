@@ -13,7 +13,16 @@ Platform ini memudahkan pencatatan setoran sampah, memantau saldo tabungan wilay
 - **Notifikasi & Broadcast:** Sistem pengumuman dan riwayat aktivitas interaktif antar BEM Wilayah dan Administrator.
 - **Pemulihan Akun via OTP Email:** Mendukung reset password secara mandiri dan aman menggunakan verifikasi OTP 6 digit yang dikirimkan secara otomatis ke email pengguna (Auto OTP Email).
 
-## 👥 Pengguna Sistem (Role)
+## 🛠️ Teknologi yang Digunakan
+- **Backend:** Rust 🦀, Axum (Web Framework), SeaORM (ORM), Utoipa (Swagger/OpenAPI)
+- **Frontend:** React.js, Vite, Tailwind CSS
+- **Database:** PostgreSQL
+- **Infrastruktur:** Docker / Podman, Cloudflare Zero Trust (Tunnel)
+- **CI/CD:** GitHub Actions (Automated Linting, Formatting, & Build to GHCR)
+
+---
+
+##  Pengguna Sistem (Role)
 Sistem ini membagi pengguna ke dalam tiga kelompok hak akses utama:
 1. **Administrator (BEM KM / Admin):** Memiliki hak akses penuh (*Super Admin*) untuk memantau data seluruh wilayah, mengekspor laporan, mengeksekusi penarikan dana, mengelola pengaturan data (Kategori & Wilayah), serta berhak **mengedit/membatalkan** data transaksi.
 2. **Auditor / Pemantau (DUI):** Memiliki hak akses *Read-Only* level-atas. DUI dapat memantau data seluruh IPB, melihat *Leaderboard*, dan mengekspor laporan, namun **dilarang** memanipulasi (mengedit/menghapus) data transaksi.
@@ -44,6 +53,7 @@ Cara ini paling mudah karena kamu tidak perlu menginstal Rust, Node.js, atau men
 4. **Akses Aplikasi:**
    - Frontend (UI): 👉 http://localhost:5173
    - Backend (API): 👉 http://localhost:3000
+   - **Dokumentasi API (Swagger UI):** 👉 http://localhost:3000/swagger-ui
 5. **Mematikan Server:** Jika sudah selesai, matikan semua *container* dengan mengetik perintah berikut (sertakan profil yang sedang menyala):
    ```bash
    docker compose --profile dev down
@@ -81,7 +91,12 @@ Gunakan cara ini jika kamu ingin aktif melakukan *coding* agar fitur *Hot Reload
    npm install
    npm run dev
    ```
-6. **Mematikan Server & Database:**
+6. **Akses Aplikasi:**
+   - Frontend (UI): 👉 http://localhost:5173
+   - Backend (API): 👉 http://localhost:3000
+   - **Dokumentasi API (Swagger UI):** 👉 http://localhost:3000/swagger-ui
+
+7. **Mematikan Server & Database:**
    Untuk mematikan aplikasi Frontend dan Backend, cukup tekan tombol `Ctrl + C` di masing-masing terminal yang sedang berjalan.
    Sedangkan untuk mematikan *container database* yang berjalan di latar belakang, buka terminal di folder utama (root) dan jalankan:
    ```bash
