@@ -34,7 +34,7 @@ Setelah berhasil masuk ke dalam folder project, terdapat dua cara yang bisa digu
 ### Cara 1: Menggunakan Docker Sepenuhnya (Sangat Disarankan)
 Cara ini paling mudah karena kamu tidak perlu menginstal Rust, Node.js, atau mengatur konfigurasi *database* secara manual.
 
-1. **Persyaratan:** Pastikan Docker Desktop (atau Podman) sudah terinstal di komputer.
+1. **Persyaratan:** Pastikan Docker Desktop (atau Podman Desktop) sudah terinstal di komputer. *(Catatan: Jika menggunakan Podman, kamu cukup mengganti semua perintah `docker` di panduan ini menjadi `podman`)*.
 2. **Konfigurasi `.env`:** Copy file `.env.example` yang sudah ada di **folder utama (root)** menjadi `.env` (di lokasi yang sama). Buka file tersebut dan ikuti arahan di dalamnya.
 3. **Jalankan Project:** Buka terminal di folder utama (root) project ini, lalu jalankan:
    ```bash
@@ -44,15 +44,21 @@ Cara ini paling mudah karena kamu tidak perlu menginstal Rust, Node.js, atau men
 4. **Akses Aplikasi:**
    - Frontend (UI): 👉 http://localhost:5173
    - Backend (API): 👉 http://localhost:3000
-5. **Mematikan Server:** Jika sudah selesai, bersihkan RAM dan proses dengan mengetik:
+5. **Mematikan Server:** Jika sudah selesai, matikan semua *container* dengan mengetik perintah berikut (sertakan profil yang sedang menyala):
    ```bash
-   docker compose down
+   docker compose --profile dev down
+   ```
+   *(Catatan: Perintah ini akan mematikan semua service secara otomatis tanpa menghapus data di database. Wajib menyertakan `--profile dev` agar UI lokal juga ikut dimatikan).*
+   
+   Jika kamu ingin melakukan *reset* total (mematikan server sekaligus **menghapus seluruh data database/volume**), gunakan *flag* `-v`:
+   ```bash
+   docker compose --profile dev down -v
    ```
 
 ### Cara 2: Menjalankan Secara Manual (Native Rust & Vite)
 Gunakan cara ini jika kamu ingin aktif melakukan *coding* agar fitur *Hot Reload* dan pesan *error compiler* tampil lebih cepat di terminal.
 
-1. **Persyaratan:** Pastikan kamu sudah menginstal toolchain Rust (rustup) dan Node.js.
+1. **Persyaratan:** Pastikan kamu sudah menginstal toolchain Rust (rustup), Node.js, dan juga Docker/Podman (karena *database* tetap dijalankan di dalam *container*).
 2. **Nyalakan Database:** Buka terminal di folder utama, dan hidupkan hanya *container database*:
    ```bash
    docker compose up -d db_sim_th
@@ -63,7 +69,7 @@ Gunakan cara ini jika kamu ingin aktif melakukan *coding* agar fitur *Hot Reload
    DATABASE_URL=postgres://[USER]:[PASSWORD]@localhost:5433/[DB_NAME]
    ```
 4. **Jalankan Backend (Rust):**
-   Masuk ke folder backend, lalu jalankan server (migrasi tabel akan berjalan otomatis saat server dinyalakan):
+   Buka **tab terminal baru**, masuk ke folder backend, lalu jalankan server (migrasi tabel akan berjalan otomatis saat server dinyalakan):
    ```bash
    cd sim-th-backend
    cargo run
@@ -75,6 +81,12 @@ Gunakan cara ini jika kamu ingin aktif melakukan *coding* agar fitur *Hot Reload
    npm install
    npm run dev
    ```
+6. **Mematikan Server & Database:**
+   Untuk mematikan aplikasi Frontend dan Backend, cukup tekan tombol `Ctrl + C` di masing-masing terminal yang sedang berjalan.
+   Sedangkan untuk mematikan *container database* yang berjalan di latar belakang, buka terminal di folder utama (root) dan jalankan:
+   ```bash
+   docker compose down
+   ```
 
 ---
 
@@ -82,7 +94,7 @@ Gunakan cara ini jika kamu ingin aktif melakukan *coding* agar fitur *Hot Reload
 Sistem ini dirancang agar mudah di-*deploy* ke *server cloud* atau server mandiri (*Home Server* / VPS) dengan bantuan **Cloudflare Tunnel**. Penggunaan *tunnel* menghilangkan kebutuhan untuk mengatur *Port Forwarding* pada *router* dan mengamankan aplikasi dari akses luar yang tidak sah.
 
 1. **Persiapan Server:**
-   Sama seperti langkah *development*, pertama-tama kamu wajib meng-*clone* *repository* ini di server tujuan:
+   Pastikan server tujuan sudah terinstal **Docker (beserta Docker Compose)** atau **Podman (beserta podman Compose)**. Sama seperti langkah *development*, pertama-tama kamu wajib meng-*clone* *repository* ini di server tujuan:
    ```bash
    git clone https://github.com/nanda_zahran/Sistem-Manajemen-Informasi-Tabung-Hijau.git
    cd Sistem-Manajemen-Informasi-Tabung-Hijau
@@ -111,3 +123,9 @@ Sistem ini dirancang agar mudah di-*deploy* ke *server cloud* atau server mandir
 
 5. **Selesai!** 
    Aplikasi Tabung Hijau sekarang sudah *live* dan bisa diakses dari internet dengan aman!
+
+6. **Mematikan Server Production (Bila Diperlukan):**
+   Jika sewaktu-waktu kamu perlu mematikan seluruh layanan di server, jalankan perintah ini agar *container* production dan *tunnel* ikut mati:
+   ```bash
+   docker compose --profile production down
+   ```
