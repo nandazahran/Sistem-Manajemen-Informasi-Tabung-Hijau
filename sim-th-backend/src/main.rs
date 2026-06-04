@@ -6,6 +6,7 @@ use axum::Extension;
 use axum::http::{Method, header};
 use utoipa::{openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},Modify, OpenApi,};
 use utoipa_swagger_ui::SwaggerUi;
+use migration::{Migrator, MigratorTrait};
 
 mod handlers;
 mod entities;
@@ -130,6 +131,10 @@ async fn main() {
     let db = Database::connect(&db_url).await.expect("Gagal menyambung ke database! Pastikan Podman nyala.");
     println!("✅ Berhasil tersambung ke PostgreSQL!");
 
+    println!("Memulai pemeriksaan dan migrasi tabel otomatis...");
+    Migrator::up(&db, None).await.expect("Gagal melakukan migrasi database!");
+    println!("✅ Migrasi database selesai dan siap digunakan!");
+
     // Buat aturan CORS (Jembatan Lintas Domain)
     let jembatan_cors = CorsLayer::new()
         // Izinkan tamu dari alamat mana saja (nanti bisa diganti ke localhost:5173 spesifik kalau mau lebih ketat)
@@ -208,9 +213,13 @@ async fn main() {
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(db) // <-- Kunci dititipkan di sini
         .layer(Extension(tx)) // <-- Titipkan transmitter WebSocket ke seluruh aplikasi
-        .layer(jembatan_cors); 
+        .layer(jembatan_cors);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
-    println!("🚀 Server SIM-TH berjalan di http://localhost:3000");
+    // Baca variabel HOST. Jika tidak ada di .env, otomatis pakai 127.0.0.1
+    let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let bind_address = format!("{}:3000", host); 
+
+    let listener = tokio::net::TcpListener::bind(&bind_address).await.unwrap();
+    println!("🚀 Server SIM-TH berjalan di http://{}", bind_address);
     axum::serve(listener, app).await.unwrap();
 }

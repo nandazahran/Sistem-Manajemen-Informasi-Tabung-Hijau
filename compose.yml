@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql
 
@@ -18,7 +18,7 @@ services:
       context: ./sim-th-backend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@db_sim_th:5432/${DB_NAME}
     depends_on:
@@ -33,7 +33,7 @@ services:
       context: ./sim-th-frontend
       dockerfile: Dockerfile.dev
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     volumes:
       # Mount source code frontend agar HMR Vite tetap jalan secara live
       - ./sim-th-frontend:/app
