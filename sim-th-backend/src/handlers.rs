@@ -35,7 +35,6 @@ pub struct InputRegister {
     pub email: String,
     pub nama: String,
     pub role: String,            // Nanti diisi: "Admin", "BEMWilayah", atau "DUI"
-    pub wilayah_id: Option<i32>, // Pakai Option karena Admin/DUI tidak punya wilayah
 }
 
 // Struct khusus untuk menerima data Login
@@ -225,7 +224,6 @@ pub struct FilterExport {
 pub struct InputBroadcastNotifikasi {
     pub judul: String,
     pub pesan: String,
-    pub target: Option<String>,
 }
 
 // Fungsi pembantu untuk memetakan role dari form register ke nama wilayah di database
@@ -2714,15 +2712,42 @@ async fn handle_socket(mut socket: WebSocket, mut rx: tokio::sync::broadcast::Re
     post,
     path = "/api/notifikasi/broadcast",
     request_body = InputBroadcastNotifikasi,
-    responses((status = 200, description = "Broadcast berhasil dikirim", body = ResponPesan)),
+    responses(
+        (status = 200, description = "Broadcast berhasil dikirim", body = ResponPesan),
+        (status = 401, description = "Akses ditolak: User tidak ditemukan", body = ResponPesan),
+        (status = 403, description = "Akses ditolak: Hanya Admin/DUI/BEM KM yang bisa mengirim broadcast", body = ResponPesan)
+    ),
     tag = "Dashboard",
     security(("jwt_auth" = []))
 )]
 pub async fn broadcast_notifikasi(
     State(db): State<DatabaseConnection>,
     Extension(tx): Extension<tokio::sync::broadcast::Sender<String>>,
+    Extension(username_jwt): Extension<String>,
     Json(payload): Json<InputBroadcastNotifikasi>,
-) -> Json<ResponPesan> {
+) -> (StatusCode, Json<ResponPesan>) {
+    // 1. Cek identitas user yang sedang memanggil API ini
+    let pencarian_user = user::Entity::find()
+        .filter(user::Column::Username.eq(username_jwt))
+        .one(&db)
+        .await;
+
+    let user_login = match pencarian_user {
+        Ok(Some(u)) => u,
+        _ => return (StatusCode::UNAUTHORIZED, Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string() })),
+    };
+
+    // 2. Satpam Pengecek Role: Pastikan hanya BEM KM, Admin, atau DUI yang bisa menembus blok ini
+    if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui" {
+        return (
+            StatusCode::FORBIDDEN, // Status 403: Akses Ditolak
+            Json(ResponPesan {
+                status: "gagal".to_string(),
+                pesan: "Akses ditolak! Hanya BEM KM, Admin, atau DUI yang berhak mengirim pengumuman massal.".to_string(),
+            }),
+        );
+    }
+
     // Simpan history ke database
     let notif_baru = notifikasi::ActiveModel {
         tipe: Set("broadcast".to_string()),
@@ -2743,10 +2768,13 @@ pub async fn broadcast_notifikasi(
     .to_string();
     let _ = tx.send(pesan_notif);
 
-    Json(ResponPesan {
-        status: "sukses".to_string(),
-        pesan: "Broadcast notifikasi berhasil dikirim!".to_string(),
-    })
+    (
+        StatusCode::OK,
+        Json(ResponPesan {
+            status: "sukses".to_string(),
+            pesan: "Broadcast notifikasi berhasil dikirim!".to_string(),
+        })
+    )
 }
 
 // Endpoint untuk mengambil history notifikasi user
