@@ -21,7 +21,14 @@ Sistem ini membagi pengguna ke dalam dua kelompok hak akses utama:
 ---
 
 ## 💻 Panduan Menjalankan Secara Lokal (Development)
-Untuk keperluan pengembangan (*development*) atau percobaan (*testing*) di komputer lokal, terdapat dua cara yang bisa digunakan:
+Untuk keperluan pengembangan (*development*) atau percobaan (*testing*) di komputer lokal, langkah pertama yang **wajib** dilakukan adalah mengunduh (*clone*) kode sumber *repository* ini ke komputer kamu:
+
+```bash
+git clone https://github.com/nanda_zahran/Sistem-Manajemen-Informasi-Tabung-Hijau.git
+cd Sistem-Manajemen-Informasi-Tabung-Hijau
+```
+
+Setelah berhasil masuk ke dalam folder project, terdapat dua cara yang bisa digunakan untuk menjalankannya:
 
 ### Cara 1: Menggunakan Docker Sepenuhnya (Sangat Disarankan)
 Cara ini paling mudah karena kamu tidak perlu menginstal Rust, Node.js, atau mengatur konfigurasi *database* secara manual.
