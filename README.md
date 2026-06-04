@@ -43,6 +43,7 @@ Semua cara eksekusi membutuhkan file environment. Salin template `.env.example` 
 ```bash
 cp .env.example .env
 ```
+Lalu buka file tersebut dan ikuti arahan di dalamnya.
 
 Setelah berhasil masuk ke dalam folder project dan mengkonfigurasi `.env`-nya, terdapat dua cara yang bisa digunakan untuk menjalankan sistem ini:
 
@@ -50,17 +51,16 @@ Setelah berhasil masuk ke dalam folder project dan mengkonfigurasi `.env`-nya, t
 Cara ini paling mudah karena kamu tidak perlu menginstal Rust, Node.js, atau mengatur konfigurasi *database* secara manual.
 
 1. **Persyaratan:** Pastikan Docker Desktop (atau Podman Desktop) sudah terinstal di komputer. *(Catatan: Jika menggunakan Podman, kamu cukup mengganti semua perintah `docker` di panduan ini menjadi `podman`)*.
-2. **Konfigurasi `.env`:** Copy file `.env.example` yang sudah ada di **folder utama (root)** menjadi `.env` (di lokasi yang sama). Buka file tersebut dan ikuti arahan di dalamnya.
-3. **Jalankan Project:** Buka terminal di folder utama (root) project ini, lalu jalankan:
+2. **Jalankan Project:** Buka terminal di folder utama (root) project ini, lalu jalankan:
    ```bash
    docker compose --profile dev up -d --build
    ```
    *(Catatan: Flag `--profile dev` akan menyalakan Frontend dengan mode Vite HMR untuk development lokal).*
-4. **Akses Aplikasi:**
+3. **Akses Aplikasi:**
    - Frontend (UI): 👉 http://localhost:5173
    - Backend (API): 👉 http://localhost:3000
    - Dokumentasi API (Swagger UI): 👉 http://localhost:3000/swagger-ui
-5. **Mematikan Server:** Jika sudah selesai, matikan semua *container* dengan mengetik perintah berikut (sertakan profil yang sedang menyala):
+4. **Mematikan Server:** Jika sudah selesai, matikan semua *container* dengan mengetik perintah berikut (sertakan profil yang sedang menyala):
    ```bash
    docker compose --profile dev down
    ```
