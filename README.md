@@ -53,7 +53,7 @@ Cara ini paling mudah karena kamu tidak perlu menginstal Rust, Node.js, atau men
 4. **Akses Aplikasi:**
    - Frontend (UI): 👉 http://localhost:5173
    - Backend (API): 👉 http://localhost:3000
-   - **Dokumentasi API (Swagger UI):** 👉 http://localhost:3000/swagger-ui
+   - Dokumentasi API (Swagger UI): 👉 http://localhost:3000/swagger-ui
 5. **Mematikan Server:** Jika sudah selesai, matikan semua *container* dengan mengetik perintah berikut (sertakan profil yang sedang menyala):
    ```bash
    docker compose --profile dev down
@@ -94,7 +94,7 @@ Gunakan cara ini jika kamu ingin aktif melakukan *coding* agar fitur *Hot Reload
 6. **Akses Aplikasi:**
    - Frontend (UI): 👉 http://localhost:5173
    - Backend (API): 👉 http://localhost:3000
-   - **Dokumentasi API (Swagger UI):** 👉 http://localhost:3000/swagger-ui
+   - Dokumentasi API (Swagger UI): 👉 http://localhost:3000/swagger-ui
 
 7. **Mematikan Server & Database:**
    Untuk mematikan aplikasi Frontend dan Backend, cukup tekan tombol `Ctrl + C` di masing-masing terminal yang sedang berjalan.
