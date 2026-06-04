@@ -6,6 +6,20 @@ Platform ini memudahkan pencatatan setoran sampah, memantau saldo tabungan wilay
 
 ---
 
+## 🎯 Fitur Utama
+- **Manajemen Setoran Sampah:** Pencatatan berat dan kategori sampah secara transparan yang otomatis dikonversi menjadi nilai rupiah berdasarkan harga terbaru.
+- **Sistem Tabungan Wilayah:** Saldo tabungan setiap wilayah akan otomatis terakumulasi dari setoran dan mendukung fitur penarikan/pencairan dana.
+- **Leaderboard KPI (Key Performance Indicator):** Pemeringkatan wilayah secara *real-time* berdasarkan metrik rata-rata kualitas pemilahan, kuantitas sampah, dan nilai ekonomi.
+- **Notifikasi & Broadcast:** Sistem pengumuman dan riwayat aktivitas interaktif antar BEM Wilayah dan Administrator.
+- **Pemulihan Akun via OTP Email:** Mendukung reset password secara mandiri dan aman menggunakan verifikasi OTP 6 digit yang dikirimkan secara otomatis ke email pengguna (Auto OTP Email).
+
+## 👥 Pengguna Sistem (Role)
+Sistem ini membagi pengguna ke dalam dua kelompok hak akses utama:
+1. **Administrator (BEM KM / DUI / Admin):** Memiliki hak akses level-atas untuk memantau data seluruh wilayah, mengekspor laporan ke Excel/CSV, mengeksekusi penarikan dana, serta mengelola referensi data (Kategori & Wilayah).
+2. **BEM Wilayah (14 Fakultas/Sekolah):** Memiliki akses eksklusif ke wilayahnya masing-masing untuk melakukan input transaksi harian, memantau *dashboard* pertumbuhan wilayah, dan melihat posisi di *Leaderboard*.
+
+---
+
 ## 💻 Panduan Menjalankan Secara Lokal (Development)
 Untuk keperluan pengembangan (*development*) atau percobaan (*testing*) di komputer lokal, terdapat dua cara yang bisa digunakan:
 
@@ -16,9 +30,9 @@ Cara ini paling mudah karena kamu tidak perlu menginstal Rust, Node.js, atau men
 2. **Konfigurasi `.env`:** Copy file `.env.example` yang sudah ada di **folder utama (root)** menjadi `.env` (di lokasi yang sama). Buka file tersebut dan ikuti arahan di dalamnya.
 3. **Jalankan Project:** Buka terminal di folder utama (root) project ini, lalu jalankan:
    ```bash
-   docker compose up -d --build
+   docker compose --profile dev up -d --build
    ```
-   *(Catatan: Proses pertama kali memakan waktu karena akan meng-compile Rust dan Node.js).*
+   *(Catatan: Flag `--profile dev` akan menyalakan Frontend dengan mode Vite HMR untuk development lokal).*
 4. **Akses Aplikasi:**
    - Frontend (UI): 👉 http://localhost:5173
    - Backend (API): 👉 http://localhost:3000
@@ -41,10 +55,9 @@ Gunakan cara ini jika kamu ingin aktif melakukan *coding* agar fitur *Hot Reload
    DATABASE_URL=postgres://[USER]:[PASSWORD]@localhost:5433/[DB_NAME]
    ```
 4. **Jalankan Backend (Rust):**
-   Masuk ke folder backend, lakukan migrasi tabel database, lalu jalankan server:
+   Masuk ke folder backend, lalu jalankan server (migrasi tabel akan berjalan otomatis saat server dinyalakan):
    ```bash
    cd sim-th-backend
-   cargo run -- up
    cargo run
    ```
 5. **Jalankan Frontend (Vite):**
@@ -74,7 +87,7 @@ Sistem ini dirancang agar mudah di-*deploy* ke *server cloud* atau server mandir
 
 3. **Konfigurasi Cloudflare Zero Trust:**
    Pada menu *Public Hostname* di *dashboard* Cloudflare, lakukan perutean trafik internet masuk menuju *network* Docker lokal:
-   - Untuk UI (misal: `sim.tabunghijau.com`) -> arahkan ke URL `http://frontend:5173`
+   - Untuk UI (misal: `sim.tabunghijau.com`) -> arahkan ke URL `http://frontend-prod:80`
    - Untuk API (misal: `api.tabunghijau.com`) -> arahkan ke URL `http://backend:3000`
 
 4. **Selesai!** 
