@@ -1,4 +1,4 @@
-# 🌿 Sistem Manajemen Informasi Tabung Hijau (SIM-TH)
+# 🌿 Sistem Informasi dan Manajemen Tabung Hijau (SIM-TH)
 
 Sistem Informasi dan Manajemen Tabung Hijau (SIM-TH) adalah platform digital terpadu yang dirancang untuk mengelola, melacak, dan menganalisis data transaksi bank sampah dari berbagai BEM Wilayah di IPB. 
 
@@ -81,22 +81,33 @@ Gunakan cara ini jika kamu ingin aktif melakukan *coding* agar fitur *Hot Reload
 ## 🚀 Panduan Deployment (Production)
 Sistem ini dirancang agar mudah di-*deploy* ke *server cloud* atau server mandiri (*Home Server* / VPS) dengan bantuan **Cloudflare Tunnel**. Penggunaan *tunnel* menghilangkan kebutuhan untuk mengatur *Port Forwarding* pada *router* dan mengamankan aplikasi dari akses luar yang tidak sah.
 
-1. **Siapkan Environment Variables:**
-   Di *server*, pastikan kamu sudah membuat file `.env` di folder utama. Selain kredensial standar, tambahkan Token dari konfigurasi Tunnel di *dashboard* **Cloudflare Zero Trust**:
+1. **Persiapan Server:**
+   Sama seperti langkah *development*, pertama-tama kamu wajib meng-*clone* *repository* ini di server tujuan:
+   ```bash
+   git clone https://github.com/nanda_zahran/Sistem-Manajemen-Informasi-Tabung-Hijau.git
+   cd Sistem-Manajemen-Informasi-Tabung-Hijau
+   ```
+
+2. **Siapkan Environment Variables (.env) untuk Production:**
+   Copy `.env.example` menjadi `.env`. **Penting:** Ubah konfigurasi URL API dan masukkan Token Cloudflare-nya:
    ```env
+   # Ganti ke domain API publik kamu agar Frontend bisa memanggilnya
+   VITE_API_URL=https://api.tabunghijau.com/api
+   
+   # Dapatkan dari Cloudflare Zero Trust (Networks -> Tunnels -> Create Tunnel)
    CLOUDFLARE_TOKEN=eyJh...
    ```
 
-2. **Jalankan Profile Production:**
-   Sistem memiliki "trik" *Docker Profile*. Jalankan perintah berikut agar Backend, Frontend, Database, **dan Tunnel** menyala bersamaan:
+3. **Jalankan Profile Production:**
+   Jalankan perintah berikut agar Backend, Frontend (Nginx siap rilis), Database, **dan Cloudflare Tunnel** menyala secara otomatis di latar belakang (*background*):
    ```bash
    docker compose --profile production up -d --build
    ```
 
-3. **Konfigurasi Cloudflare Zero Trust:**
-   Pada menu *Public Hostname* di *dashboard* Cloudflare, lakukan perutean trafik internet masuk menuju *network* Docker lokal:
-   - Untuk UI (misal: `sim.tabunghijau.com`) -> arahkan ke URL `http://frontend-prod:80`
-   - Untuk API (misal: `api.tabunghijau.com`) -> arahkan ke URL `http://backend:3000`
+4. **Konfigurasi Routing Cloudflare Zero Trust:**
+   Karena Tunnel berjalan di dalam Docker, ia bisa memanggil *container* lain hanya dengan menggunakan nama *service*-nya. Pada menu *Public Hostname* di *dashboard* Cloudflare, atur perutean menjadi:
+   - **Domain UI** (misal: `sim.tabunghijau.com`) -> Service Type: `HTTP` | URL: `frontend-prod:80`
+   - **Domain API** (misal: `api.tabunghijau.com`) -> Service Type: `HTTP` | URL: `backend:3000`
 
-4. **Selesai!** 
+5. **Selesai!** 
    Aplikasi Tabung Hijau sekarang sudah *live* dan bisa diakses dari internet dengan aman!
