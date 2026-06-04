@@ -43,9 +43,7 @@ Semua cara eksekusi membutuhkan file environment. Salin template `.env.example` 
 ```bash
 cp .env.example .env
 ```
-Lalu buka file tersebut dan ikuti arahan di dalamnya.
-
-Setelah berhasil masuk ke dalam folder project dan mengkonfigurasi `.env`-nya, terdapat dua cara yang bisa digunakan untuk menjalankan sistem ini:
+Setelah berhasil masuk ke dalam folder project dan menyalin `.env`-nya, terdapat dua cara yang bisa digunakan untuk menjalankan sistem ini:
 
 ### Cara 1: Menggunakan Docker Sepenuhnya (Sangat Disarankan)
 Cara ini paling mudah karena kamu tidak perlu menginstal Rust, Node.js, atau mengatur konfigurasi *database* secara manual.
