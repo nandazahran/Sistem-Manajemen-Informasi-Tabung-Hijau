@@ -16,11 +16,11 @@ impl MigrationTrait for Migration {
                     .col(string(User::Email).unique_key())
                     .col(string(User::Password))
                     .col(string(User::Nama))
-                    .col(string(User::Role))   // Isinya nanti: "Admin", "BEMWilayah", atau "DUI"
+                    .col(string(User::Role)) // Isinya nanti: "Admin", "BEMWilayah", atau "DUI"
                     .col(string(User::Status)) // Isinya nanti: "Aktif" atau "Non-Aktif"
                     .col(ColumnDef::new(User::Telepon).string().null()) // Tambah kolom telepon
                     // Kolom wilayah_id boleh kosong (null) karena Admin dan DUI tidak terikat 1 wilayah spesifik
-                    .col(integer_null(User::WilayahId)) 
+                    .col(integer_null(User::WilayahId))
                     // --- MEMBUAT RELASI (FOREIGN KEY) KE TABEL WILAYAH ---
                     .foreign_key(
                         ForeignKey::create()

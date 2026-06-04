@@ -13,12 +13,11 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(pk_auto(TabunganSampah::Id))
                     // Saldo otomatis mulai dari 0.0
-                    .col(integer(TabunganSampah::Saldo).default(0.0)) 
+                    .col(integer(TabunganSampah::Saldo).default(0.0))
                     .col(string(TabunganSampah::Status))
-                    
                     // --- RELASI 1-TO-1 KE WILAYAH ---
                     // Wajib unik agar 1 wilayah cuma punya 1 tabungan
-                    .col(integer(TabunganSampah::WilayahId).unique_key()) 
+                    .col(integer(TabunganSampah::WilayahId).unique_key())
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk-tabungan-wilayah")

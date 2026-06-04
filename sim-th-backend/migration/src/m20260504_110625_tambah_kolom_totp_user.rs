@@ -13,7 +13,12 @@ impl MigrationTrait for Migration {
                     // Secret key TOTP biasanya lumayan panjang, kita beri VARCHAR 64
                     .add_column(ColumnDef::new(User::TotpSecret).string_len(64).null())
                     // Tanda apakah user sudah berhasil sinkronisasi app TOTP-nya
-                    .add_column(ColumnDef::new(User::TotpAktif).boolean().default(false).not_null())
+                    .add_column(
+                        ColumnDef::new(User::TotpAktif)
+                            .boolean()
+                            .default(false)
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await

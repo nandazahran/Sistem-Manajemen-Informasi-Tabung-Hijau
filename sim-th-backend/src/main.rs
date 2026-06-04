@@ -1,15 +1,21 @@
-use axum::{routing::{get, post, put}, Router, middleware};
-use sea_orm::Database;
-use std::env;
-use tower_http::cors::{CorsLayer, Any};
 use axum::Extension;
 use axum::http::{Method, header};
-use utoipa::{openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},Modify, OpenApi,};
-use utoipa_swagger_ui::SwaggerUi;
+use axum::{
+    Router, middleware,
+    routing::{get, post, put},
+};
 use migration::{Migrator, MigratorTrait};
+use sea_orm::Database;
+use std::env;
+use tower_http::cors::{Any, CorsLayer};
+use utoipa::{
+    Modify, OpenApi,
+    openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
+};
+use utoipa_swagger_ui::SwaggerUi;
 
-mod handlers;
 mod entities;
+mod handlers;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -128,42 +134,64 @@ async fn main() {
 
     // Coba colokkan kabel koneksi ke PostgreSQL
     println!("Mencoba menyambungkan ke brankas data...");
-    let db = Database::connect(&db_url).await.expect("Gagal menyambung ke database! Pastikan Podman nyala.");
+    let db = Database::connect(&db_url)
+        .await
+        .expect("Gagal menyambung ke database! Pastikan Podman nyala.");
     println!("✅ Berhasil tersambung ke PostgreSQL!");
 
     println!("Memulai pemeriksaan dan migrasi tabel otomatis...");
-    Migrator::up(&db, None).await.expect("Gagal melakukan migrasi database!");
+    Migrator::up(&db, None)
+        .await
+        .expect("Gagal melakukan migrasi database!");
     println!("✅ Migrasi database selesai dan siap digunakan!");
 
     // Buat aturan CORS (Jembatan Lintas Domain)
     let jembatan_cors = CorsLayer::new()
         // Izinkan tamu dari alamat mana saja (nanti bisa diganti ke localhost:5173 spesifik kalau mau lebih ketat)
-        .allow_origin(Any) 
+        .allow_origin(Any)
         // Izinkan mereka membawa JWT dan format JSON
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
         // Izinkan mereka melakukan aksi CRUD
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE]);
-    
+
     // Buat channel untuk WebSocket (Kapasitas maksimal antrian 100 pesan)
     let (tx, _rx) = tokio::sync::broadcast::channel::<String>(100);
 
     // Buat wilayah
     let rute_wilayah = Router::new()
-        .route("/", get(handlers::lihat_wilayah).post(handlers::tambah_wilayah))
+        .route(
+            "/",
+            get(handlers::lihat_wilayah).post(handlers::tambah_wilayah),
+        )
         .route("/aktif", get(handlers::lihat_wilayah_aktif))
-        .route("/{id}", put(handlers::update_wilayah).delete(handlers::hapus_wilayah))
+        .route(
+            "/{id}",
+            put(handlers::update_wilayah).delete(handlers::hapus_wilayah),
+        )
         .route_layer(middleware::from_fn(handlers::token_jwt));
 
     // Rute Kategori
     let rute_kategori = Router::new()
-        .route("/", get(handlers::lihat_kategori).post(handlers::tambah_kategori))
-        .route("/{id}", put(handlers::update_kategori).delete(handlers::hapus_kategori))
+        .route(
+            "/",
+            get(handlers::lihat_kategori).post(handlers::tambah_kategori),
+        )
+        .route(
+            "/{id}",
+            put(handlers::update_kategori).delete(handlers::hapus_kategori),
+        )
         .route_layer(middleware::from_fn(handlers::token_jwt));
 
     let rute_transaksi = Router::new()
-        .route("/", get(handlers::lihat_transaksi).post(handlers::tambah_transaksi))
+        .route(
+            "/",
+            get(handlers::lihat_transaksi).post(handlers::tambah_transaksi),
+        )
         .route("/export", get(handlers::export_transaksi))
-        .route("/{id}", put(handlers::update_transaksi).delete(handlers::hapus_transaksi))
+        .route(
+            "/{id}",
+            put(handlers::update_transaksi).delete(handlers::hapus_transaksi),
+        )
         .route_layer(middleware::from_fn(handlers::token_jwt));
 
     let rute_tabungan = Router::new()
@@ -182,7 +210,10 @@ async fn main() {
     // Rute Manajemen User (BARU)
     let rute_user = Router::new()
         .route("/", get(handlers::lihat_user))
-        .route("/{id}", put(handlers::update_user).delete(handlers::hapus_user))
+        .route(
+            "/{id}",
+            put(handlers::update_user).delete(handlers::hapus_user),
+        )
         .route("/ubah-password", put(handlers::ubah_password))
         .route("/setup-totp", post(handlers::setup_totp))
         .route("/aktifkan-totp", post(handlers::aktifkan_totp))
@@ -190,15 +221,25 @@ async fn main() {
 
     // Rute Notifikasi (WebSocket & Broadcast)
     let rute_notifikasi = Router::new()
-        .route("/", get(handlers::lihat_notifikasi).route_layer(middleware::from_fn(handlers::token_jwt)))
-        .route("/broadcast", post(handlers::broadcast_notifikasi).route_layer(middleware::from_fn(handlers::token_jwt)))
+        .route(
+            "/",
+            get(handlers::lihat_notifikasi).route_layer(middleware::from_fn(handlers::token_jwt)),
+        )
+        .route(
+            "/broadcast",
+            post(handlers::broadcast_notifikasi)
+                .route_layer(middleware::from_fn(handlers::token_jwt)),
+        )
         .route("/ws", get(handlers::ws_notifikasi)); // Endpoint terbuka khusus WebSocket
 
     // Titipkan kunci brankas (db) ke dalam aplikasi (State)
     let app = Router::new()
-        .route("/", get(|| async { "Halo Tim! Backend SIM-TH sudah menyala!" }))
+        .route(
+            "/",
+            get(|| async { "Halo Tim! Backend SIM-TH sudah menyala!" }),
+        )
         .route("/api/kontak", post(handlers::simpan_kontak))
-        .route("/api/register", post(handlers::register))// Rute untuk registrasi user baru
+        .route("/api/register", post(handlers::register)) // Rute untuk registrasi user baru
         .route("/api/login", post(handlers::login)) // Rute untuk login
         .route("/api/lupa-password", post(handlers::minta_otp_email))
         .route("/api/reset-password", post(handlers::reset_password_email))
@@ -217,7 +258,7 @@ async fn main() {
 
     // Baca variabel HOST. Jika tidak ada di .env, otomatis pakai 127.0.0.1
     let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
-    let bind_address = format!("{}:3000", host); 
+    let bind_address = format!("{}:3000", host);
 
     let listener = tokio::net::TcpListener::bind(&bind_address).await.unwrap();
     println!("🚀 Server SIM-TH berjalan di http://{}", bind_address);

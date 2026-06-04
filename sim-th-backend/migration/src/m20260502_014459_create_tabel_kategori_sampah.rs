@@ -13,9 +13,9 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(pk_auto(KategoriSampah::Id)) // kategoriID (Primary Key)
                     // Nama kategori wajib diisi dan tidak boleh kembar
-                    .col(string(KategoriSampah::NamaKategori).unique_key()) 
+                    .col(string(KategoriSampah::NamaKategori).unique_key())
                     // Harga konversi per kilogram (menggunakan tipe float/desimal)
-                    .col(integer(KategoriSampah::HargaPerKg)) 
+                    .col(integer(KategoriSampah::HargaPerKg))
                     .to_owned(),
             )
             .await

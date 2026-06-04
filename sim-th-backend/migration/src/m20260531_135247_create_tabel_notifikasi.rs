@@ -16,7 +16,7 @@ impl MigrationTrait for Migration {
                     .col(string(Notifikasi::Judul))
                     .col(text(Notifikasi::Deskripsi))
                     // Kita simpan array role dalam format text (contoh: '["all"]' atau '["admin", "bem_km"]')
-                    .col(text_null(Notifikasi::TargetRole)) 
+                    .col(text_null(Notifikasi::TargetRole))
                     .col(integer_null(Notifikasi::TargetWilayahId))
                     .col(timestamp(Notifikasi::Waktu).default(Expr::current_timestamp()))
                     // Relasi ke wilayah jika notifikasi ini spesifik untuk 1 wilayah

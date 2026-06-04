@@ -13,18 +13,16 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(pk_auto(TransaksiSampah::Id))
                     // Catat waktu transaksi otomatis
-                    .col(timestamp(TransaksiSampah::Tanggal).default(Expr::current_timestamp())) 
+                    .col(timestamp(TransaksiSampah::Tanggal).default(Expr::current_timestamp()))
                     .col(integer(TransaksiSampah::Berat)) // Simpan dalam satuan Gram
                     .col(integer(TransaksiSampah::TotalNilai))
                     .col(string(TransaksiSampah::Status))
                     .col(integer(TransaksiSampah::PoinKualitas).default(0)) // Penilaian (30, 25, 15, 5, -5)
                     .col(ColumnDef::new(TransaksiSampah::Catatan).text().null()) // Kolom Catatan (Opsional)
-                    
                     // --- KOLOM UNTUK FOREIGN KEY ---
                     .col(integer(TransaksiSampah::KategoriId))
                     .col(integer(TransaksiSampah::WilayahId))
                     .col(integer(TransaksiSampah::InputBy)) // ID Petugas BEM yang mencatat
-                    
                     // 1. Relasi ke Kategori Sampah
                     .foreign_key(
                         ForeignKey::create()
@@ -82,8 +80,17 @@ pub enum TransaksiSampah {
 
 // Kamus Referensi Tabel Lain
 #[derive(DeriveIden)]
-pub enum KategoriSampah { Table, Id }
+pub enum KategoriSampah {
+    Table,
+    Id,
+}
 #[derive(DeriveIden)]
-pub enum Wilayah { Table, Id }
+pub enum Wilayah {
+    Table,
+    Id,
+}
 #[derive(DeriveIden)]
-pub enum User { Table, Id }
+pub enum User {
+    Table,
+    Id,
+}
