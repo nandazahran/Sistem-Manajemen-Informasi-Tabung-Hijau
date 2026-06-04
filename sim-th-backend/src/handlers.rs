@@ -339,7 +339,7 @@ pub async fn register(
             StatusCode::CONFLICT,
             Json(ResponPesan {
                 status: "gagal".to_string(),
-                pesan: format!("Gagal mendaftar: Email atau Username mungkin sudah dipakai."),
+                pesan: "Gagal mendaftar: Email atau Username mungkin sudah dipakai.".to_string(),
             }),
         ),
     }
@@ -1453,7 +1453,7 @@ pub async fn tambah_transaksi(
         .await;
 
     let petugas = match pencarian_petugas {
-        Ok(Some(p)) => p, 
+        Ok(Some(p)) => p,
         _ => return Json(ResponPesan {
             status: "gagal".to_string(),
             pesan: "Akses ditolak! Akun di token JWT ini sudah tidak ada di database. Silakan login ulang.".to_string(),
@@ -1676,11 +1676,10 @@ pub async fn lihat_transaksi(
         .join(JoinType::InnerJoin, transaksi_sampah::Relation::User.def());
 
     // FILTER: Jika dia BEM Wilayah, HANYA BISA LIHAT transaksinya sendiri
-    if role != "bem_km" && role != "admin" && role != "dui" {
-        if let Some(id_wil) = wilayah_id {
+    if role != "bem_km" && role != "admin" && role != "dui"
+        && let Some(id_wil) = wilayah_id {
             query = query.filter(transaksi_sampah::Column::WilayahId.eq(id_wil));
         }
-    }
 
     let hasil_eksekusi = query
         // Tuangkan hasilnya ke dalam cetakan JSON yang kita buat tadi
@@ -2004,14 +2003,13 @@ pub async fn hapus_transaksi(
                 });
             }
 
-            if user_login.role != "bem_km" && user_login.role != "admin" {
-                if user_login.wilayah_id != Some(data_trx.wilayah_id) {
+            if user_login.role != "bem_km" && user_login.role != "admin"
+                && user_login.wilayah_id != Some(data_trx.wilayah_id) {
                     return Json(ResponPesan {
                         status: "gagal".to_string(),
                         pesan: "Akses ditolak! Anda tidak boleh memanipulasi/menghapus transaksi milik wilayah lain.".to_string(),
                     });
                 }
-            }
 
             // Ambil informasi nilai dan wilayah sebelum transaksinya dimusnahkan
             let nilai_yang_dihapus = data_trx.total_nilai;
@@ -2096,8 +2094,8 @@ pub async fn tarik_saldo(
         .await
         .unwrap()
         .unwrap();
-    if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui" {
-        if user_login.wilayah_id != Some(payload.wilayah_id) {
+    if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui"
+        && user_login.wilayah_id != Some(payload.wilayah_id) {
             return Json(ResponPesan {
                 status: "gagal".to_string(),
                 pesan:
@@ -2105,7 +2103,6 @@ pub async fn tarik_saldo(
                         .to_string(),
             });
         }
-    }
 
     // 1. Cari dompet tabungan wilayah tersebut
     let pencarian_dompet = tabungan_sampah::Entity::find()
@@ -2264,14 +2261,13 @@ pub async fn lihat_dashboard_wilayah(
         .await
         .unwrap()
         .unwrap();
-    if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui" {
-        if user_login.wilayah_id != Some(wilayah_id) {
+    if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui"
+        && user_login.wilayah_id != Some(wilayah_id) {
             return Json(serde_json::json!({
                 "status": "gagal",
                 "pesan": "Akses ditolak! Anda hanya boleh melihat detail dashboard wilayah Anda sendiri."
             }));
         }
-    }
 
     // 1. Cek dulu apakah wilayahnya ada, sekalian ambil namanya untuk ditampilkan
     let pencarian_wilayah = wilayah::Entity::find_by_id(wilayah_id).one(&db).await;
@@ -2538,11 +2534,10 @@ pub async fn lihat_aktivitas_terbaru(
         .await
         .unwrap()
         .unwrap();
-    if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui" {
-        if user_login.wilayah_id != Some(wilayah_id) {
+    if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui"
+        && user_login.wilayah_id != Some(wilayah_id) {
             return Json(serde_json::json!({ "status": "gagal", "pesan": "Akses ditolak!" }));
         }
-    }
 
     let transaksi = transaksi_sampah::Entity::find()
         .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id))
@@ -2787,16 +2782,14 @@ pub async fn lihat_notifikasi(
         .into_iter()
         .filter(|n| {
             let mut should_show = false;
-            if let Some(target_role) = &n.target_role {
-                if target_role.contains("all") || target_role.contains(&role) {
+            if let Some(target_role) = &n.target_role
+                && (target_role.contains("all") || target_role.contains(&role)) {
                     should_show = true;
                 }
-            }
-            if let Some(target_wilayah) = n.target_wilayah_id {
-                if Some(target_wilayah) == wilayah_id {
+            if let Some(target_wilayah) = n.target_wilayah_id
+                && Some(target_wilayah) == wilayah_id {
                     should_show = true;
                 }
-            }
             should_show
         })
         .map(|n| {

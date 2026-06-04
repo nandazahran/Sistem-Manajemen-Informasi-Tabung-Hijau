@@ -29,8 +29,8 @@ mod handlers;
         // Modul Manajemen User
         handlers::setup_totp,
         handlers::aktifkan_totp,
-        handlers::lihat_user,    
-        handlers::update_user,   
+        handlers::lihat_user,
+        handlers::update_user,
         handlers::hapus_user,
         handlers::simpan_kontak,
         handlers::ubah_password,
