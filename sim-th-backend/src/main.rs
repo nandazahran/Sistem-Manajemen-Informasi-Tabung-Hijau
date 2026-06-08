@@ -256,8 +256,8 @@ async fn main() {
         .layer(Extension(tx)) // <-- Titipkan transmitter WebSocket ke seluruh aplikasi
         .layer(jembatan_cors);
 
-    // Baca variabel HOST. Jika tidak ada di .env, otomatis pakai 127.0.0.1
-    let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    // Baca variabel HOST. Jika tidak ada di .env, otomatis pakai 0.0.0.0
+    let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
     let bind_address = format!("{}:3000", host);
 
     let listener = tokio::net::TcpListener::bind(&bind_address).await.unwrap();
