@@ -34,6 +34,26 @@ function AktivitasPage() {
     return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
+  const filteredAktivitas = aktivitasData.filter(akt => {
+    if (filterWaktu === 'Semua Waktu') return true;
+    
+    const d = new Date(akt.tanggal);
+    const now = new Date();
+    
+    if (filterWaktu === 'Hari Ini') {
+       return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }
+    if (filterWaktu === 'Kemarin') {
+       const yesterday = new Date(now);
+       yesterday.setDate(now.getDate() - 1);
+       return d.getDate() === yesterday.getDate() && d.getMonth() === yesterday.getMonth() && d.getFullYear() === yesterday.getFullYear();
+    }
+    if (filterWaktu === 'Bulan Ini') {
+       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }
+    return true;
+  });
+
   return (
     <DashboardLayout>
       <div className="bg-[#0B4D1E] rounded-3xl p-10 flex items-center gap-4 text-white shadow-sm mt-2 mb-8">
@@ -87,7 +107,7 @@ function AktivitasPage() {
       <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-6">
         <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-8">Semua Aktivitas</h3>
         <div className="relative border-l-2 border-gray-100 ml-6 space-y-10">
-          {aktivitasData.map((akt, idx) => (
+          {filteredAktivitas.map((akt, idx) => (
             <div key={akt.id} className="relative pl-8 group">
               <div className={`absolute -left-[19px] top-0 w-9 h-9 rounded-full border-4 border-white flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform ${idx % 2 === 0 ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-[#F4A300]'}`}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -102,7 +122,7 @@ function AktivitasPage() {
               </div>
             </div>
           ))}
-          {aktivitasData.length === 0 && <p className="text-gray-500 font-bold">Belum ada aktivitas di sistem ini.</p>}
+          {filteredAktivitas.length === 0 && <p className="text-gray-500 font-bold">Belum ada aktivitas untuk filter yang dipilih.</p>}
         </div>
       </div>
     </DashboardLayout>

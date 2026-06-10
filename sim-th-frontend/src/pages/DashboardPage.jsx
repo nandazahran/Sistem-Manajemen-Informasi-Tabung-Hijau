@@ -26,34 +26,103 @@ function DashboardPage() {
     const fetchDashboardData = async () => {
       try {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (!token) return;
+
+        // Extract username from token
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const usernameJwt = payload.sub;
+
+        // Fetch users to find current user's wilayah_id
+        const userRes = await fetch(`${import.meta.env.VITE_API_URL}/users`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const userDataRes = await userRes.json();
         
-        // 1. Ambil Nama Wilayah Dinamis dari LocalStorage
+        if (userDataRes.status !== 'sukses') return;
+        
+        const myUser = userDataRes.data.find(u => u.username === usernameJwt);
+        if (!myUser || !myUser.wilayah_id) return;
+
+        const wilayahId = myUser.wilayah_id;
+        
+        // Set nama wilayah
         const userData = JSON.parse(localStorage.getItem('user'));
         if (userData && userData.nama_wilayah) {
           setNamaWilayah(userData.nama_wilayah);
         } else if (userData && userData.nama) {
           setNamaWilayah(userData.nama);
         } else {
-          setNamaWilayah('BEM Wilayah');
+          setNamaWilayah(myUser.nama_wilayah || 'BEM Wilayah');
         }
 
-        // 2. Fetch Data Statistik Dashboard dari Backend
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/wilayah`, {
+        // 1. Fetch Data Statistik Dashboard dari Backend
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/${wilayahId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const resData = await response.json();
 
+        // 2. Fetch Leaderboard (Top 3)
+        const lbRes = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/leaderboard`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const lbData = await lbRes.json();
+
+        // 3. Fetch Aktivitas Terbaru
+        const actRes = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/${wilayahId}/aktivitas`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const actData = await actRes.json();
+
+        // 4. Fetch Transaksi Terbaru
+        const trxRes = await fetch(`${import.meta.env.VITE_API_URL}/transaksi`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const trxData = await trxRes.json();
+        
+        let myWilayahId = null;
+
         if (resData.status === 'sukses') {
+          // Cari rank wilayah ini di leaderboard
+          let myRank = '-';
+          if (lbData.status === 'sukses' && lbData.data) {
+            const rankObj = lbData.data.find(w => w.nama_wilayah === resData.nama_wilayah);
+            if (rankObj) {
+               myRank = `#${rankObj.peringkat} Wilayah`;
+               myWilayahId = rankObj.wilayah_id;
+            }
+          }
+
           setStats({
-            totalSampah: `${resData.data.total_sampah || 0} kg`,
-            nilaiEkonomi: formatRp(resData.data.nilai_ekonomi || 0),
-            totalTransaksi: resData.data.total_transaksi || 0,
-            rank: resData.data.rank ? `#${resData.data.rank} Wilayah` : '-'
+            totalSampah: `${resData.rekap_wilayah?.total_berat_gram ? resData.rekap_wilayah.total_berat_gram / 1000 : 0} kg`,
+            nilaiEkonomi: formatRp(resData.rekap_wilayah?.total_rupiah || 0),
+            totalTransaksi: resData.rekap_wilayah?.jumlah_transaksi || 0,
+            rank: myRank
           });
-          setTop3(resData.data.top_wilayah || []);
-          setTransaksiTerbaru(resData.data.transaksi_terbaru || []);
-          setGrafikBulanan(resData.data.grafik_bulanan || []);
-          setAktivitas(resData.data.aktivitas_terbaru || []);
+          
+          if (lbData.status === 'sukses') {
+            setTop3(lbData.data.slice(0, 3) || []);
+          }
+          
+          if (trxData.status === 'sukses') {
+             // filter transaksi for this wilayah, limit to 5
+             const myTrx = trxData.data.filter(t => t.nama_wilayah === resData.nama_wilayah);
+             setTransaksiTerbaru(myTrx.slice(0, 5) || []);
+          }
+
+          if (actData.status === 'sukses') {
+            setAktivitas(actData.data || []);
+          }
+
+          // 6. Fetch Grafik Bulanan dengan parameter spesifik
+          try {
+             const resGrafik = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/${resData.nama_wilayah_id || myWilayahId}?grafik_bulanan=true`, { headers });
+             const dataGrafik = await resGrafik.json();
+             if (dataGrafik.status === 'sukses') {
+               setGrafikBulanan(dataGrafik.data || []);
+             }
+          } catch (e) {
+             console.error("Gagal mengambil grafik:", e);
+          }
         }
       } catch (error) {
         console.error("Gagal mengambil data dashboard:", error);
@@ -115,13 +184,14 @@ function DashboardPage() {
           
           <div className="w-full h-64 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex items-end justify-between p-4 gap-2">
             {grafikBulanan.map((g, i) => {
-               const maxBerat = Math.max(...grafikBulanan.map(x => x.berat), 1);
-               const heightPct = Math.max((g.berat / maxBerat) * 100, 2); 
+               const maxBerat = Math.max(...grafikBulanan.map(x => x.total_berat || x.berat), 1);
+               const b = g.total_berat !== undefined ? g.total_berat : g.berat;
+               const heightPct = Math.max((b / maxBerat) * 100, 2); 
                return (
                  <div key={i} className="flex flex-col items-center justify-end w-full h-full gap-2 group">
                    <div className="w-full bg-[#8FA57A] rounded-t-md relative group-hover:bg-[#F4A300] transition-colors" style={{ height: `${heightPct}%` }}>
                       <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity z-10">
-                        {g.berat / 1000} kg
+                        {b / 1000} kg
                       </div>
                    </div>
                    <span className="text-[10px] text-gray-500 font-bold">{g.bulan}</span>

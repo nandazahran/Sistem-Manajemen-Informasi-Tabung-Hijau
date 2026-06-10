@@ -46,6 +46,7 @@ mod handlers;
         handlers::lihat_kategori,
         handlers::update_kategori,
         handlers::hapus_kategori,
+        handlers::lihat_riwayat_harga,
         // Modul Transaksi
         handlers::tambah_transaksi,
         handlers::lihat_transaksi,
@@ -55,6 +56,7 @@ mod handlers;
         // Modul Tabungan
         handlers::lihat_tabungan,
         handlers::tarik_saldo,
+        handlers::lihat_histori_tabungan,
         // Modul Dashboard
         handlers::lihat_dashboard,
         handlers::lihat_dashboard_wilayah,
@@ -271,6 +273,7 @@ async fn main() {
     let rute_tabungan = Router::new()
         .route("/", get(handlers::lihat_tabungan))
         .route("/tarik", post(handlers::tarik_saldo)) // Cukup GET saja, karena tabungan diisi otomatis!
+        .route("/histori", get(handlers::lihat_histori_tabungan))
         .route_layer(middleware::from_fn(handlers::token_jwt));
 
     // Rute Dashboard
@@ -326,6 +329,7 @@ async fn main() {
         .route("/api/lupa-password", post(handlers::minta_otp_email))
         .route("/api/reset-password", post(handlers::reset_password_email))
         .route("/api/verify-2fa", post(handlers::verify_2fa))
+        .route("/api/riwayat-harga", get(handlers::lihat_riwayat_harga).route_layer(middleware::from_fn(handlers::token_jwt)))
         .nest("/api/wilayah", rute_wilayah)
         .nest("/api/kategori", rute_kategori)
         .nest("/api/transaksi", rute_transaksi)

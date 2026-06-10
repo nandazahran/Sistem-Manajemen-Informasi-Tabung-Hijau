@@ -29,6 +29,20 @@ function LoginPage() {
       const data = await response.json();
 
       if (response.status === 200) {
+        if (data.status === 'butuh_otp') {
+          // Navigate to OTP page
+          navigate('/otp', { 
+            state: { 
+              username: email.split('@')[0], 
+              preAuthToken: data.token, 
+              role: data.role, 
+              nama: data.nama, 
+              rememberMe 
+            } 
+          });
+          return;
+        }
+
         // Logika Ingat Saya
         const userData = { role: data.role, nama: data.nama };
         if (rememberMe) {

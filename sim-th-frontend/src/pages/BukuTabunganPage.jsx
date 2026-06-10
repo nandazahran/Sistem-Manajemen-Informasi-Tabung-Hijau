@@ -82,37 +82,32 @@ function BukuTabunganPage() {
              setTrenPertumbuhan(0);
           }
 
-          // LOGIKA BIKIN DATA GRAFIK (Akumulasi per bulan)
-          // Menggunakan data 6 bulan terakhir biar rapih di grafik
-          const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
-          let tempGrafik = {};
-          
-          for(let i=5; i>=0; i--) {
-            let d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            let key = `${monthNames[d.getMonth()]} ${d.getFullYear().toString().slice(2)}`;
-            tempGrafik[key] = 0; // Default 0
-          }
+          // LOGIKA BIKIN DATA GRAFIK
+          // Kini ditangani oleh API terpisah (GET /api/tabungan/histori) di bawah ini
 
-          sortedTrx.forEach(t => {
-            let d = new Date(t.tanggal);
-            let key = `${monthNames[d.getMonth()]} ${d.getFullYear().toString().slice(2)}`;
-            if (tempGrafik.hasOwnProperty(key)) {
-               tempGrafik[key] += t.total_nilai;
-            }
-          });
-
-          // Convert ke array format Recharts
-          const finalGrafik = Object.keys(tempGrafik).map(k => ({
-            name: k,
-            Pemasukan: tempGrafik[k]
-          }));
-
-          setGrafikSaldo(finalGrafik);
         }
 
         if (dataTabungan.status === 'sukses') {
           const myDompet = dataTabungan.data.find(t => t.nama_wilayah === myWilayah);
-          if (myDompet) setSaldo(myDompet.saldo);
+          if (myDompet) {
+             setSaldo(myDompet.saldo);
+             
+             // Ambil riwayat grafik
+             try {
+                const resHistori = await fetch(`${import.meta.env.VITE_API_URL}/tabungan/histori?wilayah_id=${myDompet.wilayah_id}`, { headers });
+                const dataHistori = await resHistori.json();
+                if (dataHistori.status === 'sukses') {
+                   const formatGrafik = dataHistori.data.map(d => ({
+                      name: d.bulan,
+                      Pemasukan: d.pemasukan,
+                      Penarikan: d.penarikan
+                   }));
+                   setGrafikSaldo(formatGrafik);
+                }
+             } catch (err) {
+                console.error("Gagal mengambil histori:", err);
+             }
+          }
         }
       } catch (err) {
         console.error("Gagal menarik data tabungan:", err);
@@ -179,8 +174,9 @@ function BukuTabunganPage() {
                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />
                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} width={80} tickFormatter={(val) => `Rp ${val/1000}k`} />
-                 <Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 2}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => [`${formatRp(value)}`, 'Pemasukan']} />
+                 <Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 2}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value, name) => [`${formatRp(value)}`, name]} />
                  <Line type="monotone" dataKey="Pemasukan" stroke="#125B2A" strokeWidth={4} dot={{r: 5, fill: '#125B2A'}} activeDot={{r: 8}} />
+                 <Line type="monotone" dataKey="Penarikan" stroke="#EF4444" strokeWidth={4} dot={{r: 5, fill: '#EF4444'}} activeDot={{r: 8}} />
                </LineChart>
              </ResponsiveContainer>
           ) : (

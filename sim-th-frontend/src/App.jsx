@@ -19,7 +19,6 @@ import AktivitasPage from './pages/AktivitasPage'
 
 // Rute Auth
 import OtpPage from './pages/OtpPage'
-import ResetPasswordAuthPage from './pages/ResetPasswordAuthPage'
 
 // Rute Admin
 import AdminDashboardPage from './pages/Admin/AdminDashboardPage'
@@ -67,7 +66,6 @@ function App() {
         
         {/* Rute Auth */}
         <Route path="/otp" element={<OtpPage />} />
-        <Route path="/reset-password-auth" element={<ResetPasswordAuthPage />} />
  
         {/* Rute Admin */}
         <Route path="/admin/dashboard" element={<AdminDashboardPage />} />

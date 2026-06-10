@@ -10,28 +10,16 @@ function NotifikasiPage() {
     const fetchNotifikasi = async () => {
       try {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/transaksi`, {
+        if (!token) return;
+
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/notifikasi`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const resData = await response.json();
         
         if (resData.status === 'sukses') {
-          const dataTrx = resData.data.sort((a, b) => b.id - a.id);
-          
-          // Mapping riwayat transaksi ke format Notifikasi
-          const mappedNotif = dataTrx.map((t, index) => ({
-            id: t.id,
-            type: 'check',
-            title: `Transaksi ${t.nama_kategori} berhasil dicatat`,
-            desc: `Setoran ${t.nama_kategori.toLowerCase()} ${t.berat/1000}kg telah dicatat oleh ${t.nama_petugas}`,
-            time: 'Sistem Terhubung',
-            read: index >= 3 // 3 aktivitas terbaru ditandai sebagai belum dibaca
-          }));
-
-          // --- INTEGRASI WEBSOCKET ---
-          // Ambil notifikasi dari LocalStorage dan format agar cocok dengan UI saat ini
-          const savedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
-          const mappedSavedNotifs = savedNotifs.map(n => ({
+          // Mapping data riil dari API
+          const mappedNotif = resData.data.map(n => ({
             id: n.id,
             type: n.tipe === 'transaksi' ? 'check' : n.tipe === 'hapus_transaksi' ? 'alert' : n.tipe === 'update_transaksi' ? 'wallet' : 'up',
             title: n.judul,
@@ -40,13 +28,12 @@ function NotifikasiPage() {
             read: n.isRead
           }));
 
-          // Tambahkan notifikasi sistem default di awal
+          // Tetap tambahkan notif sistem 
           mappedNotif.unshift({
             id: 'sys-1', type: 'up', title: 'Sistem Notifikasi Aktif', desc: 'Notifikasi berjalan real-time dengan database', time: 'Baru saja', read: false
           });
 
-          // Gabungkan notifikasi real-time terbaru di urutan paling atas!
-          setNotifikasi([...mappedSavedNotifs, ...mappedNotif]);
+          setNotifikasi(mappedNotif);
         }
       } catch (error) {
         console.error("Gagal mengambil data notifikasi:", error);

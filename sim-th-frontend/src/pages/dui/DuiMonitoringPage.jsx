@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DuiLayout from '../../components/DuiLayout';
 
 function DuiMonitoringPage() {
@@ -27,25 +27,41 @@ function DuiMonitoringPage() {
     setIsStatusOpen(false);
   };
 
-  // Dummy Data Sesuai Gambar
-  const monitoringData = [
-    { id: 1, rank: '#1', wilayah: 'BEM FATETA', kontribusi: '385', transaksi: 124, nilai: 'Rp 1.250.000', kpi: 925, status: 'Aktif' },
-    { id: 2, rank: '#2', wilayah: 'BEM FAPET', kontribusi: '360', transaksi: 118, nilai: 'Rp 1.180.000', kpi: 890, status: 'Aktif' },
-    { id: 3, rank: '#3', wilayah: 'BEM FEM', kontribusi: '340', transaksi: 112, nilai: 'Rp 1.100.000', kpi: 875, status: 'Aktif' },
-    { id: 4, rank: '#4', wilayah: 'BEM FAHUTAN', kontribusi: '310', transaksi: 98, nilai: 'Rp 950.000', kpi: 820, status: 'Aktif' },
-    { id: 5, rank: '#5', wilayah: 'BEM FPIK', kontribusi: '285', transaksi: 89, nilai: 'Rp 850.000', kpi: 780, status: 'Aktif' },
-    { id: 6, rank: '#6', wilayah: 'BEM FMIPA', kontribusi: '260', transaksi: 82, nilai: 'Rp 780.000', kpi: 750, status: 'Aktif' },
-    { id: 7, rank: '#7', wilayah: 'BEM FEMA', kontribusi: '240', transaksi: 75, nilai: 'Rp 720.000', kpi: 720, status: 'Aktif' },
-    { id: 8, rank: '#8', wilayah: 'BEM FESB', kontribusi: '210', transaksi: 65, nilai: 'Rp 650.000', kpi: 680, status: 'Nonaktif' },
-  ];
+  const [monitoringData, setMonitoringData] = useState([]);
+  const [breakdownKategori, setBreakdownKategori] = useState([]);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
-  // Dummy Breakdown Kategori (Buat di Modal)
-  const breakdownKategori = [
-    { name: 'Plastik', berat: '120 kg', nilai: 'Rp 480.000' },
-    { name: 'Kertas', berat: '80 kg', nilai: 'Rp 160.000' },
-    { name: 'Logam', berat: '45 kg', nilai: 'Rp 225.000' },
-    { name: 'Organik', berat: '140 kg', nilai: 'Rp 140.000' },
-  ];
+  useEffect(() => {
+    const fetchMonitoring = async () => {
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (!token) return;
+
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/leaderboard`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const resData = await response.json();
+
+        if (resData.status === 'sukses') {
+          const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+          const mappedData = resData.data.map(item => ({
+            id: item.wilayah_id,
+            rank: `#${item.peringkat}`,
+            wilayah: item.nama_wilayah,
+            kontribusi: (item.total_berat_gram / 1000).toString(),
+            transaksi: item.jumlah_transaksi,
+            nilai: formatRp(item.total_rupiah),
+            kpi: item.poin_kpi,
+            status: 'Aktif' // Dummy sementara karena API leaderboard tidak memuat status wilayah
+          }));
+          setMonitoringData(mappedData);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil data monitoring:", error);
+      }
+    };
+    fetchMonitoring();
+  }, []);
 
   // Logic Filter Berfungsi
   const filteredData = monitoringData.filter(d => {
@@ -55,9 +71,35 @@ function DuiMonitoringPage() {
     return matchSearch && matchWilayah && matchStatus;
   });
 
-  const handleViewDetail = (data) => {
+  const handleViewDetail = async (data) => {
     setSelectedWilayah(data);
     setIsDetailOpen(true);
+    setIsLoadingDetail(true);
+    setBreakdownKategori([]);
+
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/${data.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const resData = await response.json();
+
+      if (resData.status === 'sukses' && resData.breakdown_kategori) {
+        const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+        const mappedBreakdown = resData.breakdown_kategori.map(k => ({
+          name: k.kategori,
+          berat: `${k.total_berat / 1000} kg`,
+          nilai: formatRp(k.total_nilai)
+        }));
+        setBreakdownKategori(mappedBreakdown);
+      }
+    } catch (error) {
+      console.error("Gagal mengambil detail breakdown wilayah:", error);
+    } finally {
+      setIsLoadingDetail(false);
+    }
   };
 
   return (
@@ -207,19 +249,21 @@ function DuiMonitoringPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
           <p className="text-gray-400 text-sm font-medium mb-1">Total Wilayah</p>
-          <h3 className="text-3xl font-extrabold text-[#0B4D1E]">8</h3>
+          <h3 className="text-3xl font-extrabold text-[#0B4D1E]">{monitoringData.length}</h3>
         </div>
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
           <p className="text-gray-400 text-sm font-medium mb-1">Wilayah Aktif</p>
-          <h3 className="text-3xl font-extrabold text-[#2E7D32]">7</h3>
+          <h3 className="text-3xl font-extrabold text-[#2E7D32]">{monitoringData.filter(d => d.status === 'Aktif').length}</h3>
         </div>
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
           <p className="text-gray-400 text-sm font-medium mb-1">Total Sampah</p>
-          <h3 className="text-3xl font-extrabold text-[#0B4D1E]">2390 kg</h3>
+          <h3 className="text-3xl font-extrabold text-[#0B4D1E]">{monitoringData.reduce((acc, curr) => acc + parseFloat(curr.kontribusi || 0), 0)} kg</h3>
         </div>
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
           <p className="text-gray-400 text-sm font-medium mb-1">KPI Rata-rata</p>
-          <h3 className="text-3xl font-extrabold text-[#F4A300]">805</h3>
+          <h3 className="text-3xl font-extrabold text-[#F4A300]">
+            {monitoringData.length > 0 ? Math.round(monitoringData.reduce((acc, curr) => acc + curr.kpi, 0) / monitoringData.length) : 0}
+          </h3>
         </div>
       </div>
 
@@ -236,54 +280,54 @@ function DuiMonitoringPage() {
                 <span className="font-extrabold text-[#0B4D1E] text-lg">{selectedWilayah.wilayah}</span>
               </div>
               
-              <div className="flex justify-between items-center border-b border-gray-100 pb-4 mb-4">
-                <span className="text-gray-400 font-medium">Ranking</span>
-                <span className="font-extrabold text-[#F4A300] text-lg">{selectedWilayah.rank}</span>
-              </div>
-              
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-gray-400 font-medium">Total Kontribusi</span>
-                <span className="font-extrabold text-[#0B4D1E] text-lg">{selectedWilayah.kontribusi} kg</span>
-              </div>
-
-              {/* Box Breakdown Kategori */}
-              <div className="bg-[#F5EFE6] p-6 rounded-3xl mb-6">
-                <p className="text-[#0B4D1E] font-bold text-sm mb-4">Breakdown Kategori:</p>
-                <div className="space-y-4">
-                  {breakdownKategori.map((kategori, index) => (
-                    <div key={index} className="flex justify-between items-center">
-                      <span className="font-bold text-[#0B4D1E] text-sm">{kategori.name}</span>
-                      <div className="text-right">
-                        <p className="font-extrabold text-[#0B4D1E] text-sm">{kategori.berat}</p>
-                        <p className="text-green-600 text-[11px] font-bold">{kategori.nilai}</p>
-                      </div>
-                    </div>
-                  ))}
+              <div className="space-y-4 mb-6">
+                <div className="flex justify-between items-center bg-[#F5EFE6] p-4 rounded-2xl">
+                  <span className="text-[#0B4D1E] font-bold text-sm">Status</span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${selectedWilayah.status === 'Aktif' ? 'bg-[#E8F5E9] text-[#2E7D32]' : 'bg-[#FFEBEE] text-[#C62828]'}`}>
+                    {selectedWilayah.status}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center bg-[#F5EFE6] p-4 rounded-2xl">
+                  <span className="text-[#0B4D1E] font-bold text-sm">Poin KPI</span>
+                  <span className="font-extrabold text-[#0B4D1E] text-lg">{selectedWilayah.kpi}</span>
+                </div>
+                <div className="flex justify-between items-center bg-[#F5EFE6] p-4 rounded-2xl">
+                  <span className="text-[#0B4D1E] font-bold text-sm">Jumlah Transaksi</span>
+                  <span className="font-extrabold text-[#0B4D1E] text-lg">{selectedWilayah.transaksi}x</span>
                 </div>
               </div>
 
-              <div className="flex justify-between items-center border-b border-gray-100 pb-4 mb-4">
-                <span className="text-gray-400 font-medium">Total Transaksi</span>
-                <span className="font-extrabold text-[#0B4D1E] text-lg">{selectedWilayah.transaksi}</span>
-              </div>
-              
-              <div className="flex justify-between items-center border-b border-gray-100 pb-4 mb-4">
-                <span className="text-gray-400 font-medium">Nilai Ekonomi</span>
-                <span className="font-extrabold text-green-600 text-lg">{selectedWilayah.nilai}</span>
-              </div>
-              
-              <div className="flex justify-between items-center border-b border-gray-100 pb-4 mb-4">
-                <span className="text-gray-400 font-medium">KPI Score</span>
-                <span className="font-extrabold text-[#F4A300] text-lg">{selectedWilayah.kpi}</span>
-              </div>
-              
-              <div className="flex justify-between items-center pb-2">
-                <span className="text-gray-400 font-medium">Status</span>
-                <span className={`px-5 py-2 rounded-full text-sm font-bold ${selectedWilayah.status === 'Aktif' ? 'bg-[#E8F5E9] text-[#2E7D32]' : 'bg-[#FFEBEE] text-[#C62828]'}`}>
-                  {selectedWilayah.status}
-                </span>
-              </div>
-
+              {isLoadingDetail ? (
+                <div className="text-center py-6 text-gray-500 font-medium animate-pulse">Memuat data breakdown...</div>
+              ) : (
+                <>
+                  <div className="bg-[#125B2A] text-white p-5 rounded-2xl mb-6 shadow-inner">
+                    <p className="text-green-100 text-xs font-bold uppercase tracking-wider mb-1">Total Nilai Ekonomi</p>
+                    <h2 className="text-3xl font-extrabold">{selectedWilayah.nilai}</h2>
+                    <p className="text-green-100/80 text-xs mt-2 text-right">Dari total {selectedWilayah.kontribusi} kg sampah</p>
+                  </div>
+                  
+                  <div className="bg-[#F5EFE6] p-6 rounded-3xl mb-6">
+                    <h4 className="font-extrabold text-[#0B4D1E] mb-3">Breakdown per Kategori</h4>
+                    <div className="space-y-2">
+                      {breakdownKategori.length > 0 ? breakdownKategori.map((k, i) => (
+                        <div key={i} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0 group">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-[#F4A300]"></div>
+                            <span className="text-gray-500 font-medium text-sm group-hover:text-[#0B4D1E] transition-colors">{k.name}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[#0B4D1E] font-bold text-sm block">{k.nilai}</span>
+                            <span className="text-[10px] font-bold text-gray-400">{k.berat}</span>
+                          </div>
+                        </div>
+                      )) : (
+                        <div className="text-center py-4 text-gray-500 text-sm">Belum ada rincian kategori.</div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Tombol Kembali Tetap di Bawah (Tidak Ikut Terscroll) */}

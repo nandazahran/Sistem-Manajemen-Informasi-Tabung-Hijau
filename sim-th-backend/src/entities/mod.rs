@@ -6,6 +6,8 @@ pub mod kategori_sampah;
 pub mod kontak;
 pub mod notifikasi;
 pub mod rekening_wilayah;
+pub mod riwayat_harga;
+pub mod riwayat_penarikan;
 pub mod tabungan_sampah;
 pub mod transaksi_sampah;
 pub mod user;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../../components/AdminLayout';
 import bannerImg from '../../assets/DB-gambar-banner.png';
@@ -6,14 +6,100 @@ import bannerImg from '../../assets/DB-gambar-banner.png';
 function AdminDashboardPage() {
   const navigate = useNavigate();
 
-  const stats = [
-    { title: 'Total Transaksi', value: '1,284', badge: '+12% bulan ini', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-    { title: 'Total Berat Sampah', value: '1,890 kg', badge: '+8% bulan ini', icon: 'M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2' },
-    { title: 'Total Nilai Ekonomi', value: 'Rp 6,1jt', badge: '+15% bulan ini', icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
-    { title: 'Wilayah Aktif', value: '8', badge: 'dari 8 total', icon: 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z' },
-    { title: 'User Aktif', value: '42', badge: '+3 baru', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197' },
-    { title: 'KPI Tertinggi', value: '925', badge: 'BEM FATETA', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
-  ];
+  const [stats, setStats] = useState([
+    { title: 'Total Transaksi', value: '0', badge: 'Memuat...', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+    { title: 'Total Berat Sampah', value: '0 kg', badge: 'Memuat...', icon: 'M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2' },
+    { title: 'Total Nilai Ekonomi', value: 'Rp 0', badge: 'Memuat...', icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
+    { title: 'Wilayah Aktif', value: '0', badge: 'Memuat...', icon: 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z' },
+    { title: 'User Aktif', value: '0', badge: 'Memuat...', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197' },
+    { title: 'KPI Tertinggi', value: '0', badge: '-', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
+  ]);
+
+  const [aktivitasTerbaru, setAktivitasTerbaru] = useState([]);
+  const [riwayatTerbaru, setRiwayatTerbaru] = useState([]);
+
+  useEffect(() => {
+    const fetchAdminDashboard = async () => {
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (!token) return;
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        // 1. Fetch Global Dashboard
+        const dashRes = await fetch(`${import.meta.env.VITE_API_URL}/dashboard`, { headers });
+        const dashData = await dashRes.json();
+        
+        // 2. Fetch Leaderboard
+        const lbRes = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/leaderboard`, { headers });
+        const lbData = await lbRes.json();
+        
+        // 3. Fetch Wilayah Aktif
+        const wilRes = await fetch(`${import.meta.env.VITE_API_URL}/wilayah/aktif`, { headers });
+        const wilData = await wilRes.json();
+        
+        // 4. Fetch Users (Hitung yang aktif jika ada statusnya, sementara total)
+        const userRes = await fetch(`${import.meta.env.VITE_API_URL}/users`, { headers });
+        const userData = await userRes.json();
+        
+        // 5. Fetch Transaksi
+        const trxRes = await fetch(`${import.meta.env.VITE_API_URL}/transaksi`, { headers });
+        const trxData = await trxRes.json();
+
+        // --- Susun Data ---
+        const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+        
+        let newStats = [...stats];
+        if (dashData.status === 'sukses') {
+          newStats[0].value = (dashData.rekap_seluruh_ipb?.jumlah_transaksi || 0).toString();
+          newStats[0].badge = 'Total Seluruh Wilayah';
+          newStats[1].value = `${(dashData.rekap_seluruh_ipb?.total_berat_gram || 0) / 1000} kg`;
+          newStats[1].badge = 'Total Berat Disetor';
+          newStats[2].value = formatRp(dashData.rekap_seluruh_ipb?.total_rupiah || 0);
+          newStats[2].badge = 'Total Nilai Terkumpul';
+        }
+        
+        if (wilData.status === 'sukses') {
+          newStats[3].value = wilData.data.length.toString();
+          newStats[3].badge = 'Wilayah Status Aktif';
+        }
+        
+        if (userData.status === 'sukses') {
+          newStats[4].value = userData.data.length.toString();
+          newStats[4].badge = 'Akun Terdaftar';
+        }
+        
+        if (lbData.status === 'sukses' && lbData.data.length > 0) {
+          newStats[5].value = lbData.data[0].poin_kpi.toString();
+          newStats[5].badge = lbData.data[0].nama_wilayah;
+        }
+
+        setStats(newStats);
+
+        if (trxData.status === 'sukses') {
+          const sortedTrx = trxData.data.sort((a, b) => b.id - a.id);
+          setRiwayatTerbaru(sortedTrx.slice(0, 3));
+          
+          // Generate aktivitas dari transaksi
+          const mapAktivitas = sortedTrx.slice(0, 3).map(t => {
+            const date = new Date(t.tanggal);
+            const timeStr = date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+            return {
+              t: 'Transaksi baru dicatat',
+              s: `${t.nama_wilayah} - ${t.nama_kategori} ${t.berat / 1000}kg`,
+              time: timeStr,
+              c: 'bg-green-100 text-green-600',
+              i: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'
+            };
+          });
+          setAktivitasTerbaru(mapAktivitas);
+        }
+
+      } catch (error) {
+        console.error("Gagal mengambil data dashboard admin:", error);
+      }
+    };
+    fetchAdminDashboard();
+  }, []);
 
   return (
     <AdminLayout>
@@ -133,11 +219,7 @@ function AdminDashboardPage() {
             </button>
           </div>
           <div className="space-y-6">
-            {[
-              { t: 'Transaksi baru masuk', s: 'BEM FATETA - Plastik 25kg', time: '5 menit lalu', c: 'bg-green-100 text-green-600', i: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
-              { t: 'User baru ditambahkan', s: 'BEM FAPET berhasil didaftarkan', time: '15 menit lalu', c: 'bg-blue-100 text-blue-600', i: 'M16 7a4 4 0 11-8 0 4 4 0 018 0z' },
-              { t: 'Kategori harga diperbarui', s: 'Plastik: Rp 4.500/kg', time: '1 jam lalu', c: 'bg-yellow-100 text-yellow-600', i: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-            ].map((item, i) => (
+            {aktivitasTerbaru.map((item, i) => (
               <div key={i} className="flex items-center gap-4 group cursor-pointer">
                 <div className={`${item.c} p-3 rounded-full transition-transform group-hover:scale-110`}><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.i} /></svg></div>
                 <div className="flex-1">
@@ -147,6 +229,7 @@ function AdminDashboardPage() {
                 <div className="text-[10px] text-gray-400 font-bold">{item.time}</div>
               </div>
             ))}
+            {aktivitasTerbaru.length === 0 && <p className="text-sm text-gray-500 py-4">Belum ada aktivitas.</p>}
           </div>
         </div>
 
@@ -160,22 +243,23 @@ function AdminDashboardPage() {
             </button>
           </div>
           <div className="space-y-4">
-            {[
-              { n: 'BEM FATETA', m: 'Plastik', q: '25 kg', d: '9 Mei 2026', a: 'Rp 112.500' },
-              { n: 'BEM FAPET', m: 'Kertas', q: '15 kg', d: '9 Mei 2026', a: 'Rp 37.500' },
-              { n: 'BEM FEM', m: 'Logam', q: '10 kg', d: '8 Mei 2026', a: 'Rp 75.000' },
-            ].map((rw, i) => (
+            {riwayatTerbaru.map((rw, i) => {
+              const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+              const dateObj = new Date(rw.tanggal);
+              const tglStr = dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+              return (
               <div key={i} className="flex justify-between items-center bg-[#F5EFE6] p-5 rounded-2xl hover:bg-white hover:shadow-lg transition-all border border-transparent hover:border-gray-100 cursor-pointer group">
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="font-extrabold text-[#0B4D1E] text-sm">{rw.n}</p>
-                    <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-bold">{rw.m}</span>
+                    <p className="font-extrabold text-[#0B4D1E] text-sm">{rw.nama_wilayah}</p>
+                    <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-bold">{rw.nama_kategori}</span>
                   </div>
-                  <p className="text-[11px] text-gray-400 font-bold mt-1">{rw.q} • {rw.d}</p>
+                  <p className="text-[11px] text-gray-400 font-bold mt-1">{rw.berat / 1000} kg • {tglStr}</p>
                 </div>
-                <div className="font-extrabold text-[#0B4D1E] group-hover:text-green-600 transition-colors">{rw.a}</div>
+                <div className="font-extrabold text-[#0B4D1E] group-hover:text-green-600 transition-colors">{formatRp(rw.total_nilai)}</div>
               </div>
-            ))}
+            )})}
+            {riwayatTerbaru.length === 0 && <p className="text-sm text-gray-500 py-4 text-center">Belum ada riwayat transaksi.</p>}
           </div>
         </div>
 

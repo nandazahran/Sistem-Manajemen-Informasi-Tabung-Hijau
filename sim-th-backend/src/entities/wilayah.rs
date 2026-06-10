@@ -19,6 +19,8 @@ pub enum Relation {
     Notifikasi,
     #[sea_orm(has_many = "super::rekening_wilayah::Entity")]
     RekeningWilayah,
+    #[sea_orm(has_many = "super::riwayat_penarikan::Entity")]
+    RiwayatPenarikan,
     #[sea_orm(has_one = "super::tabungan_sampah::Entity")]
     TabunganSampah,
     #[sea_orm(has_many = "super::transaksi_sampah::Entity")]
@@ -36,6 +38,12 @@ impl Related<super::notifikasi::Entity> for Entity {
 impl Related<super::rekening_wilayah::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::RekeningWilayah.def()
+    }
+}
+
+impl Related<super::riwayat_penarikan::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::RiwayatPenarikan.def()
     }
 }
 

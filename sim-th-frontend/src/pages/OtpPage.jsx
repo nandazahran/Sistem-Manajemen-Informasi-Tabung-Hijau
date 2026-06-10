@@ -1,9 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout';
 
 function OtpPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const authState = location.state || {}; // { username, preAuthToken, role, nama, rememberMe }
+
   // State diubah jadi 6 kotak kosong
   const [otp, setOtp] = useState(['', '', '', '', '', '']); 
   const [isLoading, setIsLoading] = useState(false);
@@ -31,28 +34,74 @@ function OtpPage() {
     }
   };
 
-  const handleVerify = (e) => {
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const handleVerify = async (e) => {
     e.preventDefault();
     const otpCode = otp.join('');
     
     // Validasi harus 6 digit
     if (otpCode.length < 6) {
-      alert('Masukkan 6 digit kode OTP terlebih dahulu!');
+      setErrorMsg('Masukkan 6 digit kode OTP terlebih dahulu!');
       return;
     }
     
     setIsLoading(true);
-    // Simulasi loading ke server selama 1 detik
-    setTimeout(() => {
+    setErrorMsg('');
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/verify-2fa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          username: authState.username,
+          pre_auth_token: authState.preAuthToken,
+          kode_totp: otpCode
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.status === 200 && data.status === 'sukses') {
+        // Berhasil verifikasi 2FA!
+        const userData = { role: data.role || authState.role, nama: data.nama || authState.nama };
+        if (authState.rememberMe) {
+          localStorage.setItem('token', data.token); 
+          localStorage.setItem('user', JSON.stringify(userData));
+        } else {
+          sessionStorage.setItem('token', data.token); 
+          sessionStorage.setItem('user', JSON.stringify(userData));
+        }
+        
+        alert("Verifikasi berhasil! Anda masuk ke sistem.");
+        
+        const role = data.role || authState.role;
+        if (role === 'admin' || role === 'superadmin' || role === 'bem_km') {
+          navigate('/admin/dashboard');
+        } else if (role === 'dui') {
+          navigate('/dui/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
+      } else {
+        setErrorMsg(data.pesan || 'Kode OTP salah. Silakan coba lagi.');
+      }
+    } catch (error) {
+      setErrorMsg('Gagal terhubung ke server.');
+    } finally {
       setIsLoading(false);
-      // Lempar ke halaman reset password auth yang udah lu rename
-      navigate('/reset-password-auth'); 
-    }, 1000);
+    }
   };
 
   return (
-    <AuthLayout title="Verifikasi OTP" subtitle="Masukkan 6 digit kode yang kami kirimkan ke email Anda.">
+    <AuthLayout title="Verifikasi OTP" subtitle="Masukkan 6 digit kode OTP dari Authenticator Anda.">
       <form onSubmit={handleVerify} className="flex flex-col gap-6 mt-4">
+        
+        {errorMsg && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl text-sm">
+            {errorMsg}
+          </div>
+        )}
         
         {/* KOTAK INPUT OTP (Disesuaikan ukurannya biar 6 kotak muat sejajar) */}
         <div className="flex justify-center gap-2 sm:gap-4">

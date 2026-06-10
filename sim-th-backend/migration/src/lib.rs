@@ -12,6 +12,8 @@ mod m20260504_131630_tambah_kolom_otp_reset;
 mod m20260507_070235_create_kontak_table;
 mod m20260527_150521_create_tabel_rekening_wilayah;
 mod m20260531_135247_create_tabel_notifikasi;
+mod m20260610_144218_create_riwayat_harga_table;
+mod m20260610_150546_create_riwayat_penarikan_table;
 
 pub struct Migrator;
 
@@ -29,6 +31,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260507_070235_create_kontak_table::Migration),
             Box::new(m20260527_150521_create_tabel_rekening_wilayah::Migration),
             Box::new(m20260531_135247_create_tabel_notifikasi::Migration),
+            Box::new(m20260610_144218_create_riwayat_harga_table::Migration),
+            Box::new(m20260610_150546_create_riwayat_penarikan_table::Migration),
         ]
     }
 }

@@ -23,8 +23,7 @@ use totp_rs::{Algorithm, Secret, TOTP};
 use utoipa::ToSchema;
 
 use crate::entities::{
-    kategori_sampah, kontak, notifikasi, rekening_wilayah, tabungan_sampah, transaksi_sampah, user,
-    wilayah,
+    kategori_sampah, kontak, notifikasi, rekening_wilayah, riwayat_harga, riwayat_penarikan, tabungan_sampah, transaksi_sampah, user, wilayah,
 };
 
 // Struct khusus untuk menerima data Register
@@ -1474,6 +1473,52 @@ pub async fn lihat_kategori(State(db): State<DatabaseConnection>) -> Json<serde_
     }
 }
 
+// 2b. Fungsi Lihat Riwayat Harga Kategori
+#[utoipa::path(
+    get,
+    path = "/api/riwayat-harga",
+    responses(
+        (status = 200, description = "Berhasil mengambil data riwayat harga", body = serde_json::Value),
+        (status = 500, description = "Gagal mengambil data riwayat harga", body = serde_json::Value)
+    ),
+    tag = "Kategori",
+    security(("jwt_auth" = []))
+)]
+pub async fn lihat_riwayat_harga(State(db): State<DatabaseConnection>) -> Json<serde_json::Value> {
+    use sea_orm::{QueryOrder, QuerySelect};
+    
+    let daftar_riwayat = riwayat_harga::Entity::find()
+        .find_also_related(kategori_sampah::Entity)
+        .order_by_desc(riwayat_harga::Column::Id)
+        .all(&db)
+        .await;
+
+    match daftar_riwayat {
+        Ok(data) => {
+            let mapped_data: Vec<serde_json::Value> = data.into_iter().map(|(riwayat, kategori)| {
+                serde_json::json!({
+                    "id": riwayat.id,
+                    "kategori_id": riwayat.kategori_id,
+                    "nama_kategori": kategori.map(|k| k.nama_kategori).unwrap_or_else(|| "Kategori Terhapus".to_string()),
+                    "harga_lama": riwayat.harga_lama,
+                    "harga_baru": riwayat.harga_baru,
+                    "tanggal_perubahan": riwayat.tanggal_perubahan,
+                    "diubah_oleh": riwayat.diubah_oleh
+                })
+            }).collect();
+
+            Json(serde_json::json!({
+                "status": "sukses",
+                "data": mapped_data
+            }))
+        },
+        Err(_) => Json(serde_json::json!({
+            "status": "error",
+            "pesan": "Gagal mengambil data riwayat harga"
+        })),
+    }
+}
+
 // Fungsi Update Kategori Sampah (Misal untuk mengubah harga)
 #[utoipa::path(
     put,
@@ -1491,6 +1536,7 @@ pub async fn lihat_kategori(State(db): State<DatabaseConnection>) -> Json<serde_
     security(("jwt_auth" = []))
 )]
 pub async fn update_kategori(
+    Extension(username_jwt): Extension<String>,
     State(db): State<DatabaseConnection>,
     Path(kategori_id): Path<i32>,
     Json(payload): Json<InputKategori>,
@@ -1502,6 +1548,9 @@ pub async fn update_kategori(
 
     match pencarian_kategori {
         Ok(Some(kategori_lama)) => {
+            let harga_lama_sebelumnya = kategori_lama.harga_per_kg;
+            let apakah_harga_berubah = harga_lama_sebelumnya != payload.harga_per_kg;
+
             // 2. Ubah data lamanya menjadi ActiveModel agar bisa diedit
             let mut kategori_aktif: kategori_sampah::ActiveModel = kategori_lama.into();
 
@@ -1511,13 +1560,27 @@ pub async fn update_kategori(
 
             // 4. Simpan pembaruan ke database
             match kategori_aktif.update(&db).await {
-                Ok(_) => Json(ResponPesan {
-                    status: "sukses".to_string(),
-                    pesan: format!(
-                        "Kategori ID {} berhasil diupdate menjadi '{}' dengan harga Rp {}/kg.",
-                        kategori_id, payload.nama_kategori, payload.harga_per_kg
-                    ),
-                }),
+                Ok(_) => {
+                    // Jika harga berubah, catat ke riwayat_harga
+                    if apakah_harga_berubah {
+                        let riwayat = riwayat_harga::ActiveModel {
+                            kategori_id: Set(kategori_id),
+                            harga_lama: Set(harga_lama_sebelumnya),
+                            harga_baru: Set(payload.harga_per_kg),
+                            diubah_oleh: Set(username_jwt),
+                            ..Default::default()
+                        };
+                        let _ = riwayat_harga::Entity::insert(riwayat).exec(&db).await;
+                    }
+
+                    Json(ResponPesan {
+                        status: "sukses".to_string(),
+                        pesan: format!(
+                            "Kategori ID {} berhasil diupdate menjadi '{}' dengan harga Rp {}/kg.",
+                            kategori_id, payload.nama_kategori, payload.harga_per_kg
+                        ),
+                    })
+                },
                 Err(e) => Json(ResponPesan {
                     status: "gagal".to_string(),
                     pesan: format!("Gagal mengupdate kategori: {}", e),
@@ -2250,7 +2313,7 @@ pub async fn tarik_saldo(
 ) -> Json<ResponPesan> {
     // CEK HAK AKSES: BEM dilarang narik tabungan BEM wilayah lain!
     let user_login = user::Entity::find()
-        .filter(user::Column::Username.eq(username_jwt))
+        .filter(user::Column::Username.eq(username_jwt.clone()))
         .one(&db)
         .await
         .unwrap()
@@ -2292,13 +2355,24 @@ pub async fn tarik_saldo(
             dompet_aktif.saldo = Set(saldo_baru);
 
             match dompet_aktif.update(&db).await {
-                Ok(_) => Json(ResponPesan {
-                    status: "sukses".to_string(),
-                    pesan: format!(
-                        "Pencairan dana Rp {} berhasil. Sisa saldo tabungan saat ini: Rp {}.",
-                        payload.nominal, saldo_baru
-                    ),
-                }),
+                Ok(_) => {
+                    // 4. Catat riwayat penarikan
+                    let log_penarikan = riwayat_penarikan::ActiveModel {
+                        wilayah_id: Set(payload.wilayah_id),
+                        nominal: Set(payload.nominal),
+                        ditarik_oleh: Set(username_jwt.clone()),
+                        ..Default::default()
+                    };
+                    let _ = riwayat_penarikan::Entity::insert(log_penarikan).exec(&db).await;
+
+                    Json(ResponPesan {
+                        status: "sukses".to_string(),
+                        pesan: format!(
+                            "Pencairan dana Rp {} berhasil. Sisa saldo tabungan saat ini: Rp {}.",
+                            payload.nominal, saldo_baru
+                        ),
+                    })
+                },
                 Err(e) => Json(ResponPesan {
                     status: "gagal".to_string(),
                     pesan: format!("Gagal memproses penarikan di database: {}", e),
@@ -2318,6 +2392,87 @@ pub async fn tarik_saldo(
 
 #[utoipa::path(
     get,
+    path = "/api/tabungan/histori",
+    params(
+        ("wilayah_id" = i32, Query, description = "ID Wilayah"),
+        ("tahun" = Option<i32>, Query, description = "Tahun filter (opsional)")
+    ),
+    responses(
+        (status = 200, description = "Berhasil mengambil histori tabungan", body = serde_json::Value),
+        (status = 500, description = "Gagal mengambil histori tabungan", body = serde_json::Value)
+    ),
+    tag = "Tabungan",
+    security(("jwt_auth" = []))
+)]
+pub async fn lihat_histori_tabungan(
+    State(db): State<DatabaseConnection>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let wilayah_id_str = params.get("wilayah_id");
+    if wilayah_id_str.is_none() {
+        return Json(serde_json::json!({
+            "status": "gagal",
+            "pesan": "Parameter wilayah_id wajib diisi."
+        }));
+    }
+    let wilayah_id = wilayah_id_str.unwrap().parse::<i32>().unwrap_or(0);
+    
+    // Ambil tahun dari query, default tahun sekarang
+    let tahun_sekarang = chrono::Utc::now().year();
+    let tahun = params.get("tahun")
+        .and_then(|t| t.parse::<i32>().ok())
+        .unwrap_or(tahun_sekarang);
+
+    // Ambil transaksi (Pemasukan)
+    let transaksi = transaksi_sampah::Entity::find()
+        .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id))
+        .all(&db)
+        .await
+        .unwrap_or_default();
+
+    // Ambil riwayat penarikan (Pengeluaran)
+    let penarikan = riwayat_penarikan::Entity::find()
+        .filter(riwayat_penarikan::Column::WilayahId.eq(wilayah_id))
+        .all(&db)
+        .await
+        .unwrap_or_default();
+
+    let month_names = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
+    let mut histori_bulanan = vec![];
+
+    for i in 0..12 {
+        let mut total_pemasukan = 0;
+        let mut total_penarikan = 0;
+
+        for trx in &transaksi {
+            if trx.tanggal.year() == tahun && trx.tanggal.month() as usize - 1 == i {
+                total_pemasukan += trx.total_nilai;
+            }
+        }
+
+        for pen in &penarikan {
+            if pen.tanggal_penarikan.year() == tahun && pen.tanggal_penarikan.month() as usize - 1 == i {
+                total_penarikan += pen.nominal;
+            }
+        }
+
+        histori_bulanan.push(serde_json::json!({
+            "bulan": month_names[i],
+            "pemasukan": total_pemasukan,
+            "penarikan": total_penarikan,
+            "saldo_sisa": total_pemasukan - total_penarikan // Saldo bersih bulan tsb
+        }));
+    }
+
+    Json(serde_json::json!({
+        "status": "sukses",
+        "tahun": tahun,
+        "data": histori_bulanan
+    }))
+}
+
+#[utoipa::path(
+    get,
     path = "/api/dashboard",
     responses(
         (status = 200, description = "Berhasil mengambil data dashboard", body = serde_json::Value),
@@ -2327,6 +2482,84 @@ pub async fn tarik_saldo(
     security(("jwt_auth" = []))
 )]
 pub async fn lihat_dashboard(State(db): State<DatabaseConnection>) -> Json<serde_json::Value> {
+    use chrono::{Datelike, Utc};
+
+    // 1. Ambil semua kategori untuk breakdown global
+    let kategori_semua = kategori_sampah::Entity::find()
+        .all(&db)
+        .await
+        .unwrap_or_default();
+
+    let mut breakdown_list = vec![];
+    for kat in kategori_semua {
+        let trx_kat = transaksi_sampah::Entity::find()
+            .filter(transaksi_sampah::Column::KategoriId.eq(kat.id))
+            .all(&db)
+            .await
+            .unwrap_or_default();
+
+        let mut total_berat_kat = 0;
+        for t in trx_kat {
+            total_berat_kat += t.berat;
+        }
+
+        if total_berat_kat > 0 {
+            breakdown_list.push(serde_json::json!({
+                "kategori": kat.nama_kategori,
+                "total_berat": total_berat_kat
+            }));
+        }
+    }
+
+    // Sort by total_berat descending
+    breakdown_list.sort_by(|a, b| {
+        let berat_a = a.get("total_berat").unwrap().as_i64().unwrap();
+        let berat_b = b.get("total_berat").unwrap().as_i64().unwrap();
+        berat_b.cmp(&berat_a)
+    });
+
+    // 2. Ambil semua transaksi tahun ini untuk grafik bulanan global
+    let tahun = Utc::now().year();
+    let semua_trx = transaksi_sampah::Entity::find()
+        .filter(transaksi_sampah::Column::Tanggal.gte(format!("{}-01-01", tahun)))
+        .filter(transaksi_sampah::Column::Tanggal.lte(format!("{}-12-31", tahun)))
+        .all(&db)
+        .await
+        .unwrap_or_default();
+
+    let mut data_bulanan = vec![
+        serde_json::json!({"bulan": "Jan", "total_berat": 0, "total_nilai": 0}),
+        serde_json::json!({"bulan": "Feb", "total_berat": 0, "total_nilai": 0}),
+        serde_json::json!({"bulan": "Mar", "total_berat": 0, "total_nilai": 0}),
+        serde_json::json!({"bulan": "Apr", "total_berat": 0, "total_nilai": 0}),
+        serde_json::json!({"bulan": "Mei", "total_berat": 0, "total_nilai": 0}),
+        serde_json::json!({"bulan": "Jun", "total_berat": 0, "total_nilai": 0}),
+        serde_json::json!({"bulan": "Jul", "total_berat": 0, "total_nilai": 0}),
+        serde_json::json!({"bulan": "Ags", "total_berat": 0, "total_nilai": 0}),
+        serde_json::json!({"bulan": "Sep", "total_berat": 0, "total_nilai": 0}),
+        serde_json::json!({"bulan": "Okt", "total_berat": 0, "total_nilai": 0}),
+        serde_json::json!({"bulan": "Nov", "total_berat": 0, "total_nilai": 0}),
+        serde_json::json!({"bulan": "Des", "total_berat": 0, "total_nilai": 0}),
+    ];
+
+    for trx in semua_trx {
+        let bulan_idx = trx.tanggal.month() as usize - 1;
+        if let Some(obj) = data_bulanan[bulan_idx].as_object_mut() {
+            let berat_lama = obj.get("total_berat").unwrap().as_i64().unwrap();
+            let rupiah_lama = obj.get("total_nilai").unwrap().as_i64().unwrap();
+
+            obj.insert(
+                "total_berat".to_string(),
+                serde_json::json!(berat_lama + trx.berat as i64),
+            );
+            obj.insert(
+                "total_nilai".to_string(),
+                serde_json::json!(rupiah_lama + trx.total_nilai as i64),
+            );
+        }
+    }
+
+    // 3. Rekap Total Seluruh Wilayah
     let query = transaksi_sampah::Entity::find()
         .select_only()
         .column_as(transaksi_sampah::Column::Berat.sum(), "total_berat_gram")
@@ -2338,7 +2571,6 @@ pub async fn lihat_dashboard(State(db): State<DatabaseConnection>) -> Json<serde
 
     match query {
         Ok(Some(data)) => {
-            // Kita buka bungkus Option-nya. Kalau NULL, ubah jadi 0.
             let berat = data.total_berat_gram.unwrap_or(0);
             let rupiah = data.total_rupiah.unwrap_or(0);
 
@@ -2348,7 +2580,9 @@ pub async fn lihat_dashboard(State(db): State<DatabaseConnection>) -> Json<serde
                     "total_berat_gram": berat,
                     "total_rupiah": rupiah,
                     "jumlah_transaksi": data.jumlah_transaksi
-                }
+                },
+                "breakdown_kategori": breakdown_list,
+                "grafik_bulanan": data_bulanan
             }))
         }
         Ok(None) => Json(serde_json::json!({
@@ -2357,7 +2591,9 @@ pub async fn lihat_dashboard(State(db): State<DatabaseConnection>) -> Json<serde
                 "total_berat_gram": 0,
                 "total_rupiah": 0,
                 "jumlah_transaksi": 0
-            }
+            },
+            "breakdown_kategori": breakdown_list,
+            "grafik_bulanan": data_bulanan
         })),
         Err(e) => Json(serde_json::json!({
             "status": "error",
@@ -2413,6 +2649,7 @@ pub async fn lihat_wilayah_aktif(State(db): State<DatabaseConnection>) -> Json<s
 pub async fn lihat_dashboard_wilayah(
     State(db): State<DatabaseConnection>,
     Path(wilayah_id): Path<i32>,
+    Query(params): Query<HashMap<String, String>>,
     Extension(username_jwt): Extension<String>,
 ) -> Json<serde_json::Value> {
     // CEK HAK AKSES: Kunci agar BEM tidak bisa mengintip ringkasan dashboard BEM saingannya
@@ -2429,6 +2666,42 @@ pub async fn lihat_dashboard_wilayah(
                 "pesan": "Akses ditolak! Anda hanya boleh melihat detail dashboard wilayah Anda sendiri."
             }));
         }
+
+    // Kalau butuh grafik bulanan via endpoint spesifik
+    if let Some(grafik_req) = params.get("grafik_bulanan") {
+        if grafik_req == "true" {
+            let tahun_sekarang = chrono::Utc::now().year();
+            let tahun = params.get("tahun").and_then(|t| t.parse::<i32>().ok()).unwrap_or(tahun_sekarang);
+            
+            let semua_trx = transaksi_sampah::Entity::find()
+                .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id))
+                .all(&db)
+                .await
+                .unwrap_or_default();
+
+            let month_names = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
+            let mut data_bulanan = vec![];
+            for i in 0..12 {
+                let mut berat = 0;
+                let mut rupiah = 0;
+                for trx in &semua_trx {
+                    if trx.tanggal.year() == tahun && trx.tanggal.month() as usize - 1 == i {
+                        berat += trx.berat;
+                        rupiah += trx.total_nilai;
+                    }
+                }
+                data_bulanan.push(serde_json::json!({
+                    "bulan": month_names[i],
+                    "total_berat": berat,
+                    "total_nilai": rupiah
+                }));
+            }
+            return Json(serde_json::json!({
+                "status": "sukses",
+                "data": data_bulanan
+            }));
+        }
+    }
 
     // 1. Cek dulu apakah wilayahnya ada, sekalian ambil namanya untuk ditampilkan
     let pencarian_wilayah = wilayah::Entity::find_by_id(wilayah_id).one(&db).await;
@@ -3310,9 +3583,42 @@ pub async fn seed_data(
         }
     }
 
+    // 4.5. Buat atau ambil user bem_km sebagai pengelola dummy
+    let bem_km_user = user::Entity::find()
+        .filter(user::Column::Role.eq("bem_km"))
+        .one(&db)
+        .await
+        .unwrap_or(None);
+
+    let bem_km_admin_id;
+    let bem_km_admin_username;
+
+    if let Some(u) = bem_km_user {
+        bem_km_admin_id = u.id;
+        bem_km_admin_username = u.username;
+    } else {
+        // Buat user bem_km baru
+        let password_hash = hash("bemkm123", DEFAULT_COST).unwrap_or_else(|_| "dummyhash".to_string());
+        let model = user::ActiveModel {
+            username: Set("admin_bem_km".to_string()),
+            email: Set("admin_bemkm@simth.ipb.ac.id".to_string()),
+            password: Set(password_hash),
+            nama: Set("Admin BEM KM".to_string()),
+            role: Set("bem_km".to_string()),
+            status: Set("Aktif".to_string()),
+            wilayah_id: Set(None),
+            ..Default::default()
+        };
+        let res = model.insert(&db).await.expect("Gagal membuat user bem_km");
+        bem_km_admin_id = res.id;
+        bem_km_admin_username = res.username;
+    }
+
     // 5. Buat Transaksi Dummy (2 sesi / 4 bulan terakhir dengan trend positif)
     // Sesi 1: 4 bulan lalu
     // Sesi 2: 2 bulan lalu
+    let mut total_saldo_wilayah: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
+
     if !user_ids.is_empty() {
         let now = Utc::now().naive_utc();
         let sesi_4_bulan = now - Duration::days(120);
@@ -3335,7 +3641,8 @@ pub async fn seed_data(
                     let poin_kualitas = if poin_kualitas > 100 { 100 } else { poin_kualitas };
                     
                     let berat = 5000 + (rand::rng().random_range(1000..5000) * multiplier); // dalam gram
-                    let total_nilai = (berat / 1000) * rand::rng().random_range(2000..5000);
+                    let harga_acak: i32 = rand::rng().random_range(2000..5000);
+                    let total_nilai = (berat / 1000) * harga_acak;
 
                     let model = transaksi_sampah::ActiveModel {
                         tanggal: Set(*date),
@@ -3346,17 +3653,66 @@ pub async fn seed_data(
                         catatan: Set(Some("Dummy transaksi positif".to_string())),
                         kategori_id: Set(k_id),
                         wilayah_id: Set(w_id),
-                        input_by: Set(admin_user.id),
+                        input_by: Set(bem_km_admin_id),
                         ..Default::default()
                     };
                     let _ = model.insert(&db).await;
+
+                    *total_saldo_wilayah.entry(w_id).or_insert(0) += total_nilai;
                 }
             }
         }
     }
 
+    // 6. Generate Tabungan dan Riwayat Penarikan
+    let now = Utc::now().naive_utc();
+    let sesi_1_bulan = now - Duration::days(30);
+
+    for (w_id, saldo_terkumpul) in total_saldo_wilayah {
+        // Buat penarikan dummy 1 bulan lalu
+        let ditarik = saldo_terkumpul / 4; // Tarik 25% dari saldo
+        let saldo_akhir = saldo_terkumpul - ditarik;
+
+        if ditarik > 0 {
+            let riwayat_penarikan_model = riwayat_penarikan::ActiveModel {
+                wilayah_id: Set(w_id),
+                nominal: Set(ditarik),
+                tanggal_penarikan: Set(sesi_1_bulan),
+                ditarik_oleh: Set(bem_km_admin_username.clone()),
+                ..Default::default()
+            };
+            let _ = riwayat_penarikan::Entity::insert(riwayat_penarikan_model).exec(&db).await;
+        }
+
+        let tabungan_model = tabungan_sampah::ActiveModel {
+            wilayah_id: Set(w_id),
+            saldo: Set(saldo_akhir),
+            status: Set("Aktif".to_string()),
+            ..Default::default()
+        };
+        let _ = tabungan_sampah::Entity::insert(tabungan_model).exec(&db).await;
+    }
+
+    // 7. Tambah riwayat harga untuk tiap kategori (harga sebelumnya)
+    for k_id in &kategori_ids {
+        let harga_lama: i32 = rand::rng().random_range(2000..4000);
+        let harga_baru = harga_lama + 500; // Harga baru naik 500
+        
+        let sesi_3_bulan = now - Duration::days(90);
+
+        let model_riwayat = riwayat_harga::ActiveModel {
+            kategori_id: Set(*k_id),
+            harga_lama: Set(harga_lama),
+            harga_baru: Set(harga_baru),
+            tanggal_perubahan: Set(sesi_3_bulan),
+            diubah_oleh: Set(bem_km_admin_username.clone()),
+            ..Default::default()
+        };
+        let _ = riwayat_harga::Entity::insert(model_riwayat).exec(&db).await;
+    }
+
     (StatusCode::CREATED, Json(ResponPesan {
         status: "sukses".to_string(),
-        pesan: "Data dummy untuk 2 sesi (4 bulan) berhasil di-generate secara acak!".to_string()
+        pesan: "Data dummy untuk 2 sesi beserta tabungan dan riwayat lengkap berhasil di-generate!".to_string()
     }))
 }

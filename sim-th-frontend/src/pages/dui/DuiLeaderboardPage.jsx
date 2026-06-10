@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DuiLayout from '../../components/DuiLayout';
 
 function DuiLeaderboardPage() {
@@ -16,16 +16,42 @@ function DuiLeaderboardPage() {
 
   const [filterPeriode, setFilterPeriode] = useState(periodeList[2]); // Default Mei-Jun
   
-  const leaderboardData = [
-    { rank: 1, wilayah: 'BEM FATETA', kpi: 925, input: '385 kg', nilai: 'Rp 1.250.000', trend: 'up' },
-    { rank: 2, wilayah: 'BEM FAPET', kpi: 890, input: '360 kg', nilai: 'Rp 1.180.000', trend: 'up' },
-    { rank: 3, wilayah: 'BEM FEM', kpi: 875, input: '340 kg', nilai: 'Rp 1.100.000', trend: 'flat' },
-    { rank: 4, wilayah: 'BEM FAHUTAN', kpi: 820, input: '310 kg', nilai: 'Rp 950.000', trend: 'down' },
-    { rank: 5, wilayah: 'BEM FPIK', kpi: 780, input: '285 kg', nilai: 'Rp 850.000', trend: 'flat' },
-    { rank: 6, wilayah: 'BEM FMIPA', kpi: 750, input: '260 kg', nilai: 'Rp 780.000', trend: 'up' },
-    { rank: 7, wilayah: 'BEM FEMA', kpi: 720, input: '240 kg', nilai: 'Rp 720.000', trend: 'down' },
-    { rank: 8, wilayah: 'BEM FESB', kpi: 680, input: '210 kg', nilai: 'Rp 650.000', trend: 'flat' },
-  ];
+  const [leaderboardData, setLeaderboardData] = useState([]);
+
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (!token) return;
+
+        let url = `${import.meta.env.VITE_API_URL}/dashboard/leaderboard`;
+        if (filterPeriode && filterPeriode.start && filterPeriode.end) {
+          url += `?tanggal_mulai=${filterPeriode.start}&tanggal_akhir=${filterPeriode.end}`;
+        }
+
+        const response = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const resData = await response.json();
+
+        if (resData.status === 'sukses') {
+          const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+          const mappedData = resData.data.map(item => ({
+            rank: item.peringkat,
+            wilayah: item.nama_wilayah,
+            kpi: item.poin_kpi,
+            input: `${item.total_berat_gram / 1000} kg`,
+            nilai: formatRp(item.total_rupiah),
+            trend: 'flat' // dummy trend since backend doesn't provide it
+          }));
+          setLeaderboardData(mappedData);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil data leaderboard:", error);
+      }
+    };
+    fetchLeaderboard();
+  }, [filterPeriode]);
 
   const visibleData = isExpanded ? leaderboardData : leaderboardData.slice(0, 5); 
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../components/AdminLayout';
 
 function AktivitasAdminPage() {
@@ -6,6 +6,48 @@ function AktivitasAdminPage() {
   const [search, setSearch] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filterWaktu, setFilterWaktu] = useState('Semua Waktu');
+  const [aktivitasList, setAktivitasList] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchAktivitas = async () => {
+      setIsLoading(true);
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (!token) return;
+
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/transaksi`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const resData = await response.json();
+
+        if (resData.status === 'sukses') {
+          // Format data transaksi menjadi aktivitas
+          const mapped = resData.data.sort((a, b) => b.id - a.id).map(t => {
+            const dateObj = new Date(t.tanggal);
+            const timeStr = dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+            return {
+              id: t.id,
+              tipe: 'transaksi',
+              judul: 'Transaksi baru dicatat',
+              deskripsi: `${t.nama_wilayah} - ${t.nama_kategori} ${t.berat / 1000}kg senilai Rp ${t.total_nilai.toLocaleString('id-ID')}`,
+              waktu: timeStr,
+              tanggalAsli: t.tanggal,
+              ikon: 'M5 13l4 4L19 7',
+              warnaBg: 'bg-green-100',
+              warnaTeks: 'text-green-600'
+            };
+          });
+          setAktivitasList(mapped);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil data aktivitas:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAktivitas();
+  }, []);
   
   const filterOptions = ['Semua Waktu', 'Hari Ini', 'Kemarin', '7 Hari Terakhir', 'Bulan Ini'];
 
@@ -64,29 +106,49 @@ function AktivitasAdminPage() {
 
       {/* LIST AKTIVITAS */}
       <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-8">
-        <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-6 border-b border-gray-100 pb-4">Hari Ini</h3>
-        <div className="space-y-6">
-          <div className="flex gap-4">
-            <div className="bg-green-100 p-3 rounded-full text-green-600 h-12 w-12 flex items-center justify-center hover:scale-110 transition-transform">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-            </div>
-            <div>
-              <p className="font-bold text-[#0B4D1E]">Transaksi baru masuk</p>
-              <p className="text-xs text-gray-500 font-medium">BEM FATETA - Plastik 25kg</p>
-              <p className="text-[10px] text-gray-400 font-bold mt-1">5 menit lalu</p>
-            </div>
+        <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-6 border-b border-gray-100 pb-4">Seluruh Aktivitas</h3>
+        {isLoading ? (
+          <div className="text-center text-gray-500 py-10 font-medium animate-pulse">Memuat riwayat aktivitas...</div>
+        ) : (
+          <div className="space-y-6">
+            {aktivitasList.filter(a => {
+               // 1. Text Search Filter
+               const matchSearch = a.deskripsi.toLowerCase().includes(search.toLowerCase()) || a.judul.toLowerCase().includes(search.toLowerCase());
+               if (!matchSearch) return false;
+
+               // 2. Date Filter
+               if (filterWaktu === 'Semua Waktu' || !a.tanggalAsli) return true;
+               
+               const d = new Date(a.tanggalAsli);
+               const now = new Date();
+               
+               if (filterWaktu === 'Hari Ini') {
+                  return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+               }
+               if (filterWaktu === 'Kemarin') {
+                  const yesterday = new Date(now);
+                  yesterday.setDate(now.getDate() - 1);
+                  return d.getDate() === yesterday.getDate() && d.getMonth() === yesterday.getMonth() && d.getFullYear() === yesterday.getFullYear();
+               }
+               if (filterWaktu === 'Bulan Ini') {
+                  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+               }
+               return true;
+            }).map((item, idx) => (
+              <div key={item.id || idx} className="flex gap-4">
+                <div className={`${item.warnaBg} p-3 rounded-full ${item.warnaTeks} h-12 w-12 flex items-center justify-center hover:scale-110 transition-transform`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.ikon} /></svg>
+                </div>
+                <div>
+                  <p className="font-bold text-[#0B4D1E]">{item.judul}</p>
+                  <p className="text-xs text-gray-500 font-medium">{item.deskripsi}</p>
+                  <p className="text-[10px] text-gray-400 font-bold mt-1">{item.waktu}</p>
+                </div>
+              </div>
+            ))}
+            {aktivitasList.length === 0 && <p className="text-center text-gray-500 text-sm py-4">Belum ada aktivitas terekam.</p>}
           </div>
-          <div className="flex gap-4">
-            <div className="bg-blue-100 p-3 rounded-full text-blue-600 h-12 w-12 flex items-center justify-center hover:scale-110 transition-transform">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-            </div>
-            <div>
-              <p className="font-bold text-[#0B4D1E]">User baru ditambahkan</p>
-              <p className="text-xs text-gray-500 font-medium">BEM FAPET berhasil didaftarkan</p>
-              <p className="text-[10px] text-gray-400 font-bold mt-1">15 menit lalu</p>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </AdminLayout>
   );
