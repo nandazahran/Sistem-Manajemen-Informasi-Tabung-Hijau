@@ -92,7 +92,9 @@ pub struct KlaimToken {
 pub struct ResponLogin {
     pub status: String,
     pub pesan: String,
-    pub token: Option<String>, // Option karena kalau gagal login, token-nya kosong (None)
+    pub token: Option<String>,
+    pub role: Option<String>,
+    pub nama: Option<String>,
 }
 
 // Struct Input
@@ -726,7 +728,7 @@ pub async fn login(
                     Json(ResponLogin {
                         status: "gagal".to_string(),
                         pesan: "Akun nonaktif.".to_string(),
-                        token: None,
+                        token: None, role: None, nama: None,
                     }),
                 );
             }
@@ -764,6 +766,8 @@ pub async fn login(
                             pesan: "Silakan masukkan 6 digit kode dari Authenticator Anda."
                                 .to_string(),
                             token: Some(token_sementara),
+                            role: Some(data_user.role.clone()),
+                            nama: Some(data_user.nama.clone()),
                         }),
                     );
                 }
@@ -790,7 +794,7 @@ pub async fn login(
                     Json(ResponLogin {
                         status: "sukses".to_string(),
                         pesan: format!("Selamat datang, {}!", data_user.nama),
-                        token: Some(token_jwt),
+                        token: Some(token_jwt), role: Some(data_user.role.clone()), nama: Some(data_user.nama.clone()),
                     }),
                 )
             } else {
@@ -799,7 +803,7 @@ pub async fn login(
                     Json(ResponLogin {
                         status: "gagal".to_string(),
                         pesan: "Password salah.".to_string(),
-                        token: None,
+                        token: None, role: None, nama: None,
                     }),
                 )
             }
@@ -809,7 +813,7 @@ pub async fn login(
             Json(ResponLogin {
                 status: "gagal".to_string(),
                 pesan: "Akun tidak ditemukan.".to_string(),
-                token: None,
+                token: None, role: None, nama: None,
             }),
         ),
     }
@@ -850,7 +854,7 @@ pub async fn verify_2fa(
                     status: "gagal".to_string(),
                     pesan: "Sesi login kadaluarsa (lewat 5 menit). Silakan login ulang."
                         .to_string(),
-                    token: None,
+                    token: None, role: None, nama: None,
                 }),
             );
         }
@@ -863,7 +867,7 @@ pub async fn verify_2fa(
             Json(ResponLogin {
                 status: "gagal".to_string(),
                 pesan: "Token tidak valid.".to_string(),
-                token: None,
+                token: None, role: None, nama: None,
             }),
         );
     }
@@ -897,7 +901,7 @@ pub async fn verify_2fa(
                     Json(ResponLogin {
                         status: "gagal".to_string(),
                         pesan: "Kode OTP salah!".to_string(),
-                        token: None,
+                        token: None, role: None, nama: None,
                     }),
                 );
             }
@@ -924,7 +928,7 @@ pub async fn verify_2fa(
                 Json(ResponLogin {
                     status: "sukses".to_string(),
                     pesan: "Autentikasi 2FA Berhasil!".to_string(),
-                    token: Some(token_jwt),
+                    token: Some(token_jwt), role: Some(data_user.role.clone()), nama: Some(data_user.nama.clone()),
                 }),
             )
         }
@@ -933,7 +937,7 @@ pub async fn verify_2fa(
             Json(ResponLogin {
                 status: "gagal".to_string(),
                 pesan: "User tidak ditemukan.".to_string(),
-                token: None,
+                token: None, role: None, nama: None,
             }),
         ),
     }

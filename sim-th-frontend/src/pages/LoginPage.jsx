@@ -30,13 +30,23 @@ function LoginPage() {
 
       if (response.status === 200) {
         // Logika Ingat Saya
+        const userData = { role: data.role, nama: data.nama };
         if (rememberMe) {
           localStorage.setItem('token', data.token); // Nempel permanen
+          localStorage.setItem('user', JSON.stringify(userData));
         } else {
           sessionStorage.setItem('token', data.token); // Hilang pas tab ditutup
+          sessionStorage.setItem('user', JSON.stringify(userData));
         }
         alert("Berhasil masuk ke dashboard!");
-        navigate('/dashboard');
+        
+        if (data.role === 'admin' || data.role === 'superadmin' || data.role === 'bem_km') {
+          navigate('/admin/dashboard');
+        } else if (data.role === 'dui') {
+          navigate('/dui/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
         setErrorMsg(data.pesan || "Username atau password salah.");
       }
