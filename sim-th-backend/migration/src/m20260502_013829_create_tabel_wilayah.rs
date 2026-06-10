@@ -11,9 +11,9 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Wilayah::Table)
                     .if_not_exists()
-                    .col(pk_auto(Wilayah::Id))               // wilayahID (Primary Key)
+                    .col(pk_auto(Wilayah::Id)) // wilayahID (Primary Key)
                     .col(string(Wilayah::Nama).unique_key()) // nama wilayah (tidak boleh kembar)
-                    .col(string(Wilayah::Status))            // status (misal: "Aktif" / "Non-Aktif")
+                    .col(string(Wilayah::Status)) // status (misal: "Aktif" / "Non-Aktif")
                     .to_owned(),
             )
             .await

@@ -1,2 +1,6 @@
 *.pdf
 *.jpeg
+
+.env
+.env.backup
+.env.local

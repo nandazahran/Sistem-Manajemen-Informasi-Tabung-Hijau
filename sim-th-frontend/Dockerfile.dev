@@ -1,0 +1,14 @@
+FROM node:26.3-trixie-slim
+
+WORKDIR /app
+
+# Copy file dependencies dulu untuk optimasi cache docker
+COPY package*.json ./
+RUN npm install
+
+# Copy seluruh file UI
+COPY . .
+
+EXPOSE 5173
+# Gunakan argumen --host agar development server Vite mengekspos IP untuk diakses via Docker Port Binding
+CMD ["npm", "run", "dev", "--", "--host"]

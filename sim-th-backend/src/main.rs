@@ -1,14 +1,21 @@
-use axum::{routing::{get, post, put}, Router, middleware};
-use sea_orm::Database;
-use std::env;
-use tower_http::cors::{CorsLayer, Any};
 use axum::Extension;
 use axum::http::{Method, header};
-use utoipa::{openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},Modify, OpenApi,};
+use axum::{
+    Router, middleware,
+    routing::{get, post, put},
+};
+use migration::{Migrator, MigratorTrait};
+use sea_orm::Database;
+use std::env;
+use tower_http::cors::{Any, CorsLayer};
+use utoipa::{
+    Modify, OpenApi,
+    openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
+};
 use utoipa_swagger_ui::SwaggerUi;
 
-mod handlers;
 mod entities;
+mod handlers;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -22,8 +29,9 @@ mod entities;
         // Modul Manajemen User
         handlers::setup_totp,
         handlers::aktifkan_totp,
-        handlers::lihat_user,    
-        handlers::update_user,   
+        handlers::lihat_user,
+        handlers::buat_user,
+        handlers::update_user,
         handlers::hapus_user,
         handlers::simpan_kontak,
         handlers::ubah_password,
@@ -53,7 +61,9 @@ mod entities;
         handlers::lihat_leaderboard,
         handlers::lihat_aktivitas_terbaru,
         handlers::broadcast_notifikasi,
-        handlers::lihat_notifikasi
+        handlers::lihat_notifikasi,
+        // Modul Dev
+        handlers::seed_data
     ),
     components(
         schemas(
@@ -68,6 +78,7 @@ mod entities;
             handlers::ResponLogin,
             // Struct Untuk Manajemen User
             handlers::InputUpdateUser,
+            handlers::InputBuatUser,
             handlers::InputUbahPassword,
             // Struct Respon Umum
             handlers::InputKontak,
@@ -93,7 +104,8 @@ mod entities;
         (name = "Transaksi", description = "Endpoint untuk mencatat dan mengelola transaksi sampah"),
         (name = "Tabungan", description = "Endpoint untuk melihat dan menarik saldo tabungan"),
         (name = "Dashboard", description = "Endpoint untuk statistik dan aktivitas dashboard"),
-        (name = "Notifikasi", description = "Endpoint untuk history notifikasi")
+        (name = "Notifikasi", description = "Endpoint untuk history notifikasi"),
+        (name = "Dev", description = "Endpoint khusus untuk development dan simulasi data")
     )
 )]
 struct ApiDoc;
@@ -127,38 +139,133 @@ async fn main() {
 
     // Coba colokkan kabel koneksi ke PostgreSQL
     println!("Mencoba menyambungkan ke brankas data...");
-    let db = Database::connect(&db_url).await.expect("Gagal menyambung ke database! Pastikan Podman nyala.");
+    let db = Database::connect(&db_url)
+        .await
+        .expect("Gagal menyambung ke database! Pastikan Podman nyala.");
     println!("✅ Berhasil tersambung ke PostgreSQL!");
+
+    println!("Memulai pemeriksaan dan migrasi tabel otomatis...");
+    Migrator::up(&db, None)
+        .await
+        .expect("Gagal melakukan migrasi database!");
+    println!("✅ Migrasi database selesai dan siap digunakan!");
+
+    // Auto-seed Admin Pertama jika belum ada user admin di database
+    {
+        use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
+        let ada_admin = crate::entities::user::Entity::find()
+            .filter(crate::entities::user::Column::Role.eq("admin"))
+            .one(&db)
+            .await
+            .unwrap_or(None);
+
+        if ada_admin.is_none() {
+            use bcrypt::{hash, DEFAULT_COST};
+            use sea_orm::{ActiveModelTrait, Set};
+
+            let password_hash = hash("admin123", DEFAULT_COST)
+                .expect("Gagal hashing password admin default");
+
+            let admin_seed = crate::entities::user::ActiveModel {
+                username: Set("admin".to_string()),
+                email: Set("admin@simth.ipb.ac.id".to_string()),
+                password: Set(password_hash),
+                nama: Set("Administrator".to_string()),
+                role: Set("admin".to_string()),
+                status: Set("Aktif".to_string()),
+                wilayah_id: Set(None),
+                ..Default::default()
+            };
+
+            match admin_seed.insert(&db).await {
+                Ok(_) => println!("🌱 Admin pertama berhasil dibuat! Username: admin, Password: admin123"),
+                Err(e) => println!("⚠️  Gagal membuat admin seed: {}", e),
+            }
+        } else {
+            println!("✅ Admin sudah ada, skip seeding.");
+        }
+
+        // Auto-seed Superadmin Pertama
+        let ada_superadmin = crate::entities::user::Entity::find()
+            .filter(crate::entities::user::Column::Role.eq("superadmin"))
+            .one(&db)
+            .await
+            .unwrap_or(None);
+
+        if ada_superadmin.is_none() {
+            use bcrypt::{hash, DEFAULT_COST};
+            use sea_orm::{ActiveModelTrait, Set};
+
+            let password_hash = hash("superadmin123", DEFAULT_COST)
+                .expect("Gagal hashing password superadmin default");
+
+            let superadmin_seed = crate::entities::user::ActiveModel {
+                username: Set("superadmin".to_string()),
+                email: Set("superadmin@simth.ipb.ac.id".to_string()),
+                password: Set(password_hash),
+                nama: Set("Super Administrator".to_string()),
+                role: Set("superadmin".to_string()),
+                status: Set("Aktif".to_string()),
+                wilayah_id: Set(None),
+                ..Default::default()
+            };
+
+            match superadmin_seed.insert(&db).await {
+                Ok(_) => println!("🌱 Superadmin berhasil dibuat! Username: superadmin, Password: superadmin123"),
+                Err(e) => println!("⚠️  Gagal membuat superadmin seed: {}", e),
+            }
+        } else {
+            println!("✅ Superadmin sudah ada, skip seeding.");
+        }
+    }
 
     // Buat aturan CORS (Jembatan Lintas Domain)
     let jembatan_cors = CorsLayer::new()
         // Izinkan tamu dari alamat mana saja (nanti bisa diganti ke localhost:5173 spesifik kalau mau lebih ketat)
-        .allow_origin(Any) 
+        .allow_origin(Any)
         // Izinkan mereka membawa JWT dan format JSON
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
         // Izinkan mereka melakukan aksi CRUD
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE]);
-    
+
     // Buat channel untuk WebSocket (Kapasitas maksimal antrian 100 pesan)
     let (tx, _rx) = tokio::sync::broadcast::channel::<String>(100);
 
     // Buat wilayah
     let rute_wilayah = Router::new()
-        .route("/", get(handlers::lihat_wilayah).post(handlers::tambah_wilayah))
+        .route(
+            "/",
+            get(handlers::lihat_wilayah).post(handlers::tambah_wilayah),
+        )
         .route("/aktif", get(handlers::lihat_wilayah_aktif))
-        .route("/{id}", put(handlers::update_wilayah).delete(handlers::hapus_wilayah))
+        .route(
+            "/{id}",
+            put(handlers::update_wilayah).delete(handlers::hapus_wilayah),
+        )
         .route_layer(middleware::from_fn(handlers::token_jwt));
 
     // Rute Kategori
     let rute_kategori = Router::new()
-        .route("/", get(handlers::lihat_kategori).post(handlers::tambah_kategori))
-        .route("/{id}", put(handlers::update_kategori).delete(handlers::hapus_kategori))
+        .route(
+            "/",
+            get(handlers::lihat_kategori).post(handlers::tambah_kategori),
+        )
+        .route(
+            "/{id}",
+            put(handlers::update_kategori).delete(handlers::hapus_kategori),
+        )
         .route_layer(middleware::from_fn(handlers::token_jwt));
 
     let rute_transaksi = Router::new()
-        .route("/", get(handlers::lihat_transaksi).post(handlers::tambah_transaksi))
+        .route(
+            "/",
+            get(handlers::lihat_transaksi).post(handlers::tambah_transaksi),
+        )
         .route("/export", get(handlers::export_transaksi))
-        .route("/{id}", put(handlers::update_transaksi).delete(handlers::hapus_transaksi))
+        .route(
+            "/{id}",
+            put(handlers::update_transaksi).delete(handlers::hapus_transaksi),
+        )
         .route_layer(middleware::from_fn(handlers::token_jwt));
 
     let rute_tabungan = Router::new()
@@ -176,8 +283,14 @@ async fn main() {
 
     // Rute Manajemen User (BARU)
     let rute_user = Router::new()
-        .route("/", get(handlers::lihat_user))
-        .route("/{id}", put(handlers::update_user).delete(handlers::hapus_user))
+        .route(
+            "/",
+            get(handlers::lihat_user).post(handlers::buat_user),
+        )
+        .route(
+            "/{id}",
+            put(handlers::update_user).delete(handlers::hapus_user),
+        )
         .route("/ubah-password", put(handlers::ubah_password))
         .route("/setup-totp", post(handlers::setup_totp))
         .route("/aktifkan-totp", post(handlers::aktifkan_totp))
@@ -185,15 +298,30 @@ async fn main() {
 
     // Rute Notifikasi (WebSocket & Broadcast)
     let rute_notifikasi = Router::new()
-        .route("/", get(handlers::lihat_notifikasi).route_layer(middleware::from_fn(handlers::token_jwt)))
-        .route("/broadcast", post(handlers::broadcast_notifikasi).route_layer(middleware::from_fn(handlers::token_jwt)))
+        .route(
+            "/",
+            get(handlers::lihat_notifikasi).route_layer(middleware::from_fn(handlers::token_jwt)),
+        )
+        .route(
+            "/broadcast",
+            post(handlers::broadcast_notifikasi)
+                .route_layer(middleware::from_fn(handlers::token_jwt)),
+        )
         .route("/ws", get(handlers::ws_notifikasi)); // Endpoint terbuka khusus WebSocket
+
+    // Rute Dev (Khusus Data Dummy)
+    let rute_dev = Router::new()
+        .route("/seed", post(handlers::seed_data))
+        .route_layer(middleware::from_fn(handlers::token_jwt));
 
     // Titipkan kunci brankas (db) ke dalam aplikasi (State)
     let app = Router::new()
-        .route("/", get(|| async { "Halo Tim! Backend SIM-TH sudah menyala!" }))
+        .route(
+            "/",
+            get(|| async { "Halo Tim! Backend SIM-TH sudah menyala!" }),
+        )
         .route("/api/kontak", post(handlers::simpan_kontak))
-        .route("/api/register", post(handlers::register))// Rute untuk registrasi user baru
+        .route("/api/register", post(handlers::register)) // Rute untuk registrasi user baru
         .route("/api/login", post(handlers::login)) // Rute untuk login
         .route("/api/lupa-password", post(handlers::minta_otp_email))
         .route("/api/reset-password", post(handlers::reset_password_email))
@@ -205,12 +333,17 @@ async fn main() {
         .nest("/api/dashboard", rute_dashboard)
         .nest("/api/users", rute_user)
         .nest("/api/notifikasi", rute_notifikasi)
+        .nest("/api/dev", rute_dev)
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(db) // <-- Kunci dititipkan di sini
         .layer(Extension(tx)) // <-- Titipkan transmitter WebSocket ke seluruh aplikasi
-        .layer(jembatan_cors); 
+        .layer(jembatan_cors);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
-    println!("🚀 Server SIM-TH berjalan di http://localhost:3000");
+    // Baca variabel HOST. Jika tidak ada di .env, otomatis pakai 0.0.0.0
+    let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let bind_address = format!("{}:3000", host);
+
+    let listener = tokio::net::TcpListener::bind(&bind_address).await.unwrap();
+    println!("🚀 Server SIM-TH berjalan di http://{}", bind_address);
     axum::serve(listener, app).await.unwrap();
 }

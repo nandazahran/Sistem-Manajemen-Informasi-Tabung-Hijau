@@ -22,18 +22,18 @@ import OtpPage from './pages/OtpPage'
 import ResetPasswordAuthPage from './pages/ResetPasswordAuthPage'
 
 // Rute Admin
-import AdminDashboardPage from './pages/admin/AdminDashboardPage'
-import KelolaTransaksiPage from './pages/admin/KelolaTransaksiPage'
-import AdminRiwayatTransaksiPage from './pages/admin/RiwayatTransaksiPage'
-import KelolaUserPage from './pages/admin/KelolaUserPage'
-import KelolaWilayahPage from './pages/admin/KelolaWilayahPage'
-import KelolaKategoriPage from './pages/admin/KelolaKategoriPage'
-import AdminLeaderboardPage from './pages/admin/LeaderboardPage'
-import AdminLaporanPage from './pages/admin/LaporanPage'
-import AdminProfilPage from './pages/admin/ProfilPage'
+import AdminDashboardPage from './pages/Admin/AdminDashboardPage'
+import KelolaTransaksiPage from './pages/Admin/KelolaTransaksiPage'
+import AdminRiwayatTransaksiPage from './pages/Admin/RiwayatTransaksiPage'
+import KelolaUserPage from './pages/Admin/KelolaUserPage'
+import KelolaWilayahPage from './pages/Admin/KelolaWilayahPage'
+import KelolaKategoriPage from './pages/Admin/KelolaKategoriPage'
+import AdminLeaderboardPage from './pages/Admin/LeaderboardPage'
+import AdminLaporanPage from './pages/Admin/LaporanPage'
+import AdminProfilPage from './pages/Admin/ProfilPage'
 import AktivitasAdminPage from './pages/Admin/AktivitasAdminPage' 
 import RiwayatHargaPage from './pages/Admin/RiwayatHargaPage' 
-import AdminNotifikasiPage from './pages/admin/AdminNotifikasiPage' // <--- IMPORT BARU ADMIN NOTIF
+import AdminNotifikasiPage from './pages/Admin/AdminNotifikasiPage' // <--- IMPORT BARU ADMIN NOTIF
 
 // Rute DUI
 import DuiDashboardPage from './pages/dui/DuiDashboardPage'

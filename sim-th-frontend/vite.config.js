@@ -4,7 +4,8 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  envDir: '../',
   optimizeDeps: {
-    include: ['recharts'] // <-- INI OBATNYA BRO, biar Vite ngenalin Recharts
+    include: ['recharts']
   }
 })

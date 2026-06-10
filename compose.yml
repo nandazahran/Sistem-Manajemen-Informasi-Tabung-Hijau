@@ -1,0 +1,79 @@
+services:
+  # =========================================
+  # 1. DATABASE & BACKEND (Jalan di semua mode)
+  # =========================================
+  db_sim_th:
+    image: docker.io/library/postgres:18.4-trixie
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+
+  backend:
+    build: 
+      context: ./sim-th-backend
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@db_sim_th:5432/${DB_NAME}
+    depends_on:
+      - db_sim_th
+
+  # =========================================
+  # 2. FRONTEND MODE LOKAL (Untuk Developer)
+  # =========================================
+  frontend-dev:
+    profiles: ["dev"]
+    build: 
+      context: ./sim-th-frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      # Mount source code frontend agar HMR Vite tetap jalan secara live
+      - ./sim-th-frontend:/app
+      # Mengisolasi node_modules di dalam container 
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=${VITE_API_URL}
+    depends_on:
+      - backend
+
+  # =========================================
+  # 3. FRONTEND MODE SERVER (Untuk Deployment)
+  # =========================================
+  frontend-prod:
+    profiles: ["production"]
+    build: 
+      context: ./sim-th-frontend
+      dockerfile: Dockerfile
+      # PERBAIKAN VITE: Saat di-build menjadi file statis oleh Nginx, 
+      # Vite butuh variabel ini dilempar sebagai argumen build, bukan environment runtime.
+      args:
+        - VITE_API_URL=${VITE_API_URL}
+    ports:
+      - "8080:80"
+    # Nginx tidak butuh volume karena file sudah "matang" (statis)
+    depends_on:
+      - backend
+
+  # =========================================
+  # 4. CLOUDFLARE TUNNEL (Hanya untuk server)
+  # =========================================
+  tunnel:
+    profiles: ["production"]
+    image: cloudflare/cloudflared:latest
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TOKEN:-}
+    depends_on:
+      - frontend-prod
+      - backend
+
+volumes:
+  pgdata:

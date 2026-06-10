@@ -1,4 +1,4 @@
-use sea_orm_migration::{prelude::*, schema::*};
+use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -19,10 +19,26 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     // Kolom ini yang akan nyambung ke tabel wilayah
-                    .col(ColumnDef::new(RekeningWilayah::WilayahId).integer().not_null())
-                    .col(ColumnDef::new(RekeningWilayah::NamaBank).string().not_null())
-                    .col(ColumnDef::new(RekeningWilayah::NoRekening).string().not_null())
-                    .col(ColumnDef::new(RekeningWilayah::AtasNama).string().not_null())
+                    .col(
+                        ColumnDef::new(RekeningWilayah::WilayahId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(RekeningWilayah::NamaBank)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(RekeningWilayah::NoRekening)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(RekeningWilayah::AtasNama)
+                            .string()
+                            .not_null(),
+                    )
                     // is_utama diset default false
                     .col(
                         ColumnDef::new(RekeningWilayah::IsUtama)
