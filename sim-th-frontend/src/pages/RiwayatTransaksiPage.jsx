@@ -17,8 +17,10 @@ function RiwayatTransaksiPage() {
   const [riwayatData, setRiwayatData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // STATE BARU: Menyimpan list kategori dinamis dari database
+  const [kategoriOptions, setKategoriOptions] = useState(['Semua Kategori']);
+
   // Opsi Filter
-  const kategoriOptions = ['Semua Kategori', 'Plastik', 'Kertas', 'Logam', 'Kaca'];
   const periodeOptions = [
     'Jan - Feb 2026', 'Mar - Apr 2026', 
     'Mei - Jun 2026', 'Jul - Ags 2026', 
@@ -27,6 +29,7 @@ function RiwayatTransaksiPage() {
 
   // Helper fungsi untuk konversi ISO Date ke format "Bulan - Bulan Tahun"
   const getPeriode = (isoString) => {
+    if (!isoString) return '-';
     const d = new Date(isoString);
     const m = d.getMonth();
     const y = d.getFullYear();
@@ -38,27 +41,6 @@ function RiwayatTransaksiPage() {
     return `Nov - Des ${y}`;
   };
 
-  useEffect(() => {
-    const fetchRiwayat = async () => {
-      setIsLoading(true);
-      try {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/transaksi`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const resData = await response.json();
-        if (resData.status === 'sukses') {
-          setRiwayatData(resData.data.sort((a, b) => b.id - a.id));
-        }
-      } catch (error) {
-        console.error("Gagal mengambil riwayat transaksi", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchRiwayat();
-  }, []);
-
   const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
 
   const formatTanggal = (isoString) => {
@@ -67,15 +49,63 @@ function RiwayatTransaksiPage() {
     return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
-  // Filter Data Gabungan
+  // FETCH DATA MURNI DARI BACKEND
+  useEffect(() => {
+    const fetchRiwayat = async () => {
+      setIsLoading(true);
+      try {
+        const baseUrl = import.meta.env.VITE_API_URL;
+        if (!baseUrl) throw new Error("API URL tidak ditemukan");
+
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const response = await fetch(`${baseUrl}/transaksi`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error("Gagal mengambil data dari server");
+        
+        const resData = await response.json();
+        
+        if (resData.status === 'sukses' && Array.isArray(resData.data)) {
+          const sortedData = resData.data.sort((a, b) => b.id - a.id);
+          setRiwayatData(sortedData);
+
+          // LOGIKA AUTO-GENERATE KATEGORI DARI DATABASE
+          const uniqueCategories = new Set();
+          sortedData.forEach(item => {
+            if (item.nama_kategori && item.nama_kategori.trim() !== '') {
+              uniqueCategories.add(item.nama_kategori.trim());
+            }
+          });
+          setKategoriOptions(['Semua Kategori', ...Array.from(uniqueCategories)]);
+
+        } else {
+          setRiwayatData([]);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil riwayat transaksi", error);
+        setRiwayatData([]); 
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchRiwayat();
+  }, []);
+
+  // ==========================================
+  // LOGIKA FILTERING (SEARCH & DROPDOWN)
+  // ==========================================
   const filteredData = riwayatData.filter(item => {
+    // 1. Filter Pencarian Teks (Search Bar) - Pakai pengaman ?. anti crash
     const matchSearch = search === '' || 
-                        item.nama_kategori.toLowerCase().includes(search.toLowerCase()) || 
-                        (item.catatan && item.catatan.toLowerCase().includes(search.toLowerCase())) ||
+                        item.nama_kategori?.toLowerCase().includes(search.toLowerCase()) || 
+                        item.catatan?.toLowerCase().includes(search.toLowerCase()) ||
                         formatTanggal(item.tanggal).toLowerCase().includes(search.toLowerCase());
     
+    // 2. Filter Kategori
     const matchKategori = filterKategori === 'Semua Kategori' || item.nama_kategori === filterKategori;
     
+    // 3. Filter Waktu (Tahun dan 2-Bulanan)
     const itemPeriode = getPeriode(item.tanggal);
     const itemTahun = new Date(item.tanggal).getFullYear();
     
@@ -86,8 +116,8 @@ function RiwayatTransaksiPage() {
   });
 
   const totalTransaksi = filteredData.length;
-  const totalBerat = filteredData.reduce((sum, item) => sum + item.berat, 0) / 1000;
-  const totalNilai = filteredData.reduce((sum, item) => sum + item.total_nilai, 0);
+  const totalBerat = filteredData.reduce((sum, item) => sum + (item.berat || item.berat_gram || 0), 0) / 1000;
+  const totalNilai = filteredData.reduce((sum, item) => sum + (item.total_nilai || 0), 0);
 
   return (
     <DashboardLayout>
@@ -142,6 +172,10 @@ function RiwayatTransaksiPage() {
                       {opt}
                     </div>
                   ))}
+                  {/* Teks bantuan jika belum ada data */}
+                  {kategoriOptions.length === 1 && (
+                     <div className="px-5 py-3 text-sm text-gray-400 italic">Belum ada kategori terdaftar</div>
+                  )}
                 </div>
               )}
             </div>
@@ -231,7 +265,7 @@ function RiwayatTransaksiPage() {
                   <div className="text-xs text-gray-400">{item.nama_wilayah} (Oleh: {item.nama_petugas})</div>
                 </td>
                 <td className="px-8 py-5"><span className="bg-[#EAE5DA] text-[#0B4D1E] px-4 py-1.5 rounded-full font-bold text-xs">{item.nama_kategori}</span></td>
-                <td className="px-8 py-5 font-extrabold text-[#0B4D1E]">{item.berat / 1000}</td>
+                <td className="px-8 py-5 font-extrabold text-[#0B4D1E]">{(item.berat || item.berat_gram || 0) / 1000}</td>
                 <td className="px-8 py-5 font-extrabold text-[#0B4D1E]">{formatRp(item.total_nilai)}</td>
                 <td className="px-8 py-5"><span className="text-green-600 bg-green-100 px-3 py-1.5 rounded-full font-bold text-xs">{item.status}</span></td>
                 <td className="px-8 py-5 text-center">
@@ -274,7 +308,7 @@ function RiwayatTransaksiPage() {
               </div>
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
                 <p className="text-gray-500 font-medium text-sm">Berat</p>
-                <p className="font-extrabold text-[#0B4D1E] text-lg">{selectedTrx.berat / 1000} kg</p>
+                <p className="font-extrabold text-[#0B4D1E] text-lg">{(selectedTrx.berat || selectedTrx.berat_gram || 0) / 1000} kg</p>
               </div>
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
                 <p className="text-gray-500 font-medium text-sm">Nilai Ekonomi</p>
@@ -288,11 +322,7 @@ function RiwayatTransaksiPage() {
                 <p className="text-gray-500 font-medium text-sm">Status</p>
                 <span className="text-green-600 bg-green-100 px-3 py-1.5 rounded-full font-bold text-xs">{selectedTrx.status}</span>
               </div>
-              
-              {/* Box Catatan Dihapus di Modal Detail ini karena nggak ada di Gambar 1 */}
             </div>
-            
-            {/* Tombol Tutup Besar di bawah (Opsional, tapi gua buang karena di header udah ada X) */}
           </div>
         </div>
       )}

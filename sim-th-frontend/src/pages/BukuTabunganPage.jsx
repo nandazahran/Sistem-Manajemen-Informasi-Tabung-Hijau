@@ -37,7 +37,7 @@ function BukuTabunganPage() {
         const dataTrx = await resTrx.json();
 
         let myWilayah = 'BEM KM / Pusat';
-        if (dataTrx.status === 'sukses' && dataTrx.data.length > 0) {
+        if (dataTrx.status === 'sukses' && Array.isArray(dataTrx.data) && dataTrx.data.length > 0) {
           const allTrx = dataTrx.data;
           // Sortir transaksi dari yang terbaru ke terlama
           const sortedTrx = [...allTrx].sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
@@ -77,26 +77,22 @@ function BukuTabunganPage() {
              const persen = (selisih / totalBulanLalu) * 100;
              setTrenPertumbuhan(persen);
           } else if (totalBulanIni > 0) {
-             setTrenPertumbuhan(100); // 100% naik kalau bulan lalu kosong tapi sekarang ada pemasukan
+             setTrenPertumbuhan(100); 
           } else {
              setTrenPertumbuhan(0);
           }
-
-          // LOGIKA BIKIN DATA GRAFIK
-          // Kini ditangani oleh API terpisah (GET /api/tabungan/histori) di bawah ini
-
         }
 
-        if (dataTabungan.status === 'sukses') {
+        if (dataTabungan.status === 'sukses' && Array.isArray(dataTabungan.data)) {
           const myDompet = dataTabungan.data.find(t => t.nama_wilayah === myWilayah);
           if (myDompet) {
              setSaldo(myDompet.saldo);
              
-             // Ambil riwayat grafik
+             // Ambil riwayat grafik histori asli dari API Rust
              try {
                 const resHistori = await fetch(`${import.meta.env.VITE_API_URL}/tabungan/histori?wilayah_id=${myDompet.wilayah_id}`, { headers });
                 const dataHistori = await resHistori.json();
-                if (dataHistori.status === 'sukses') {
+                if (dataHistori.status === 'sukses' && Array.isArray(dataHistori.data) && dataHistori.data.length > 0) {
                    const formatGrafik = dataHistori.data.map(d => ({
                       name: d.bulan,
                       Pemasukan: d.pemasukan,
@@ -164,23 +160,28 @@ function BukuTabunganPage() {
         </div>
       </div>
 
-      {/* GRAFIK PERKEMBANGAN SALDO */}
+      {/* GRAFIK PERKEMBANGAN SALDO (FIXED) */}
       <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-6 hover:-translate-y-1 transition-all duration-300">
         <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-6">Grafik Pendapatan</h3>
-        <div className="w-full h-64 bg-white rounded-2xl flex items-center justify-center">
-          {grafikSaldo.length > 0 ? (
+        
+        {/* REVISI FIX: Flexbox dilepas dari div utama agar chart dapat merender width 100% */}
+        <div className="w-full h-72 bg-white rounded-2xl pt-4 pr-4">
+          {grafikSaldo && grafikSaldo.length > 0 ? (
              <ResponsiveContainer width="100%" height="100%">
-               <LineChart data={grafikSaldo}>
+               <LineChart data={grafikSaldo} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />
                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} width={80} tickFormatter={(val) => `Rp ${val/1000}k`} />
                  <Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 2}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value, name) => [`${formatRp(value)}`, name]} />
-                 <Line type="monotone" dataKey="Pemasukan" stroke="#125B2A" strokeWidth={4} dot={{r: 5, fill: '#125B2A'}} activeDot={{r: 8}} />
-                 <Line type="monotone" dataKey="Penarikan" stroke="#EF4444" strokeWidth={4} dot={{r: 5, fill: '#EF4444'}} activeDot={{r: 8}} />
+                 <Line type="monotone" dataKey="Pemasukan" stroke="#125B2A" strokeWidth={4} dot={{r: 5, fill: '#125B2A'}} activeDot={{r: 8}} isAnimationActive={false} />
+                 <Line type="monotone" dataKey="Penarikan" stroke="#EF4444" strokeWidth={4} dot={{r: 5, fill: '#EF4444'}} activeDot={{r: 8}} isAnimationActive={false} />
                </LineChart>
              </ResponsiveContainer>
           ) : (
-             <p className="text-gray-400 font-medium">Belum ada data pendapatan yang cukup untuk membuat grafik.</p>
+             /* Flexbox diaktifkan khusus di blok kondisi kosong ini agar teks presisi di tengah */
+             <div className="w-full h-full flex items-center justify-center">
+               <p className="text-gray-400 font-medium">Belum ada data transaksi yang cukup untuk membuat grafik wilayah.</p>
+             </div>
           )}
         </div>
       </div>

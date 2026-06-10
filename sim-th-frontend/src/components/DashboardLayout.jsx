@@ -13,9 +13,52 @@ function DashboardLayout({ children }) {
   const [wilayahId, setWilayahId] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // STATE NOTIFIKASI POPUP (VERSI BERSIH/ASLI)
+  // STATE NOTIFIKASI POPUP
   const [showNotifPopup, setShowNotifPopup] = useState(false);
   const [dataNotif, setDataNotif] = useState([]);
+
+  // STATE UNTUK GLOBAL SEARCH BAR
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // 1. Sinkronisasi Search Bar dengan URL (Biar UX-nya mulus)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const cari = params.get('cari');
+    if (location.pathname === '/riwayat' && cari) {
+      setSearchQuery(cari);
+    } else if (location.pathname !== '/riwayat') {
+      setSearchQuery(''); // Bersihkan searchbar kalau user ke page lain
+    }
+  }, [location.pathname, location.search]);
+
+  // 2. Fungsi eksekusi tombol Enter (Smart Routing)
+  const handleSearch = (e) => {
+    if (e.key === 'Enter' && searchQuery.trim() !== '') {
+      const query = searchQuery.toLowerCase().trim();
+
+      // Cek apakah user berniat pindah halaman menu
+      if (query.includes('input')) {
+        navigate('/input-transaksi');
+      } else if (query.includes('buku') || query.includes('tabungan')) {
+        navigate('/tabungan');
+      } else if (query.includes('aktivitas') || query.includes('aktif')) {
+        navigate('/aktivitas');
+      } else if (query.includes('notifikasi') || query.includes('notif')) {
+        navigate('/notifikasi');
+      } else if (query.includes('leaderboard') || query.includes('kpi') || query.includes('peringkat')) {
+        navigate('/leaderboard');
+      } else if (query.includes('laporan') || query.includes('export')) {
+        navigate('/laporan');
+      } else if (query.includes('profil') || query.includes('akun')) {
+        navigate('/profil');
+      } else if (query.includes('dashboard') || query.includes('home')) {
+        navigate('/dashboard');
+      } else {
+        // Kalau bukan nama menu, asumsikan lagi nyari data spesifik di riwayat
+        navigate(`/riwayat?cari=${encodeURIComponent(searchQuery.trim())}`);
+      }
+    }
+  };
 
   useEffect(() => {
     const fetchProfil = async () => {
@@ -25,7 +68,10 @@ function DashboardLayout({ children }) {
         const payload = JSON.parse(atob(token.split('.')[1]));
         const username = payload.sub;
 
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/users`, {
+        const baseUrl = import.meta.env.VITE_API_URL;
+        if (!baseUrl) return;
+
+        const res = await fetch(`${baseUrl}/users`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();
@@ -53,49 +99,55 @@ function DashboardLayout({ children }) {
     const savedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
     setUnreadCount(savedNotifs.filter(n => !n.isRead).length);
 
-    const wsUrl = import.meta.env.VITE_API_URL.replace(/^http/, 'ws') + '/notifikasi/ws';
-    const ws = new WebSocket(wsUrl);
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL;
+      if (!baseUrl) return;
 
-    ws.onmessage = (event) => {
-      const notifBaru = JSON.parse(event.data);
-      let shouldShow = false;
+      const wsUrl = baseUrl.replace(/^http/, 'ws') + '/notifikasi/ws';
+      const ws = new WebSocket(wsUrl);
 
-      if (notifBaru.target_role && notifBaru.target_role.includes('all')) shouldShow = true;
-      if (notifBaru.target_role && notifBaru.target_role.includes(rawRole)) shouldShow = true;
-      if (notifBaru.target_wilayah_id && notifBaru.target_wilayah_id === wilayahId) shouldShow = true;
+      ws.onmessage = (event) => {
+        const notifBaru = JSON.parse(event.data);
+        let shouldShow = false;
 
-      if (shouldShow) {
-        const notifFormat = {
-          id: Date.now(),
-          waktu: new Date().toLocaleString(),
-          isRead: false,
-          ...notifBaru
-        };
-        const updateNotifs = [notifFormat, ...JSON.parse(localStorage.getItem('notifikasi_th') || '[]')];
-        localStorage.setItem('notifikasi_th', JSON.stringify(updateNotifs));
-        setUnreadCount(prev => prev + 1);
+        if (notifBaru.target_role && notifBaru.target_role.includes('all')) shouldShow = true;
+        if (notifBaru.target_role && notifBaru.target_role.includes(rawRole)) shouldShow = true;
+        if (notifBaru.target_wilayah_id && notifBaru.target_wilayah_id === wilayahId) shouldShow = true;
 
-        window.dispatchEvent(new Event('notifikasi_baru'));
-      }
-    };
+        if (shouldShow) {
+          const notifFormat = {
+            id: Date.now(),
+            waktu: new Date().toLocaleString(),
+            isRead: false,
+            ...notifBaru
+          };
+          const updateNotifs = [notifFormat, ...JSON.parse(localStorage.getItem('notifikasi_th') || '[]')];
+          localStorage.setItem('notifikasi_th', JSON.stringify(updateNotifs));
+          setUnreadCount(prev => prev + 1);
 
-    const syncUnreadCount = () => {
-      const updatedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
-      setUnreadCount(updatedNotifs.filter(n => !n.isRead).length);
-    };
-    window.addEventListener('notifikasi_read', syncUnreadCount);
+          window.dispatchEvent(new Event('notifikasi_baru'));
+        }
+      };
 
-    return () => {
-      ws.close(); 
-      window.removeEventListener('notifikasi_read', syncUnreadCount);
-    };
+      const syncUnreadCount = () => {
+        const updatedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
+        setUnreadCount(updatedNotifs.filter(n => !n.isRead).length);
+      };
+      window.addEventListener('notifikasi_read', syncUnreadCount);
+
+      return () => {
+        ws.close(); 
+        window.removeEventListener('notifikasi_read', syncUnreadCount);
+      };
+    } catch (err) {
+      console.error("WebSocket not configured/running");
+    }
   }, [rawRole, wilayahId]);
 
-  // EFFECT UNTUK NGAMBIL 5 DATA NOTIF TERBARU SAAT POPUP DIBUKA
   useEffect(() => {
     if (showNotifPopup) {
       const savedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
-      setDataNotif(savedNotifs.slice(0, 5)); // Ambil 5 notifikasi teratas aja
+      setDataNotif(savedNotifs.slice(0, 5));
     }
   }, [showNotifPopup, unreadCount]);
 
@@ -108,12 +160,6 @@ function DashboardLayout({ children }) {
     { name: 'Laporan', path: '/laporan', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
     { name: 'Profil', path: '/profil', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
   ];
-
-  const handleSearch = (e) => {
-    if (e.key === 'Enter' && e.target.value) {
-      navigate('/riwayat');
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#F5EFE6] flex font-sans animate-fade-in">
@@ -158,16 +204,16 @@ function DashboardLayout({ children }) {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               <input 
                 type="text" 
-                placeholder="Cari transaksi, kategori, laporan, (Tekan Enter)..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleSearch}
+                placeholder="Cari transaksi, kategori, laporan, (Tekan Enter)..." 
                 className="w-full bg-[#F5EFE6] px-14 py-4 rounded-full focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-all text-sm font-medium placeholder-gray-500" 
               />
             </div>
           </div>
 
           <div className="flex items-center gap-6">
-            
-            {/* WRAPPER NOTIFIKASI POPUP (VERSI BERSIH/ASLI) */}
             <div className="relative">
               <button 
                 onClick={() => setShowNotifPopup(!showNotifPopup)} 

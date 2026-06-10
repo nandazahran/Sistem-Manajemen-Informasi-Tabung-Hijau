@@ -3,25 +3,35 @@ import DashboardLayout from '../components/DashboardLayout';
 
 function AktivitasPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [filterWaktu, setFilterWaktu] = useState('Semua Waktu'); // Nilai awal disamakan
+  const [filterWaktu, setFilterWaktu] = useState('Semua Waktu');
+  const [search, setSearch] = useState(''); // STATE BARU UNTUK SEARCH
   const [aktivitasData, setAktivitasData] = useState([]);
   
   const filterOptions = ['Semua Waktu', 'Hari Ini', 'Kemarin', '7 Hari Terakhir', 'Bulan Ini'];
 
+  // FETCH DATA MURNI DARI BACKEND
   useEffect(() => {
     const fetchAktivitas = async () => {
       try {
+        const baseUrl = import.meta.env.VITE_API_URL;
+        if (!baseUrl) throw new Error("API URL tidak ditemukan");
+
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/transaksi`, {
+        const response = await fetch(`${baseUrl}/transaksi`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
+        
+        if (!response.ok) throw new Error("Gagal mengambil data dari server");
         const resData = await response.json();
         
-        if (resData.status === 'sukses') {
+        if (resData.status === 'sukses' && Array.isArray(resData.data)) {
           setAktivitasData(resData.data.sort((a, b) => b.id - a.id));
+        } else {
+          setAktivitasData([]);
         }
       } catch (error) {
         console.error("Gagal mengambil data aktivitas:", error);
+        setAktivitasData([]);
       }
     };
 
@@ -34,24 +44,39 @@ function AktivitasPage() {
     return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
+  // LOGIKA GABUNGAN: SEARCH + FILTER WAKTU
   const filteredAktivitas = aktivitasData.filter(akt => {
-    if (filterWaktu === 'Semua Waktu') return true;
-    
-    const d = new Date(akt.tanggal);
-    const now = new Date();
-    
-    if (filterWaktu === 'Hari Ini') {
-       return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    // 1. Logic Search (Berdasarkan nama kategori, petugas, atau wilayah)
+    const searchLower = search.toLowerCase();
+    const matchSearch = search === '' || 
+                        akt.nama_kategori?.toLowerCase().includes(searchLower) ||
+                        akt.nama_petugas?.toLowerCase().includes(searchLower) ||
+                        akt.nama_wilayah?.toLowerCase().includes(searchLower);
+
+    // 2. Logic Filter Waktu
+    let matchWaktu = true;
+    if (filterWaktu !== 'Semua Waktu') {
+      const d = new Date(akt.tanggal);
+      const now = new Date();
+      
+      if (filterWaktu === 'Hari Ini') {
+         matchWaktu = d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      } else if (filterWaktu === 'Kemarin') {
+         const yesterday = new Date(now);
+         yesterday.setDate(now.getDate() - 1);
+         matchWaktu = d.getDate() === yesterday.getDate() && d.getMonth() === yesterday.getMonth() && d.getFullYear() === yesterday.getFullYear();
+      } else if (filterWaktu === '7 Hari Terakhir') {
+         const sevenDaysAgo = new Date(now);
+         sevenDaysAgo.setDate(now.getDate() - 7);
+         // Set ke jam 00:00:00 agar hitungan harinya presisi
+         sevenDaysAgo.setHours(0, 0, 0, 0); 
+         matchWaktu = d >= sevenDaysAgo && d <= now;
+      } else if (filterWaktu === 'Bulan Ini') {
+         matchWaktu = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }
     }
-    if (filterWaktu === 'Kemarin') {
-       const yesterday = new Date(now);
-       yesterday.setDate(now.getDate() - 1);
-       return d.getDate() === yesterday.getDate() && d.getMonth() === yesterday.getMonth() && d.getFullYear() === yesterday.getFullYear();
-    }
-    if (filterWaktu === 'Bulan Ini') {
-       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    }
-    return true;
+
+    return matchSearch && matchWaktu;
   });
 
   return (
@@ -68,12 +93,14 @@ function AktivitasPage() {
 
       {/* FILTER CARD WRAPPER */}
       <div className="bg-white p-4 rounded-[2rem] shadow-sm border border-gray-100 mb-8 flex flex-col md:flex-row gap-4 items-center">
-        {/* Searchbar */}
+        {/* Searchbar AKTIF */}
         <div className="relative flex-1 w-full">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           <input 
             type="text" 
-            placeholder="Cari aktivitas..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari petugas, wilayah, atau kategori sampah..." 
             className="w-full bg-[#F5EFE6] px-14 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-shadow" 
           />
         </div>
@@ -94,7 +121,7 @@ function AktivitasPage() {
                 <div 
                   key={opt} 
                   onClick={() => { setFilterWaktu(opt); setIsFilterOpen(false); }} 
-                  className={`px-5 py-2.5 cursor-pointer text-sm font-bold transition-colors ${filterWaktu === opt ? 'bg-[#0B4D1E] text-white' : 'text-[#0B4D1E] hover:bg-[#0B4D1E] hover:text-white'}`}
+                  className={`px-5 py-2.5 cursor-pointer text-sm font-bold transition-colors ${filterWaktu === opt ? 'bg-[#0B4D1E] text-white' : 'text-[#0B4D1E] hover:bg-[#EAE5DA]'}`}
                 >
                   {opt}
                 </div>
@@ -115,14 +142,16 @@ function AktivitasPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <p className="font-bold text-[#0B4D1E] text-base group-hover:text-[#F4A300] transition-colors">Transaksi {akt.nama_kategori} berhasil dicatat</p>
-                  <p className="text-sm text-gray-500 font-medium mt-1">+{akt.berat / 1000}kg ditambahkan oleh {akt.nama_petugas}</p>
+                  <p className="text-sm text-gray-500 font-medium mt-1">+{(akt.berat || akt.berat_gram || 0) / 1000} kg ditambahkan oleh {akt.nama_petugas}</p>
                   <p className="text-xs text-gray-400 mt-2">{formatTanggalWaktu(akt.tanggal)} • Wilayah {akt.nama_wilayah}</p>
                 </div>
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
               </div>
             </div>
           ))}
-          {filteredAktivitas.length === 0 && <p className="text-gray-500 font-bold">Belum ada aktivitas untuk filter yang dipilih.</p>}
+          {filteredAktivitas.length === 0 && (
+            <p className="text-gray-500 font-bold italic py-4">Belum ada aktivitas untuk filter yang dipilih.</p>
+          )}
         </div>
       </div>
     </DashboardLayout>
