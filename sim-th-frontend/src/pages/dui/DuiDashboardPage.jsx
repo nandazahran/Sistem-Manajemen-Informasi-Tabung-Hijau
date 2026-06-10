@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import DuiLayout from '../../components/DuiLayout'; 
+import bannerImg from '../../assets/DB-gambar-banner.png';
 
 function DuiDashboardPage() {
   const navigate = useNavigate();
@@ -25,17 +26,17 @@ function DuiDashboardPage() {
 
   return (
     <DuiLayout>
-      {/* BANNER GRADIENT KREM KE HIJAU */}
-      <div className="bg-gradient-to-r from-[#F5EFE6] via-[#F5EFE6] to-[#8FA57A]/30 rounded-3xl p-12 flex items-center justify-between shadow-sm relative overflow-hidden mt-2 mb-8 border border-white/60">
-        <div className="z-10 max-w-xl">
+      {/* BANNER GRADIENT KREM KE HIJAU DENGAN GAMBAR */}
+      <div className="bg-gradient-to-r from-[#F5EFE6] via-[#F5EFE6] to-[#8FA57A]/30 rounded-3xl p-8 md:p-12 flex flex-col md:flex-row items-center justify-between shadow-sm relative overflow-hidden mt-2 mb-8 border border-white/60">
+        <div className="z-10 max-w-xl mb-6 md:mb-0">
           <h2 className="text-4xl font-extrabold text-[#0B4D1E] mb-4">Selamat Datang, DUI SIM-TH <span className="text-green-600">🌱</span></h2>
           <p className="text-gray-700 font-medium text-lg mb-8">Pantau perkembangan pengelolaan sampah dan kontribusi wilayah secara terpusat.</p>
           <button onClick={() => navigate('/dui/monitoring')} className="bg-[#F4A300] text-white px-8 py-4 rounded-full font-bold flex items-center gap-2 hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
             Lihat Monitoring <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
           </button>
         </div>
-        <div className="hidden md:flex w-96 h-48 bg-white/40 backdrop-blur-md rounded-3xl border border-white/60 items-center justify-center z-10 shadow-sm relative">
-           <span className="text-sm font-bold text-[#0B4D1E]">Ilustrasi Dashboard DUI</span>
+        <div className="w-full md:w-80 lg:w-96 flex-shrink-0 z-10 flex justify-center md:justify-end">
+           <img src={bannerImg} alt="Ilustrasi Banner" className="w-full max-w-[280px] object-contain drop-shadow-xl hover:scale-105 transition-transform duration-500" />
         </div>
       </div>
 

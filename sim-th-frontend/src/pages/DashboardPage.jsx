@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
+import bannerImg from '../assets/DB-gambar-banner.png';
 
 function DashboardPage() {
   const navigate = useNavigate();
 
-  // STATE UNTUK DATA UI
+  // STATE UNTUK DATA API (KOSONGAN/LOADING STATE)
   const [stats, setStats] = useState({
     totalSampah: '0 kg',
     nilaiEkonomi: 'Rp 0',
@@ -15,57 +16,51 @@ function DashboardPage() {
   const [top3, setTop3] = useState([]);
   const [transaksiTerbaru, setTransaksiTerbaru] = useState([]);
   const [aktivitas, setAktivitas] = useState([]);
-  const [namaLengkap, setNamaLengkap] = useState('Memuat...');
   const [namaWilayah, setNamaWilayah] = useState('Memuat...');
   const [grafikBulanan, setGrafikBulanan] = useState([]);
 
+  // ==========================================
+  // FETCH DATA ASLI DARI API & LOCALSTORAGE
+  // ==========================================
   useEffect(() => {
-    // ==========================================
-    // BYPASS MODE: PAKAI DATA DUMMY SEMENTARA
-    // ==========================================
-    
-    // Set Nama & Identitas Dummy
-    setNamaLengkap('BEM KM IPB');
-    setNamaWilayah('BEM FATETA'); // Anggap login sebagai BEM FATETA
+    const fetchDashboardData = async () => {
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        
+        // 1. Ambil Nama Wilayah Dinamis dari LocalStorage
+        const userData = JSON.parse(localStorage.getItem('user'));
+        if (userData && userData.nama_wilayah) {
+          setNamaWilayah(userData.nama_wilayah);
+        } else if (userData && userData.nama) {
+          setNamaWilayah(userData.nama);
+        } else {
+          setNamaWilayah('BEM Wilayah');
+        }
 
-    // Set Stats Dummy
-    setStats({
-      totalSampah: '385 kg',
-      nilaiEkonomi: 'Rp 1.250.000',
-      totalTransaksi: '124',
-      rank: '#1 Wilayah'
-    });
+        // 2. Fetch Data Statistik Dashboard dari Backend
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/wilayah`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const resData = await response.json();
 
-    // Set Leaderboard Dummy
-    setTop3([
-      { nama_wilayah: 'BEM FATETA', poin_kpi: 925 },
-      { nama_wilayah: 'BEM FAPET', poin_kpi: 890 },
-      { nama_wilayah: 'BEM FEM', poin_kpi: 875 }
-    ]);
+        if (resData.status === 'sukses') {
+          setStats({
+            totalSampah: `${resData.data.total_sampah || 0} kg`,
+            nilaiEkonomi: formatRp(resData.data.nilai_ekonomi || 0),
+            totalTransaksi: resData.data.total_transaksi || 0,
+            rank: resData.data.rank ? `#${resData.data.rank} Wilayah` : '-'
+          });
+          setTop3(resData.data.top_wilayah || []);
+          setTransaksiTerbaru(resData.data.transaksi_terbaru || []);
+          setGrafikBulanan(resData.data.grafik_bulanan || []);
+          setAktivitas(resData.data.aktivitas_terbaru || []);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil data dashboard:", error);
+      }
+    };
 
-    // Set Transaksi Terbaru Dummy
-    setTransaksiTerbaru([
-      { nama_kategori: 'Plastik', berat: 25000, tanggal: '2026-05-09T10:00:00Z', nama_petugas: 'Admin', total_nilai: 112500 },
-      { nama_kategori: 'Kertas', berat: 15000, tanggal: '2026-05-08T14:30:00Z', nama_petugas: 'Admin', total_nilai: 37500 },
-      { nama_kategori: 'Logam', berat: 10000, tanggal: '2026-05-07T09:15:00Z', nama_petugas: 'Admin', total_nilai: 75000 }
-    ]);
-
-    // Set Grafik Bulanan Dummy (biar interaktif grafiknya kelihatan)
-    setGrafikBulanan([
-      { bulan: 'Jan', berat: 120000 }, { bulan: 'Feb', berat: 135000 },
-      { bulan: 'Mar', berat: 158000 }, { bulan: 'Apr', berat: 172000 },
-      { bulan: 'Mei', berat: 189000 }, { bulan: 'Jun', berat: 0 },
-      { bulan: 'Jul', berat: 0 }, { bulan: 'Ags', berat: 0 },
-      { bulan: 'Sep', berat: 0 }, { bulan: 'Okt', berat: 0 },
-      { bulan: 'Nov', berat: 0 }, { bulan: 'Des', berat: 0 }
-    ]);
-
-    // Set Aktivitas Dummy
-    setAktivitas([
-      { judul: 'Transaksi Plastik ditambahkan', deskripsi: '+25kg dicatat oleh Admin', waktu: '9 Mei 2026' },
-      { judul: 'Transaksi Kertas ditambahkan', deskripsi: '+15kg dicatat oleh Admin', waktu: '8 Mei 2026' }
-    ]);
-
+    fetchDashboardData();
   }, [navigate]);
 
   const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
@@ -77,21 +72,22 @@ function DashboardPage() {
 
   return (
     <DashboardLayout>
-      <div className="bg-gradient-to-r from-[#F5EFE6] via-[#F5EFE6] to-[#8FA57A]/30 rounded-3xl p-12 flex items-center justify-between shadow-sm relative overflow-hidden mt-2 border border-white/60">
-        <div className="z-10 max-w-xl">
-          <h2 className="text-4xl font-extrabold text-[#0B4D1E] mb-4">Selamat Datang, {namaLengkap} <span className="text-green-600">🌱</span></h2>
+      {/* BANNER UTAMA */}
+      <div className="bg-gradient-to-r from-[#F5EFE6] via-[#F5EFE6] to-[#8FA57A]/30 rounded-3xl p-8 md:p-12 flex flex-col md:flex-row items-center justify-between shadow-sm relative overflow-hidden mt-2 border border-white/60">
+        <div className="z-10 max-w-xl mb-6 md:mb-0">
+          <h2 className="text-4xl font-extrabold text-[#0B4D1E] mb-4">Selamat Datang, {namaWilayah} <span className="text-green-600">🌱</span></h2>
           <p className="text-gray-700 font-medium text-lg mb-8">Kelola transaksi sampah wilayah dengan lebih terstruktur dan transparan.</p>
           <Link to="/input-transaksi" className="inline-flex bg-[#F4A300] text-white px-8 py-4 rounded-full font-bold items-center gap-2 hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
             Input Transaksi
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
           </Link>
         </div>
-        <div className="w-96 h-48 bg-white/40 backdrop-blur-md rounded-3xl border border-white/60 flex items-center justify-center z-10 shadow-sm">
-           <span className="text-sm font-bold text-[#0B4D1E]">Ilustrasi Bank Sampah</span>
+        <div className="w-full md:w-80 lg:w-96 flex-shrink-0 z-10 flex justify-center md:justify-end">
+           <img src={bannerImg} alt="Ilustrasi Banner" className="w-full max-w-[280px] object-contain drop-shadow-xl hover:scale-105 transition-transform duration-500" />
         </div>
       </div>
 
-{/* KUMPULAN CARDS BEM WILAYAH */}
+      {/* KUMPULAN CARDS BEM WILAYAH */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-8">
         {[
           { title: 'Total Sampah', value: stats.totalSampah, icon: 'M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3', badge: 'All Time' },
@@ -101,11 +97,9 @@ function DashboardPage() {
         ].map((stat, idx) => (
           <div key={idx} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:-translate-y-1 hover:shadow-xl transition-all duration-300 cursor-pointer">
             <div className="flex justify-between items-start mb-4">
-              {/* Frame Icon Krem Gelap & Rounded Rectangle */}
               <div className="p-4 rounded-2xl bg-[#EAE5DA] text-[#0B4D1E]">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d={stat.icon} /></svg>
               </div>
-              {/* Badge Hijau Konsisten */}
               <span className="bg-[#E8F5E9] text-[#2E7D32] text-xs font-extrabold px-3 py-1.5 rounded-full">{stat.badge}</span>
             </div>
             <p className="text-gray-500 text-sm font-medium">{stat.title}</p>
@@ -115,7 +109,6 @@ function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        {/* Grafik diklik pindah ke Laporan */}
         <div onClick={() => navigate('/laporan')} className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 lg:col-span-2 hover:-translate-y-1 transition-transform duration-300 cursor-pointer group">
           <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-1 group-hover:text-[#F4A300] transition-colors">Aktivitas Bulanan <span className="text-sm font-normal text-gray-400 ml-2">(Klik untuk detail)</span></h3>
           <p className="text-gray-500 text-sm mb-6">Pengumpulan sampah per bulan (kg)</p>
@@ -161,6 +154,7 @@ function DashboardPage() {
                 </div>
               );
             })}
+            {top3.length === 0 && <p className="text-sm text-gray-500 italic text-center py-4">Belum ada data KPI</p>}
           </div>
           <Link to="/leaderboard" className="w-full mt-6 text-sm font-bold text-[#0B4D1E] hover:text-[#F4A300] flex items-center justify-center gap-2">
             Lihat Semua Peringkat <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
@@ -184,6 +178,7 @@ function DashboardPage() {
                 <div className="font-extrabold text-[#0B4D1E]">{formatRp(trx.total_nilai)}</div>
               </div>
             ))}
+            {transaksiTerbaru.length === 0 && <p className="text-sm text-gray-500 italic text-center py-4">Belum ada transaksi bulan ini</p>}
           </div>
         </div>
 
@@ -210,6 +205,7 @@ function DashboardPage() {
                 <p className="text-xs text-gray-400 mt-1">{akt.waktu}</p>
               </div>
             ))}
+            {aktivitas.length === 0 && <p className="text-sm text-gray-500 italic py-4">Belum ada riwayat aktivitas</p>}
           </div>
             <Link to="/aktivitas" className="w-full mt-8 text-sm font-bold text-[#0B4D1E] hover:text-[#F4A300] flex items-center justify-center gap-2 transition-colors">
             Lihat Semua Aktivitas

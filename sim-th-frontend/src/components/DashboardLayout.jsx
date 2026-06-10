@@ -8,11 +8,14 @@ function DashboardLayout({ children }) {
   
   // State untuk Data Asli & Notifikasi
   const [namaProfil, setNamaProfil] = useState('Memuat...');
-  const [roleProfil, setRoleProfil] = useState('User');
-  const [isBEMWilayah, setIsBEMWilayah] = useState(false);
+  const [roleProfil, setRoleProfil] = useState('BEM Wilayah');
   const [rawRole, setRawRole] = useState(null);
   const [wilayahId, setWilayahId] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // STATE NOTIFIKASI POPUP (VERSI BERSIH/ASLI)
+  const [showNotifPopup, setShowNotifPopup] = useState(false);
+  const [dataNotif, setDataNotif] = useState([]);
 
   useEffect(() => {
     const fetchProfil = async () => {
@@ -28,24 +31,10 @@ function DashboardLayout({ children }) {
         const data = await res.json();
 
         if (data.status === 'sukses') {
-          // Cari user yang sesuai dengan username yang login
           const myUser = data.data.find(u => u.username === username);
           if (myUser) {
-            setNamaProfil(myUser.nama); // Menampilkan Nama Lengkap dari Database
-            
-            // Cek role yang sebenarnya
-            let displayedRole = 'BEM Wilayah';
-            if (myUser.role === 'dui') {
-              displayedRole = 'Direktorat Umum dan Infrastruktur';
-            } else if (myUser.role === 'bem_km') {
-              displayedRole = 'BEM KM IPB';
-            } else if (myUser.role === 'admin') {
-              displayedRole = 'Administrator';
-            }
-            
-            const isNotAdmin = myUser.role !== 'bem_km' && myUser.role !== 'admin' && myUser.role !== 'dui';
-            setIsBEMWilayah(isNotAdmin); 
-            setRoleProfil(displayedRole);
+            setNamaProfil(myUser.nama); 
+            setRoleProfil('BEM Wilayah'); 
             setRawRole(myUser.role);
             setWilayahId(myUser.wilayah_id);
           }
@@ -59,9 +48,8 @@ function DashboardLayout({ children }) {
 
   // MENDENGARKAN WEBSOCKET NOTIFIKASI
   useEffect(() => {
-    if (!rawRole) return; // Tunggu sampai data user terbaca
+    if (!rawRole) return; 
 
-    // Ambil data notif lama dari LocalStorage
     const savedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
     setUnreadCount(savedNotifs.filter(n => !n.isRead).length);
 
@@ -72,7 +60,6 @@ function DashboardLayout({ children }) {
       const notifBaru = JSON.parse(event.data);
       let shouldShow = false;
 
-      // LOGIKA FILTER NOTIFIKASI
       if (notifBaru.target_role && notifBaru.target_role.includes('all')) shouldShow = true;
       if (notifBaru.target_role && notifBaru.target_role.includes(rawRole)) shouldShow = true;
       if (notifBaru.target_wilayah_id && notifBaru.target_wilayah_id === wilayahId) shouldShow = true;
@@ -88,12 +75,10 @@ function DashboardLayout({ children }) {
         localStorage.setItem('notifikasi_th', JSON.stringify(updateNotifs));
         setUnreadCount(prev => prev + 1);
 
-        // Beri tahu halaman lain (khususnya NotifikasiPage) bahwa ada notif baru!
         window.dispatchEvent(new Event('notifikasi_baru'));
       }
     };
 
-    // Listener jika notifikasi ditandai "Sudah Dibaca" dari halaman NotifikasiPage
     const syncUnreadCount = () => {
       const updatedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
       setUnreadCount(updatedNotifs.filter(n => !n.isRead).length);
@@ -101,21 +86,28 @@ function DashboardLayout({ children }) {
     window.addEventListener('notifikasi_read', syncUnreadCount);
 
     return () => {
-      ws.close(); // Matikan koneksi jika pindah tab/layout
+      ws.close(); 
       window.removeEventListener('notifikasi_read', syncUnreadCount);
     };
   }, [rawRole, wilayahId]);
 
+  // EFFECT UNTUK NGAMBIL 5 DATA NOTIF TERBARU SAAT POPUP DIBUKA
+  useEffect(() => {
+    if (showNotifPopup) {
+      const savedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
+      setDataNotif(savedNotifs.slice(0, 5)); // Ambil 5 notifikasi teratas aja
+    }
+  }, [showNotifPopup, unreadCount]);
+
   const menuItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', show: true },
-    { name: 'Input Transaksi', path: '/input-transaksi', icon: 'M12 4v16m8-8H4', show: isBEMWilayah },
-    { name: 'Riwayat Transaksi', path: '/riwayat', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', show: true },
-    { name: 'Buku Tabungan', path: '/tabungan', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477-4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253', show: true },
-    { name: 'Leaderboard KPI', path: '/leaderboard', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z', show: true },
-    { name: 'Laporan', path: '/laporan', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', show: true },
-    { name: 'Pengaturan Data', path: '/pengaturan', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', show: !isBEMWilayah },
-    { name: 'Profil', path: '/profil', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', show: true },
-  ].filter(item => item.show);
+    { name: 'Dashboard', path: '/dashboard', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
+    { name: 'Input Transaksi', path: '/input-transaksi', icon: 'M12 4v16m8-8H4' },
+    { name: 'Riwayat Transaksi', path: '/riwayat', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+    { name: 'Buku Tabungan', path: '/tabungan', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477-4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
+    { name: 'Leaderboard KPI', path: '/leaderboard', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
+    { name: 'Laporan', path: '/laporan', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+    { name: 'Profil', path: '/profil', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+  ];
 
   const handleSearch = (e) => {
     if (e.key === 'Enter' && e.target.value) {
@@ -174,12 +166,59 @@ function DashboardLayout({ children }) {
           </div>
 
           <div className="flex items-center gap-6">
-            <Link to="/notifikasi" className="relative p-2 rounded-full hover:bg-gray-100 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-              {unreadCount > 0 && (
-                <span className="absolute top-0 right-0 w-5 h-5 bg-[#F4A300] text-white text-[11px] font-bold flex items-center justify-center rounded-full border-2 border-white animate-pulse">{unreadCount}</span>
+            
+            {/* WRAPPER NOTIFIKASI POPUP (VERSI BERSIH/ASLI) */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowNotifPopup(!showNotifPopup)} 
+                className="relative p-2 rounded-full hover:bg-gray-100 transition-colors focus:outline-none"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                {unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 w-5 h-5 bg-[#F4A300] text-white text-[11px] font-bold flex items-center justify-center rounded-full border-2 border-white animate-pulse">{unreadCount}</span>
+                )}
+              </button>
+
+              {showNotifPopup && (
+                <div className="absolute right-0 mt-4 w-80 bg-white rounded-3xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-gray-100 overflow-hidden z-50 animate-fade-in">
+                  <div className="p-5 border-b border-gray-100">
+                    <h3 className="font-extrabold text-[#0B4D1E] text-lg tracking-tight">Notifikasi</h3>
+                    <p className="text-xs text-gray-400 mt-1 font-medium">{unreadCount} belum dibaca</p>
+                  </div>
+
+                  <div className="max-h-[300px] overflow-y-auto">
+                    {dataNotif.length > 0 ? (
+                      dataNotif.map((n, i) => (
+                        <div key={i} className="p-5 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer flex gap-4 items-start">
+                          <div className="mt-1.5 flex-shrink-0">
+                            <div className={`w-2.5 h-2.5 rounded-full ${!n.isRead ? 'bg-[#F4A300]' : 'bg-transparent'}`}></div>
+                          </div>
+                          <div>
+                            <p className="text-sm font-extrabold text-[#0B4D1E]">{n.judul || 'Pemberitahuan Baru'}</p>
+                            <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed">{n.pesan || n.deskripsi}</p>
+                            <p className="text-[10px] text-gray-400 mt-2 font-bold">{n.waktu}</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-6 text-center text-sm text-gray-500 italic">Belum ada notifikasi.</div>
+                    )}
+                  </div>
+
+                  <div className="p-4 bg-white text-center">
+                    <Link 
+                      to="/notifikasi" 
+                      onClick={() => setShowNotifPopup(false)} 
+                      className="text-sm font-extrabold text-[#0B4D1E] hover:text-[#F4A300] flex items-center justify-center gap-2 transition-colors"
+                    >
+                      Lihat Semua Notifikasi 
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                    </Link>
+                  </div>
+                </div>
               )}
-            </Link>
+            </div>
+
             <div className="h-10 w-px bg-gray-200"></div>
             <Link to="/profil" className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity">
               <div className="text-right">
