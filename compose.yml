@@ -21,6 +21,10 @@ services:
       - "127.0.0.1:3000:3000"
     environment:
       - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@db_sim_th:5432/${DB_NAME}
+      - JWT_SECRET=${JWT_SECRET}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_EMAIL=${SMTP_EMAIL}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
     depends_on:
       - db_sim_th
 
