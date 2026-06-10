@@ -30,6 +30,7 @@ mod handlers;
         handlers::setup_totp,
         handlers::aktifkan_totp,
         handlers::lihat_user,
+        handlers::buat_user,
         handlers::update_user,
         handlers::hapus_user,
         handlers::simpan_kontak,
@@ -60,7 +61,9 @@ mod handlers;
         handlers::lihat_leaderboard,
         handlers::lihat_aktivitas_terbaru,
         handlers::broadcast_notifikasi,
-        handlers::lihat_notifikasi
+        handlers::lihat_notifikasi,
+        // Modul Dev
+        handlers::seed_data
     ),
     components(
         schemas(
@@ -75,6 +78,7 @@ mod handlers;
             handlers::ResponLogin,
             // Struct Untuk Manajemen User
             handlers::InputUpdateUser,
+            handlers::InputBuatUser,
             handlers::InputUbahPassword,
             // Struct Respon Umum
             handlers::InputKontak,
@@ -100,7 +104,8 @@ mod handlers;
         (name = "Transaksi", description = "Endpoint untuk mencatat dan mengelola transaksi sampah"),
         (name = "Tabungan", description = "Endpoint untuk melihat dan menarik saldo tabungan"),
         (name = "Dashboard", description = "Endpoint untuk statistik dan aktivitas dashboard"),
-        (name = "Notifikasi", description = "Endpoint untuk history notifikasi")
+        (name = "Notifikasi", description = "Endpoint untuk history notifikasi"),
+        (name = "Dev", description = "Endpoint khusus untuk development dan simulasi data")
     )
 )]
 struct ApiDoc;
@@ -144,6 +149,75 @@ async fn main() {
         .await
         .expect("Gagal melakukan migrasi database!");
     println!("✅ Migrasi database selesai dan siap digunakan!");
+
+    // Auto-seed Admin Pertama jika belum ada user admin di database
+    {
+        use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
+        let ada_admin = crate::entities::user::Entity::find()
+            .filter(crate::entities::user::Column::Role.eq("admin"))
+            .one(&db)
+            .await
+            .unwrap_or(None);
+
+        if ada_admin.is_none() {
+            use bcrypt::{hash, DEFAULT_COST};
+            use sea_orm::{ActiveModelTrait, Set};
+
+            let password_hash = hash("admin123", DEFAULT_COST)
+                .expect("Gagal hashing password admin default");
+
+            let admin_seed = crate::entities::user::ActiveModel {
+                username: Set("admin".to_string()),
+                email: Set("admin@simth.ipb.ac.id".to_string()),
+                password: Set(password_hash),
+                nama: Set("Administrator".to_string()),
+                role: Set("admin".to_string()),
+                status: Set("Aktif".to_string()),
+                wilayah_id: Set(None),
+                ..Default::default()
+            };
+
+            match admin_seed.insert(&db).await {
+                Ok(_) => println!("🌱 Admin pertama berhasil dibuat! Username: admin, Password: admin123"),
+                Err(e) => println!("⚠️  Gagal membuat admin seed: {}", e),
+            }
+        } else {
+            println!("✅ Admin sudah ada, skip seeding.");
+        }
+
+        // Auto-seed Superadmin Pertama
+        let ada_superadmin = crate::entities::user::Entity::find()
+            .filter(crate::entities::user::Column::Role.eq("superadmin"))
+            .one(&db)
+            .await
+            .unwrap_or(None);
+
+        if ada_superadmin.is_none() {
+            use bcrypt::{hash, DEFAULT_COST};
+            use sea_orm::{ActiveModelTrait, Set};
+
+            let password_hash = hash("superadmin123", DEFAULT_COST)
+                .expect("Gagal hashing password superadmin default");
+
+            let superadmin_seed = crate::entities::user::ActiveModel {
+                username: Set("superadmin".to_string()),
+                email: Set("superadmin@simth.ipb.ac.id".to_string()),
+                password: Set(password_hash),
+                nama: Set("Super Administrator".to_string()),
+                role: Set("superadmin".to_string()),
+                status: Set("Aktif".to_string()),
+                wilayah_id: Set(None),
+                ..Default::default()
+            };
+
+            match superadmin_seed.insert(&db).await {
+                Ok(_) => println!("🌱 Superadmin berhasil dibuat! Username: superadmin, Password: superadmin123"),
+                Err(e) => println!("⚠️  Gagal membuat superadmin seed: {}", e),
+            }
+        } else {
+            println!("✅ Superadmin sudah ada, skip seeding.");
+        }
+    }
 
     // Buat aturan CORS (Jembatan Lintas Domain)
     let jembatan_cors = CorsLayer::new()
@@ -209,7 +283,10 @@ async fn main() {
 
     // Rute Manajemen User (BARU)
     let rute_user = Router::new()
-        .route("/", get(handlers::lihat_user))
+        .route(
+            "/",
+            get(handlers::lihat_user).post(handlers::buat_user),
+        )
         .route(
             "/{id}",
             put(handlers::update_user).delete(handlers::hapus_user),
@@ -232,6 +309,11 @@ async fn main() {
         )
         .route("/ws", get(handlers::ws_notifikasi)); // Endpoint terbuka khusus WebSocket
 
+    // Rute Dev (Khusus Data Dummy)
+    let rute_dev = Router::new()
+        .route("/seed", post(handlers::seed_data))
+        .route_layer(middleware::from_fn(handlers::token_jwt));
+
     // Titipkan kunci brankas (db) ke dalam aplikasi (State)
     let app = Router::new()
         .route(
@@ -251,6 +333,7 @@ async fn main() {
         .nest("/api/dashboard", rute_dashboard)
         .nest("/api/users", rute_user)
         .nest("/api/notifikasi", rute_notifikasi)
+        .nest("/api/dev", rute_dev)
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(db) // <-- Kunci dititipkan di sini
         .layer(Extension(tx)) // <-- Titipkan transmitter WebSocket ke seluruh aplikasi

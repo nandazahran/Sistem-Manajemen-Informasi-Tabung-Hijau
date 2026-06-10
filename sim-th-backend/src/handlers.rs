@@ -113,6 +113,18 @@ pub struct InputUpdateUser {
     pub nama: String,
     pub status: String,
     pub telepon: Option<String>,
+    pub email: Option<String>,     // Admin bisa ubah email user
+    pub role: Option<String>,      // Admin bisa ubah role user
+}
+
+// Struct khusus untuk Admin membuat user baru (POST /api/users)
+#[derive(Deserialize, ToSchema)]
+pub struct InputBuatUser {
+    pub username: String,
+    pub password: String,
+    pub email: String,
+    pub nama: String,
+    pub role: String,  // Kode role: "admin", "dui", "bem_fateta", dll.
 }
 
 // Struct untuk Ubah Password dari Halaman Profil
@@ -343,7 +355,7 @@ pub async fn register(
     }
 }
 
-// Fungsi Lihat Semua User (READ)
+// Fungsi Lihat Semua User (READ) — Dilengkapi email, status, dan nama wilayah
 #[utoipa::path(
     get,
     path = "/api/users",
@@ -360,27 +372,40 @@ pub async fn register(
 pub async fn lihat_user(
     State(db): State<DatabaseConnection>,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    // <-- Tipe kembalian ditingkatkan dengan StatusCode
     let pencarian = user::Entity::find().all(&db).await;
 
     match pencarian {
         Ok(daftar_user) => {
+            // Siapkan HashMap wilayah agar tidak query berulang-ulang
+            let semua_wilayah = wilayah::Entity::find().all(&db).await.unwrap_or_default();
+            let peta_wilayah: HashMap<i32, String> = semua_wilayah
+                .into_iter()
+                .map(|w| (w.id, w.nama))
+                .collect();
+
             // Kita saring datanya agar kolom 'password' TIDAK ikut terkirim ke frontend!
             let data_aman: Vec<_> = daftar_user
                 .into_iter()
                 .map(|u| {
+                    let nama_wilayah = u.wilayah_id
+                        .and_then(|wid| peta_wilayah.get(&wid).cloned())
+                        .unwrap_or_else(|| "-".to_string());
                     serde_json::json!({
                         "id": u.id,
                         "username": u.username,
+                        "email": u.email,
                         "nama": u.nama,
                         "role": u.role,
-                        "telepon": u.telepon
+                        "status": u.status,
+                        "telepon": u.telepon,
+                        "wilayah_id": u.wilayah_id,
+                        "nama_wilayah": nama_wilayah
                     })
                 })
                 .collect();
 
             (
-                StatusCode::OK, // 200: Sukses mengambil data
+                StatusCode::OK,
                 Json(serde_json::json!({
                     "status": "sukses",
                     "data": data_aman
@@ -388,11 +413,137 @@ pub async fn lihat_user(
             )
         }
         Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR, // 500: Server error
+            StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({
                 "status": "error",
                 "pesan": format!("Gagal mengambil data user: {}", e)
             })),
+        ),
+    }
+}
+
+// Fungsi Buat User Baru (Admin-Only)
+#[utoipa::path(
+    post,
+    path = "/api/users",
+    request_body = InputBuatUser,
+    responses(
+        (status = 201, description = "User baru berhasil dibuat oleh Admin", body = ResponPesan),
+        (status = 400, description = "Data tidak valid atau wilayah tidak ditemukan", body = ResponPesan),
+        (status = 403, description = "Akses ditolak: Hanya Admin yang boleh membuat user", body = ResponPesan),
+        (status = 409, description = "Gagal: Email atau Username sudah dipakai", body = ResponPesan),
+        (status = 500, description = "Terjadi kesalahan pada server", body = ResponPesan)
+    ),
+    tag = "Manajemen User",
+    security(
+        ("jwt_auth" = [])
+    )
+)]
+pub async fn buat_user(
+    State(db): State<DatabaseConnection>,
+    Extension(username_jwt): Extension<String>,
+    Json(payload): Json<InputBuatUser>,
+) -> (StatusCode, Json<ResponPesan>) {
+    // 1. Cek apakah pemanggil adalah Admin
+    let pemanggil = user::Entity::find()
+        .filter(user::Column::Username.eq(username_jwt.clone()))
+        .one(&db)
+        .await;
+
+    match pemanggil {
+        Ok(Some(admin_user)) => {
+            // Hanya admin atau bem_km yang boleh membuat user baru
+            if admin_user.role != "admin" && admin_user.role != "bem_km" {
+                return (
+                    StatusCode::FORBIDDEN,
+                    Json(ResponPesan {
+                        status: "gagal".to_string(),
+                        pesan: "Akses ditolak! Hanya Admin yang bisa membuat user baru.".to_string(),
+                    }),
+                );
+            }
+        }
+        _ => {
+            return (
+                StatusCode::FORBIDDEN,
+                Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: "Data admin pemanggil tidak ditemukan.".to_string(),
+                }),
+            );
+        }
+    }
+
+    // 2. Tentukan wilayah_id berdasarkan role (sama seperti register)
+    let wilayah_id_otomatis: Option<i32> = if let Some(nama_wilayah) =
+        role_to_wilayah_name(&payload.role)
+    {
+        match wilayah::Entity::find()
+            .filter(wilayah::Column::Nama.eq(nama_wilayah.clone()))
+            .one(&db)
+            .await
+        {
+            Ok(Some(w)) => Some(w.id),
+            _ => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(ResponPesan {
+                        status: "gagal".to_string(),
+                        pesan: format!(
+                            "Wilayah '{}' belum terdaftar di sistem. Buat dulu melalui menu Pengaturan Data.",
+                            nama_wilayah
+                        ),
+                    }),
+                );
+            }
+        }
+    } else {
+        None
+    };
+
+    // 3. Hash password
+    let password_hash = match hash(&payload.password, DEFAULT_COST) {
+        Ok(h) => h,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ResponPesan {
+                    status: "error".to_string(),
+                    pesan: "Gagal mengamankan password.".to_string(),
+                }),
+            );
+        }
+    };
+
+    // 4. Simpan user baru
+    let user_baru = user::ActiveModel {
+        username: Set(payload.username.clone()),
+        email: Set(payload.email.clone()),
+        password: Set(password_hash),
+        nama: Set(payload.nama.clone()),
+        role: Set(payload.role.clone()),
+        status: Set("Aktif".to_string()),
+        wilayah_id: Set(wilayah_id_otomatis),
+        ..Default::default()
+    };
+
+    match user_baru.insert(&db).await {
+        Ok(_) => (
+            StatusCode::CREATED,
+            Json(ResponPesan {
+                status: "sukses".to_string(),
+                pesan: format!(
+                    "User '{}' berhasil dibuat oleh Admin.",
+                    payload.nama
+                ),
+            }),
+        ),
+        Err(_) => (
+            StatusCode::CONFLICT,
+            Json(ResponPesan {
+                status: "gagal".to_string(),
+                pesan: "Gagal membuat user: Email atau Username mungkin sudah dipakai.".to_string(),
+            }),
         ),
     }
 }
@@ -422,32 +573,40 @@ pub async fn update_user(
     Path(user_id): Path<i32>,
     Json(payload): Json<InputUpdateUser>,
 ) -> (StatusCode, Json<ResponPesan>) {
-    // <-- Tipe kembalian ditingkatkan
-
     let pencarian = user::Entity::find_by_id(user_id).one(&db).await;
 
     match pencarian {
         Ok(Some(data_lama)) => {
             let mut data_aktif: user::ActiveModel = data_lama.into();
 
-            // Update nama dan status
+            // Update nama dan status (selalu dikirim)
             data_aktif.nama = Set(payload.nama.clone());
             data_aktif.status = Set(payload.status.clone());
             data_aktif.telepon = Set(payload.telepon.clone());
 
+            // Update email jika dikirim oleh admin
+            if let Some(ref email_baru) = payload.email {
+                data_aktif.email = Set(email_baru.clone());
+            }
+
+            // Update role jika dikirim oleh admin
+            if let Some(ref role_baru) = payload.role {
+                data_aktif.role = Set(role_baru.clone());
+            }
+
             match data_aktif.update(&db).await {
                 Ok(_) => (
-                    StatusCode::OK, // 200: Update sukses
+                    StatusCode::OK,
                     Json(ResponPesan {
                         status: "sukses".to_string(),
                         pesan: format!(
-                            "Data admin ID {} berhasil diupdate. Nama: '{}', Status: '{}'.",
+                            "Data user ID {} berhasil diupdate. Nama: '{}', Status: '{}'.",
                             user_id, payload.nama, payload.status
                         ),
                     }),
                 ),
                 Err(e) => (
-                    StatusCode::INTERNAL_SERVER_ERROR, // 500: Database gagal nge-save
+                    StatusCode::INTERNAL_SERVER_ERROR,
                     Json(ResponPesan {
                         status: "gagal".to_string(),
                         pesan: format!("Gagal mengupdate user: {}", e),
@@ -456,14 +615,14 @@ pub async fn update_user(
             }
         }
         Ok(None) => (
-            StatusCode::NOT_FOUND, // 404: ID User tidak ada di database
+            StatusCode::NOT_FOUND,
             Json(ResponPesan {
                 status: "gagal".to_string(),
                 pesan: "User tidak ditemukan.".to_string(),
             }),
         ),
         Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR, // 500: Error saat nyari data
+            StatusCode::INTERNAL_SERVER_ERROR,
             Json(ResponPesan {
                 status: "error".to_string(),
                 pesan: e.to_string(),
@@ -3017,4 +3176,183 @@ pub async fn simpan_kontak(
             }),
         ),
     }
+}
+
+// --- START DEV SEED DATA ---
+#[utoipa::path(
+    post,
+    path = "/api/dev/seed",
+    responses(
+        (status = 201, description = "Data dummy berhasil di-generate", body = ResponPesan),
+        (status = 403, description = "Akses ditolak: Hanya Superadmin", body = ResponPesan),
+        (status = 500, description = "Gagal men-generate data", body = ResponPesan)
+    ),
+    tag = "Dev",
+    security(
+        ("jwt_auth" = [])
+    )
+)]
+#[axum::debug_handler]
+pub async fn seed_data(
+    State(db): State<DatabaseConnection>,
+    Extension(username_jwt): Extension<String>,
+) -> impl axum::response::IntoResponse {
+    // 1. Verifikasi Superadmin
+    let pemanggil = user::Entity::find()
+        .filter(user::Column::Username.eq(username_jwt.clone()))
+        .one(&db)
+        .await;
+
+    let admin_user = match pemanggil {
+        Ok(Some(u)) => {
+            if u.role != "superadmin" {
+                return (
+                    StatusCode::FORBIDDEN,
+                    Json(ResponPesan {
+                        status: "gagal".to_string(),
+                        pesan: "Akses ditolak! Hanya Superadmin yang bisa menggenerate data dummy.".to_string(),
+                    }),
+                );
+            }
+            u
+        }
+        _ => {
+            return (
+                StatusCode::FORBIDDEN,
+                Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: "Data pemanggil tidak ditemukan.".to_string(),
+                }),
+            );
+        }
+    };
+
+    let charset: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
+
+    // 2. Buat Wilayah Sesuai Daftar Sebenarnya
+    let wilayah_data = vec![
+        ("BEM FAPERTA", "bem_faperta"), ("BEM SKHB", "bem_skhb"), ("BEM FPIK", "bem_fpik"), 
+        ("BEM FAPET", "bem_fapet"), ("BEM FAHUTAN", "bem_fahutan"), ("BEM FATETA", "bem_fateta"), 
+        ("BEM FMIPA", "bem_fmipa"), ("BEM FEM", "bem_fem"), ("BEM FEMA", "bem_fema"), 
+        ("BEM VOKASI", "bem_vokasi"), ("BEM SB", "bem_sb"), ("BEM FK", "bem_fk"), 
+        ("BEM SSMI", "bem_ssmi"), ("Ormawa Eksekutif PPKU", "ormawa_ppku")
+    ];
+    let mut wilayah_ids = Vec::new();
+    for (nama, _) in &wilayah_data {
+        let existing = wilayah::Entity::find().filter(wilayah::Column::Nama.eq(*nama)).one(&db).await.unwrap_or(None);
+        let w_id = if let Some(w) = existing {
+            w.id
+        } else {
+            let model = wilayah::ActiveModel {
+                nama: Set(nama.to_string()),
+                status: Set("Aktif".to_string()),
+                ..Default::default()
+            };
+            let res = model.insert(&db).await.unwrap();
+            res.id
+        };
+        wilayah_ids.push(w_id);
+    }
+
+    // 3. Buat Kategori Dummy
+    let kategori_names = vec!["Plastik Dummy", "Kertas Dummy", "Logam Dummy"];
+    let mut kategori_ids = Vec::new();
+    for (i, nama) in kategori_names.iter().enumerate() {
+        let existing = kategori_sampah::Entity::find().filter(kategori_sampah::Column::NamaKategori.eq(*nama)).one(&db).await.unwrap_or(None);
+        let k_id = if let Some(k) = existing {
+            k.id
+        } else {
+            let model = kategori_sampah::ActiveModel {
+                nama_kategori: Set(nama.to_string()),
+                harga_per_kg: Set((i as i32 + 1) * 2000),
+                ..Default::default()
+            };
+            let res = model.insert(&db).await.unwrap();
+            res.id
+        };
+        kategori_ids.push(k_id);
+    }
+
+    // 4. Buat User Dummy (1 user per wilayah mewakili admin wilayah)
+    let mut user_ids = Vec::new();
+    
+    for (idx, &w_id) in wilayah_ids.iter().enumerate() {
+        let (nama_wilayah, role_wilayah) = wilayah_data[idx];
+        
+        let random_suffix: String = (0..5).map(|_| {
+            let idx = rand::rng().random_range(0..charset.len());
+            charset[idx] as char
+        }).collect();
+        let username = format!("{}_{}", role_wilayah, random_suffix.to_lowercase());
+        let password_plain: String = (0..20).map(|_| {
+            let idx = rand::rng().random_range(0..charset.len());
+            charset[idx] as char
+        }).collect();
+        let email = format!("{}@dummy.com", username);
+        let password_hash = hash(&password_plain, DEFAULT_COST).unwrap_or_else(|_| "dummyhash".to_string());
+
+        let model = user::ActiveModel {
+            username: Set(username.clone()),
+            email: Set(email),
+            password: Set(password_hash),
+            nama: Set(format!("Admin Sosling {}", nama_wilayah)),
+            role: Set(role_wilayah.to_string()),
+            status: Set("Aktif".to_string()),
+            wilayah_id: Set(Some(w_id)),
+            ..Default::default()
+        };
+        if let Ok(res) = model.insert(&db).await {
+            user_ids.push(res.id);
+        }
+    }
+
+    // 5. Buat Transaksi Dummy (2 sesi / 4 bulan terakhir dengan trend positif)
+    // Sesi 1: 4 bulan lalu
+    // Sesi 2: 2 bulan lalu
+    if !user_ids.is_empty() {
+        let now = Utc::now().naive_utc();
+        let sesi_4_bulan = now - Duration::days(120);
+        let sesi_2_bulan = now - Duration::days(60);
+
+        let sesi_dates = vec![sesi_4_bulan, sesi_2_bulan];
+
+        for (sesi_idx, date) in sesi_dates.iter().enumerate() {
+            // Trend positif: sesi 2 (idx=1) lebih tinggi nilainya dari sesi 1 (idx=0)
+            let multiplier = if sesi_idx == 0 { 1 } else { 2 };
+
+            for _u_id in &user_ids {
+                // 2 transaksi per user per sesi
+                for _ in 0..2 {
+                    let w_id = wilayah_ids[rand::rng().random_range(0..wilayah_ids.len())];
+                    let k_id = kategori_ids[rand::rng().random_range(0..kategori_ids.len())];
+                    
+                    // Poin dan berat cenderung tinggi dan naik
+                    let poin_kualitas = 80 + (rand::rng().random_range(0..10) * multiplier);
+                    let poin_kualitas = if poin_kualitas > 100 { 100 } else { poin_kualitas };
+                    
+                    let berat = 5000 + (rand::rng().random_range(1000..5000) * multiplier); // dalam gram
+                    let total_nilai = (berat / 1000) * rand::rng().random_range(2000..5000);
+
+                    let model = transaksi_sampah::ActiveModel {
+                        tanggal: Set(*date),
+                        berat: Set(berat),
+                        total_nilai: Set(total_nilai),
+                        status: Set("Selesai".to_string()),
+                        poin_kualitas: Set(poin_kualitas),
+                        catatan: Set(Some("Dummy transaksi positif".to_string())),
+                        kategori_id: Set(k_id),
+                        wilayah_id: Set(w_id),
+                        input_by: Set(admin_user.id),
+                        ..Default::default()
+                    };
+                    let _ = model.insert(&db).await;
+                }
+            }
+        }
+    }
+
+    (StatusCode::CREATED, Json(ResponPesan {
+        status: "sukses".to_string(),
+        pesan: "Data dummy untuk 2 sesi (4 bulan) berhasil di-generate secara acak!".to_string()
+    }))
 }
