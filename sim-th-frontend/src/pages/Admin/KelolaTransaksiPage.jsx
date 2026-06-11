@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../components/AdminLayout';
 
 function KelolaTransaksiPage() {
@@ -11,7 +11,7 @@ function KelolaTransaksiPage() {
   const [selectedTx, setSelectedTx] = useState(null);
 
   // Form State
-  const [editForm, setEditForm] = useState({ tanggal: '', wilayah: '', kategori: '', berat: '', nilai: '', status: '', catatan: '', penilaian: { kebersihan: '', pemilahan: '', kondisi: '' } });
+  const [editForm, setEditForm] = useState({ tanggal: '', wilayah: '', kategori_id: '', berat: '', nilai: '', status: '', catatan: '', penilaian: { kebersihan: '', pemilahan: '', kondisi: '' } });
   const [penilaian, setPenilaian] = useState({ kebersihan: '', pemilahan: '', kondisi: '' });
 
   // States Filter & Search
@@ -26,17 +26,73 @@ function KelolaTransaksiPage() {
   const [isBulanOpen, setIsBulanOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
 
-  // Data Dummy lengkap dengan objek penilaian
-  const [transactions, setTransactions] = useState([
-    { id: 1, id_trx: '#0001', tanggal: '9 Mei 2026', wilayah: 'BEM FATETA', kategori: 'Plastik', berat: '25', nilai: '112500', status: 'Sudah Dinilai', petugas: 'Ahmad Fauzi', catatan: 'Botol plastik bersih', penilaian: { kebersihan: 'Sangat Baik', pemilahan: 'Baik', kondisi: 'Sangat Baik' } },
-    { id: 2, id_trx: '#0002', tanggal: '8 Mei 2026', wilayah: 'BEM FAPET', kategori: 'Kertas', berat: '15.5', nilai: '37500', status: 'Sudah Dinilai', petugas: 'Budi Santoso', catatan: 'Kardus bekas', penilaian: { kebersihan: 'Baik', pemilahan: 'Cukup', kondisi: 'Baik' } },
-    { id: 3, id_trx: '#0003', tanggal: '7 Mei 2026', wilayah: 'BEM FEM', kategori: 'Logam', berat: '10', nilai: '75000', status: 'Belum Dinilai', petugas: 'Siti Aminah', catatan: 'Kaleng aluminium', penilaian: { kebersihan: '', pemilahan: '', kondisi: '' } },
-    { id: 4, id_trx: '#0004', tanggal: '6 Mei 2026', wilayah: 'BEM FATETA', kategori: 'Plastik', berat: '30.25', nilai: '135000', status: 'Belum Dinilai', petugas: 'Ahmad Fauzi', catatan: 'Gelas plastik campuran', penilaian: { kebersihan: '', pemilahan: '', kondisi: '' } },
-    { id: 5, id_trx: '#0005', tanggal: '28 Apr 2026', wilayah: 'BEM FAHUTAN', kategori: 'Kaca', berat: '20', nilai: '40000', status: 'Sudah Dinilai', petugas: 'Rizky Pratama', catatan: 'Pecahan botol kaca', penilaian: { kebersihan: 'Kurang', pemilahan: 'Cukup', kondisi: 'Kurang' } },
-  ]);
+  // Data from Backend
+  const [transactions, setTransactions] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const opsiPenilaian = ['Sangat Baik', 'Baik', 'Cukup', 'Kurang', 'Sangat Kurang'];
+  const nilaiMap = { 'Sangat Baik': 10, 'Baik': 8, 'Cukup': 6, 'Kurang': 4, 'Sangat Kurang': 2 };
+
   const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+  const getToken = () => localStorage.getItem('token') || sessionStorage.getItem('token');
+  const baseUrl = import.meta.env.VITE_API_URL;
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const token = getToken();
+      if (!token || !baseUrl) return;
+      const headers = { 'Authorization': `Bearer ${token}` };
+
+      const [txRes, catRes] = await Promise.all([
+        fetch(`${baseUrl}/transaksi`, { headers }),
+        fetch(`${baseUrl}/kategori`, { headers })
+      ]);
+
+      const txResult = await txRes.json();
+      const catResult = await catRes.json();
+
+      if (catResult.status === 'sukses' && catResult.data) {
+        setCategories(catResult.data);
+      }
+
+      if (txResult.status === 'sukses' && txResult.data) {
+        // Reverse evaluation strings from poin (rough estimation for UI purposes)
+        const getEvalStrings = (poin) => {
+          if (poin === 0) return { kebersihan: '', pemilahan: '', kondisi: '' };
+          if (poin >= 25) return { kebersihan: 'Sangat Baik', pemilahan: 'Baik', kondisi: 'Sangat Baik' };
+          if (poin >= 15) return { kebersihan: 'Cukup', pemilahan: 'Cukup', kondisi: 'Cukup' };
+          return { kebersihan: 'Kurang', pemilahan: 'Kurang', kondisi: 'Kurang' };
+        };
+
+        const mapped = txResult.data.map(item => ({
+          id: item.id,
+          id_trx: `#${String(item.id).padStart(4, '0')}`,
+          tanggal: new Date(item.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+          tanggal_raw: item.tanggal,
+          wilayah: item.nama_wilayah || '-',
+          kategori: item.nama_kategori || '-',
+          kategori_id: item.kategori_id,
+          berat: `${(item.berat / 1000).toFixed(1)}`,
+          berat_raw: item.berat,
+          nilai: item.total_nilai,
+          status: item.status || 'Selesai',
+          petugas: item.nama_petugas || '-',
+          catatan: item.catatan || '-',
+          poin_kualitas: item.poin_kualitas || 0,
+          penilaian: getEvalStrings(item.poin_kualitas || 0)
+        }));
+        setTransactions(mapped);
+      }
+    } catch (error) {
+      console.error('Gagal fetch data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, []);
 
   // Logic Filter
   const filteredTransactions = transactions.filter(tx => {
@@ -59,42 +115,111 @@ function KelolaTransaksiPage() {
   
   const handleEdit = (tx) => { 
     setSelectedTx(tx); 
-    const d = new Date(tx.tanggal.replace('Mei', 'May').replace('Apr', 'April'));
+    const d = new Date(tx.tanggal_raw);
     const tgl = isNaN(d) ? '' : d.toISOString().split('T')[0];
-    setEditForm({ tanggal: tgl, wilayah: tx.wilayah, kategori: tx.kategori, berat: tx.berat, nilai: tx.nilai, status: tx.status, catatan: tx.catatan, penilaian: tx.penilaian });
+    setEditForm({ 
+      tanggal: tgl, 
+      wilayah: tx.wilayah, 
+      kategori_id: tx.kategori_id, 
+      berat: tx.berat, 
+      nilai: tx.nilai, 
+      status: tx.status, 
+      catatan: tx.catatan === '-' ? '' : tx.catatan, 
+      penilaian: tx.penilaian 
+    });
     setIsEditOpen(true); 
   };
 
   const handleDeleteClick = (tx) => { setSelectedTx(tx); setIsDeleteOpen(true); };
   
-  const confirmDelete = () => { 
-    const newData = transactions.filter(t => t.id !== selectedTx.id);
-    setTransactions(newData);
-    setIsDeleteOpen(false); 
-    showToast(`Transaksi ${selectedTx.id_trx} berhasil dihapus!`, 'error'); 
-  };
-
-  const saveEdit = () => {
-    const newData = transactions.map(t => {
-      if(t.id === selectedTx.id) {
-        return { ...t, ...editForm, tanggal: new Date(editForm.tanggal).toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' }) };
+  const confirmDelete = async () => { 
+    try {
+      const token = getToken();
+      const res = await fetch(`${baseUrl}/transaksi/${selectedTx.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await res.json();
+      if (result.status === 'sukses') {
+        showToast(`Transaksi ${selectedTx.id_trx} berhasil dihapus!`, 'error'); 
+        fetchData();
+      } else {
+        showToast(result.pesan || 'Gagal menghapus transaksi', 'error');
       }
-      return t;
-    });
-    setTransactions(newData);
-    setIsEditOpen(false);
-    showToast('Data transaksi berhasil diperbarui!');
+    } catch (error) {
+      console.error(error);
+      showToast('Terjadi kesalahan', 'error');
+    }
+    setIsDeleteOpen(false); 
   };
 
-  const savePenilaian = () => {
+  const saveEdit = async () => {
+    try {
+      const token = getToken();
+      const totalPoin = (nilaiMap[editForm.penilaian.kebersihan] || 0) + (nilaiMap[editForm.penilaian.pemilahan] || 0) + (nilaiMap[editForm.penilaian.kondisi] || 0);
+      const payload = {
+        kategori_id: parseInt(editForm.kategori_id),
+        berat_gram: Math.round(parseFloat(editForm.berat) * 1000),
+        poin_kualitas: totalPoin || selectedTx.poin_kualitas, // default to previous if untouched
+        catatan: editForm.catatan,
+        tanggal: new Date(editForm.tanggal).toISOString()
+      };
+
+      const res = await fetch(`${baseUrl}/transaksi/${selectedTx.id}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const result = await res.json();
+      if (result.status === 'sukses') {
+        showToast('Data transaksi berhasil diperbarui!');
+        fetchData();
+      } else {
+        showToast(result.pesan || 'Gagal mengedit transaksi', 'error');
+      }
+    } catch (error) {
+      console.error(error);
+      showToast('Terjadi kesalahan', 'error');
+    }
+    setIsEditOpen(false);
+  };
+
+  const savePenilaian = async () => {
     if(!penilaian.kebersihan || !penilaian.pemilahan || !penilaian.kondisi) {
       alert("Harap isi semua kriteria penilaian KPI!");
       return;
     }
-    const newData = transactions.map(t => t.id === selectedTx.id ? { ...t, status: 'Sudah Dinilai', penilaian: penilaian } : t);
-    setTransactions(newData);
+    
+    try {
+      const token = getToken();
+      const totalPoin = nilaiMap[penilaian.kebersihan] + nilaiMap[penilaian.pemilahan] + nilaiMap[penilaian.kondisi];
+      
+      const payload = {
+        kategori_id: selectedTx.kategori_id,
+        berat_gram: selectedTx.berat_raw,
+        poin_kualitas: totalPoin,
+        catatan: selectedTx.catatan,
+        tanggal: selectedTx.tanggal_raw
+      };
+
+      const res = await fetch(`${baseUrl}/transaksi/${selectedTx.id}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const result = await res.json();
+      if (result.status === 'sukses') {
+        showToast('Penilaian KPI berhasil disimpan!');
+        fetchData();
+      } else {
+        showToast(result.pesan || 'Gagal menyimpan penilaian', 'error');
+      }
+    } catch (error) {
+      console.error(error);
+      showToast('Terjadi kesalahan', 'error');
+    }
     setIsDetailOpen(false);
-    showToast('Penilaian KPI berhasil disimpan!');
   };
 
   return (
@@ -299,8 +424,10 @@ function KelolaTransaksiPage() {
               <div>
                 <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Kategori</label>
                 <div className="relative">
-                  <select value={editForm.kategori} onChange={(e) => setEditForm({...editForm, kategori: e.target.value})} className="w-full bg-[#F5EFE6] px-5 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E] appearance-none cursor-pointer">
-                    <option value="Plastik">Plastik</option><option value="Kertas">Kertas</option><option value="Logam">Logam</option><option value="Kaca">Kaca</option>
+                  <select value={editForm.kategori_id} onChange={(e) => setEditForm({...editForm, kategori_id: e.target.value})} className="w-full bg-[#F5EFE6] px-5 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E] appearance-none cursor-pointer">
+                    {categories.map(c => (
+                      <option key={c.id} value={c.id}>{c.nama_kategori}</option>
+                    ))}
                   </select>
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute right-4 top-1/2 -translate-y-1/2 text-[#0B4D1E] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                 </div>
