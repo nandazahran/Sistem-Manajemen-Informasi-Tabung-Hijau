@@ -11,32 +11,42 @@ function LaporanPage() {
   
   // States Filter & Search Utama
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterBulanUtama, setFilterBulanUtama] = useState('Mei - Jun 2026');
-  const [filterTahunUtama, setFilterTahunUtama] = useState(2026);
+  const [filterBulanUtama, setFilterBulanUtama] = useState('Semua Periode');
+  const [filterTahunUtama, setFilterTahunUtama] = useState('2026');
   
   // State Toggle Dropdown
   const [isBulanUtamaOpen, setIsBulanUtamaOpen] = useState(false);
-  const [isTahunUtamaOpen, setIsTahunUtamaOpen] = useState(false);
 
   // States Modal Export
-  const [exportPeriode, setExportPeriode] = useState('Mei - Jun 2026');
+  const [exportPeriode, setExportPeriode] = useState('Semua Periode');
+  const [exportYear, setExportYear] = useState('2026');
   const [isExportPeriodeOpen, setIsExportPeriodeOpen] = useState(false);
 
   // Opsi Dropdown
-  const periodeOptions = ['Jan - Feb 2026', 'Mar - Apr 2026', 'Mei - Jun 2026', 'Jul - Ags 2026', 'Sep - Okt 2026', 'Nov - Des 2026'];
-  const tahunOptions = [2025, 2026]; 
+  const periodeOptions = ['Semua Periode', 'Jan - Feb', 'Mar - Apr', 'Mei - Jun', 'Jul - Ags', 'Sep - Okt', 'Nov - Des'];
 
   // Data dari Backend
-  const [rekapData, setRekapData] = useState([]);
-  const [lineData, setLineData] = useState([]);
-  const [barData, setBarData] = useState([]);
-  const [pieData, setPieData] = useState([]);
-  const [summaryCards, setSummaryCards] = useState([
-    { t: 'Total Transaksi', v: '0', b: 'Memuat...' },
-    { t: 'Total Sampah', v: '0 kg', b: 'Memuat...' },
-    { t: 'Nilai Ekonomi', v: 'Rp 0', b: 'Memuat...', c: 'text-green-600' },
-    { t: 'Wilayah Aktif', v: '0', b: 'Memuat...' }
-  ]);
+  const [dataTrx, setDataTrx] = useState([]);
+  const [dataLb, setDataLb] = useState([]);
+  const [wilAktifCount, setWilAktifCount] = useState(0);
+
+  const getBulanPeriode = (isoString) => {
+    if (!isoString) return '-';
+    const m = new Date(isoString).getMonth();
+    if (m <= 1) return `Jan - Feb`;
+    if (m <= 3) return `Mar - Apr`;
+    if (m <= 5) return `Mei - Jun`;
+    if (m <= 7) return `Jul - Ags`;
+    if (m <= 9) return `Sep - Okt`;
+    return `Nov - Des`;
+  };
+
+  const getTahun = (isoString) => {
+    if (!isoString) return '-';
+    return new Date(isoString).getFullYear().toString();
+  };
+
+  const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -47,67 +57,30 @@ function LaporanPage() {
         if (!baseUrl || !token) return;
         const headers = { 'Authorization': `Bearer ${token}` };
 
-        // Fetch Dashboard (for grafik bulanan & summary)
-        const dashRes = await fetch(`${baseUrl}/dashboard`, { headers });
-        const dashData = await dashRes.json();
+        const [resTrx, resLb, wilRes] = await Promise.all([
+          fetch(`${baseUrl}/transaksi`, { headers }),
+          fetch(`${baseUrl}/dashboard/leaderboard`, { headers }),
+          fetch(`${baseUrl}/wilayah/aktif`, { headers })
+        ]);
 
-        // Fetch Leaderboard (for rekap per wilayah)
-        const lbRes = await fetch(`${baseUrl}/dashboard/leaderboard`, { headers });
-        const lbData = await lbRes.json();
-
-        // Fetch Wilayah Aktif
-        const wilRes = await fetch(`${baseUrl}/wilayah/aktif`, { headers });
+        const trx = await resTrx.json();
+        const lb = await resLb.json();
         const wilData = await wilRes.json();
 
-        const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
-
-        // Summary Cards
-        if (dashData.status === 'sukses') {
-          const totalBerat = (dashData.rekap_seluruh_ipb?.total_berat_gram || 0) / 1000;
-          const totalRupiah = dashData.rekap_seluruh_ipb?.total_rupiah || 0;
-          const totalTrx = dashData.rekap_seluruh_ipb?.jumlah_transaksi || 0;
-          const wilAktif = wilData.status === 'sukses' ? wilData.data.length : 0;
-
-          setSummaryCards([
-            { t: 'Total Transaksi', v: totalTrx.toLocaleString('id-ID'), b: 'Seluruh wilayah' },
-            { t: 'Total Sampah', v: `${totalBerat.toLocaleString('id-ID')} kg`, b: 'Total terkumpul' },
-            { t: 'Nilai Ekonomi', v: formatRp(totalRupiah), b: 'Total nilai', c: 'text-green-600' },
-            { t: 'Wilayah Aktif', v: wilAktif.toString(), b: `dari ${wilAktif} total` }
-          ]);
-
-          // Line chart: grafik bulanan
-          if (dashData.grafik_bulanan) {
-            setLineData(dashData.grafik_bulanan.map(g => ({
-              name: g.bulan,
-              berat: (g.berat || g.total_berat || 0) / 1000
-            })));
-          }
-
-          // Pie chart: breakdown kategori
-          if (dashData.breakdown_kategori) {
-            setPieData(dashData.breakdown_kategori.map(k => ({
-              name: k.kategori || k.nama_kategori,
-              value: (k.total_berat || k.total_berat_gram || 0) / 1000
-            })));
-          }
+        if (trx.status === 'sukses' && Array.isArray(trx.data)) {
+          setDataTrx(trx.data.sort((a, b) => b.id - a.id));
+        } else {
+          setDataTrx([]);
         }
 
-        // Leaderboard → rekap tabel + bar chart
-        if (lbData.status === 'sukses' && lbData.data) {
-          const rekap = lbData.data.map(item => ({
-            id: item.peringkat,
-            wilayah: item.nama_wilayah,
-            totalTx: '-',
-            berat: `${(item.total_berat_gram / 1000).toFixed(0)} kg`,
-            nilai: formatRp(item.total_rupiah),
-            kpi: item.poin_kpi
-          }));
-          setRekapData(rekap);
+        if (lb.status === 'sukses' && Array.isArray(lb.data)) {
+          setDataLb(lb.data);
+        } else {
+          setDataLb([]);
+        }
 
-          setBarData(lbData.data.slice(0, 6).map(item => ({
-            name: item.nama_wilayah.replace('BEM ', ''),
-            nilai: item.total_rupiah / 1000
-          })));
+        if (wilData.status === 'sukses') {
+          setWilAktifCount(wilData.data.length);
         }
       } catch (error) {
         console.error('Gagal fetch data laporan:', error);
@@ -118,65 +91,133 @@ function LaporanPage() {
     fetchData();
   }, []);
 
-  const filteredRekap = rekapData.filter(r => r.wilayah.toLowerCase().includes(searchTerm.toLowerCase()));
+  // LOGIKA FILTERING & AGREGASI DATA
+  const filteredData = dataTrx.filter(t => {
+    const matchBulan = filterBulanUtama === 'Semua Periode' || getBulanPeriode(t.tanggal) === filterBulanUtama;
+    const matchTahun = getTahun(t.tanggal) === filterTahunUtama;
+    const matchSearch = searchTerm === '' || t.nama_wilayah?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchBulan && matchTahun && matchSearch;
+  });
+
+  const totalTransaksi = filteredData.length;
+  const totalBerat = filteredData.reduce((sum, t) => sum + (t.berat || t.berat_gram || 0), 0) / 1000;
+  const totalNilai = filteredData.reduce((sum, t) => sum + (t.total_nilai || 0), 0);
+  const activeWilayahSet = new Set(filteredData.filter(t => t.nama_wilayah).map(t => t.nama_wilayah));
+  const activeWilayahCount = activeWilayahSet.size;
+
+  const summaryCards = [
+    { t: 'Total Transaksi', v: totalTransaksi.toLocaleString('id-ID'), b: 'Berdasarkan Filter' },
+    { t: 'Total Sampah', v: `${totalBerat.toLocaleString('id-ID')} kg`, b: 'Berdasarkan Filter' },
+    { t: 'Nilai Ekonomi', v: formatRp(totalNilai), b: 'Berdasarkan Filter', c: 'text-green-600' },
+    { t: 'Wilayah Aktif', v: activeWilayahCount.toString(), b: `dari ${wilAktifCount} total wilayah` }
+  ];
+
+  const wilayahMap = {};
+  filteredData.forEach(t => {
+    const w = t.nama_wilayah || 'Unknown';
+    if (!wilayahMap[w]) {
+      wilayahMap[w] = { totalTx: 0, berat: 0, nilai: 0 };
+    }
+    wilayahMap[w].totalTx += 1;
+    wilayahMap[w].berat += (t.berat || t.berat_gram || 0) / 1000;
+    wilayahMap[w].nilai += (t.total_nilai || 0);
+  });
+
+  const filteredRekap = Object.keys(wilayahMap).map((w, idx) => {
+    const lbItem = dataLb.find(l => l.nama_wilayah === w);
+    return {
+      id: idx,
+      wilayah: w,
+      totalTx: wilayahMap[w].totalTx,
+      beratRaw: wilayahMap[w].berat,
+      berat: `${wilayahMap[w].berat.toFixed(1)} kg`,
+      nilaiRaw: wilayahMap[w].nilai,
+      nilai: formatRp(wilayahMap[w].nilai),
+      kpi: lbItem ? lbItem.poin_kpi : '-'
+    };
+  }).sort((a, b) => b.beratRaw - a.beratRaw);
+
+  const barData = filteredRekap.slice(0, 6).map(r => ({
+    name: r.wilayah.replace('BEM ', ''),
+    nilai: r.nilaiRaw / 1000
+  }));
+
+  const pieMap = {};
+  filteredData.forEach(t => {
+     const kat = t.nama_kategori || 'Unknown';
+     if (!pieMap[kat]) pieMap[kat] = 0;
+     pieMap[kat] += (t.berat || t.berat_gram || 0) / 1000;
+  });
+  const pieData = Object.keys(pieMap).map(k => ({ name: k, value: pieMap[k] }));
+
+  const generateLineChart = () => {
+    if (filteredData.length === 0) return [];
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
+    let tempChart = {};
+
+    let startMonth = 0; let endMonth = 11;
+    if (filterBulanUtama !== 'Semua Periode') {
+      if (filterBulanUtama.startsWith('Jan')) { startMonth = 0; endMonth = 1; }
+      else if (filterBulanUtama.startsWith('Mar')) { startMonth = 2; endMonth = 3; }
+      else if (filterBulanUtama.startsWith('Mei')) { startMonth = 4; endMonth = 5; }
+      else if (filterBulanUtama.startsWith('Jul')) { startMonth = 6; endMonth = 7; }
+      else if (filterBulanUtama.startsWith('Sep')) { startMonth = 8; endMonth = 9; }
+      else if (filterBulanUtama.startsWith('Nov')) { startMonth = 10; endMonth = 11; }
+    } else {
+      endMonth = new Date().getMonth();
+      startMonth = endMonth - 5;
+      if (startMonth < 0) startMonth = 0;
+    }
+
+    for (let i = startMonth; i <= endMonth; i++) {
+      tempChart[monthNames[i]] = { name: monthNames[i], berat: 0 };
+    }
+
+    filteredData.forEach(item => {
+      const d = new Date(item.tanggal);
+      const m = monthNames[d.getMonth()];
+      if (tempChart[m]) {
+        tempChart[m].berat += (item.berat || item.berat_gram || 0) / 1000;
+      }
+    });
+
+    return Object.values(tempChart);
+  };
+  const lineData = generateLineChart();
+
   const handleRowClick = (row) => { setSelectedRow(row); setIsDetailOpen(true); };
 
   const COLORS = ['#125B2A', '#F4A300', '#8FA57A', '#517D3B', '#D1D5DB'];
-
-  const getPeriode = (isoString) => {
-    if (!isoString) return '-';
-    const d = new Date(isoString);
-    const m = d.getMonth();
-    const y = d.getFullYear();
-    if (m <= 1) return `Jan - Feb ${y}`;
-    if (m <= 3) return `Mar - Apr ${y}`;
-    if (m <= 5) return `Mei - Jun ${y}`;
-    if (m <= 7) return `Jul - Ags ${y}`;
-    if (m <= 9) return `Sep - Okt ${y}`;
-    return `Nov - Des ${y}`;
-  };
 
   // Export handler
   const handleExport = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const baseUrl = import.meta.env.VITE_API_URL;
-      if (!baseUrl || !token) { alert('Tidak dapat mengexport: Token atau URL tidak ditemukan'); return; }
-
-      const response = await fetch(`${baseUrl}/transaksi/export`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const resJson = await response.json();
-        let dataToExport = resJson.data;
-
-        if (exportPeriode !== 'Semua Periode') {
-          dataToExport = dataToExport.filter(t => getPeriode(t.tanggal) === exportPeriode);
-        }
-
-        if (dataToExport.length === 0) {
-          alert("Tidak ada data untuk diexport pada periode ini.");
-          return;
-        }
-
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport.map(t => ({
-          "ID Transaksi": t.id,
-          "Tanggal": new Date(t.tanggal).toLocaleDateString('id-ID'),
-          "Wilayah": t.nama_wilayah,
-          "Kategori": t.nama_kategori,
-          "Berat (kg)": (t.berat || t.berat_gram || 0) / 1000,
-          "Total Nilai (Rp)": t.total_nilai,
-          "Petugas": t.nama_petugas,
-          "Status": t.status
-        })));
-        
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Data Laporan");
-        XLSX.writeFile(workbook, `Laporan_Admin_SIMTH_${exportPeriode.replace(/ /g, '')}.xlsx`);
-      } else {
-        alert('Gagal mengexport laporan');
+      let dataToExport = dataTrx.filter(t => getTahun(t.tanggal) === exportYear);
+      
+      if (exportPeriode !== 'Semua Periode') {
+        dataToExport = dataToExport.filter(t => getBulanPeriode(t.tanggal) === exportPeriode);
       }
+
+      if (dataToExport.length === 0) {
+        alert("Tidak ada data untuk diexport pada periode ini.");
+        return;
+      }
+
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport.map(t => ({
+        "ID Transaksi": t.id,
+        "Tanggal": new Date(t.tanggal).toLocaleDateString('id-ID'),
+        "Wilayah": t.nama_wilayah,
+        "Kategori": t.nama_kategori,
+        "Berat (kg)": (t.berat || t.berat_gram || 0) / 1000,
+        "Total Nilai (Rp)": t.total_nilai,
+        "Petugas": t.nama_petugas,
+        "Status": t.status
+      })));
+      
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Data Laporan");
+      XLSX.writeFile(workbook, `Laporan_Admin_SIMTH_${exportPeriode.replace(/ /g, '')}_${exportYear}.xlsx`);
     } catch (error) {
       console.error('Export error:', error);
       alert('Gagal mengexport laporan');
@@ -208,7 +249,7 @@ function LaporanPage() {
         
         {/* Combo Box Filter Bulan */}
         <div className="relative w-full md:w-64">
-          <div onClick={() => { setIsBulanUtamaOpen(!isBulanUtamaOpen); setIsTahunUtamaOpen(false); }} className="bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors h-[56px]">
+          <div onClick={() => setIsBulanUtamaOpen(!isBulanUtamaOpen)} className="bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors h-[56px]">
             <span className="truncate">{filterBulanUtama}</span>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
           </div>
@@ -225,19 +266,13 @@ function LaporanPage() {
 
         {/* Combo Box Filter Tahun */}
         <div className="relative w-full md:w-32">
-          <div onClick={() => { setIsTahunUtamaOpen(!isTahunUtamaOpen); setIsBulanUtamaOpen(false); }} className="bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors h-[56px]">
-            <span className="font-extrabold text-lg truncate">{filterTahunUtama}</span>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-          </div>
-          {isTahunUtamaOpen && (
-            <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 shadow-xl rounded-xl z-50 overflow-hidden py-1">
-              {tahunOptions.map(opt => (
-                <div key={opt} onClick={() => { setFilterTahunUtama(opt); setIsTahunUtamaOpen(false); }} className={`px-5 py-2.5 cursor-pointer text-sm font-medium transition-colors ${filterTahunUtama === opt ? 'bg-[#0B4D1E] text-white' : 'text-[#0B4D1E] hover:bg-gray-100'}`}>
-                  {opt}
-                </div>
-              ))}
+          <div className="w-full bg-[#F5EFE6] border-none px-5 py-2.5 rounded-2xl flex justify-between items-center h-[56px]">
+            <span className="font-extrabold text-[#0B4D1E] text-lg">{filterTahunUtama}</span>
+            <div className="flex flex-col">
+              <button onClick={() => setFilterTahunUtama((parseInt(filterTahunUtama) + 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" /></svg></button>
+              <button onClick={() => setFilterTahunUtama((parseInt(filterTahunUtama) - 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg></button>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -325,7 +360,7 @@ function LaporanPage() {
             </div>
             <form onSubmit={handleExport} className="space-y-6">
               <div>
-                <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Periode Laporan</label>
+                <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Periode Bulan</label>
                 <div className="relative">
                   <div onClick={() => setIsExportPeriodeOpen(!isExportPeriodeOpen)} className="w-full bg-[#F5EFE6] px-5 py-4 rounded-2xl font-bold text-[#0B4D1E] cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors">
                     <span className="truncate">{exportPeriode}</span>
@@ -343,8 +378,14 @@ function LaporanPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Format File</label>
-                <div className="w-full bg-[#F4A300] text-white py-4 rounded-2xl font-extrabold text-center shadow-sm">Excel</div>
+                <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Tahun Laporan</label>
+                <div className="w-full bg-[#F5EFE6] border-none px-5 py-2.5 rounded-2xl flex justify-between items-center h-[56px]">
+                  <span className="font-extrabold text-[#0B4D1E] text-lg">{exportYear}</span>
+                  <div className="flex flex-col">
+                    <button type="button" onClick={() => setExportYear((parseInt(exportYear) + 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" /></svg></button>
+                    <button type="button" onClick={() => setExportYear((parseInt(exportYear) - 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg></button>
+                  </div>
+                </div>
               </div>
               <div className="flex gap-4 mt-8 pt-2">
                 <button type="button" onClick={() => setIsExportOpen(false)} className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-4 rounded-2xl font-bold hover:bg-[#EAE5DA] transition-all">Batal</button>
