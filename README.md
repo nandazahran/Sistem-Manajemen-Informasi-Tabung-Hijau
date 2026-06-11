@@ -14,11 +14,10 @@ Platform ini memudahkan pencatatan setoran sampah, memantau saldo tabungan wilay
 - **Pemulihan Akun via OTP Email:** Mendukung reset password secara mandiri dan aman menggunakan verifikasi OTP 6 digit yang dikirimkan secara otomatis ke email pengguna (Auto OTP Email).
 
 ## 🛠️ Teknologi yang Digunakan
-- **Backend:** Rust 🦀, Axum (Web Framework), SeaORM (ORM), Utoipa (Swagger/OpenAPI)
+- **Backend:** Rust , Axum (Web Framework), SeaORM (ORM), Utoipa (Swagger/OpenAPI)
 - **Frontend:** React.js, Vite, Tailwind CSS
 - **Database:** PostgreSQL
 - **Infrastruktur:** Docker / Podman, Cloudflare Zero Trust (Tunnel)
-- **CI/CD:** GitHub Actions (Automated Linting, Formatting, & Build to GHCR)
 
 ---
 
