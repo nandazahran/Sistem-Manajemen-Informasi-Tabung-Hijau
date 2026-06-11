@@ -2538,8 +2538,6 @@ pub async fn lihat_dashboard(State(db): State<DatabaseConnection>) -> Json<serde
     // 2. Ambil semua transaksi tahun ini untuk grafik bulanan global
     let tahun = Utc::now().year();
     let semua_trx = transaksi_sampah::Entity::find()
-        .filter(transaksi_sampah::Column::Tanggal.gte(format!("{}-01-01", tahun)))
-        .filter(transaksi_sampah::Column::Tanggal.lte(format!("{}-12-31", tahun)))
         .all(&db)
         .await
         .unwrap_or_default();
@@ -2560,19 +2558,21 @@ pub async fn lihat_dashboard(State(db): State<DatabaseConnection>) -> Json<serde
     ];
 
     for trx in semua_trx {
-        let bulan_idx = trx.tanggal.month() as usize - 1;
-        if let Some(obj) = data_bulanan[bulan_idx].as_object_mut() {
-            let berat_lama = obj.get("total_berat").unwrap().as_i64().unwrap();
-            let rupiah_lama = obj.get("total_nilai").unwrap().as_i64().unwrap();
+        if trx.tanggal.year() == tahun {
+            let bulan_idx = trx.tanggal.month() as usize - 1;
+            if let Some(obj) = data_bulanan[bulan_idx].as_object_mut() {
+                let berat_lama = obj.get("total_berat").unwrap().as_i64().unwrap();
+                let rupiah_lama = obj.get("total_nilai").unwrap().as_i64().unwrap();
 
-            obj.insert(
-                "total_berat".to_string(),
-                serde_json::json!(berat_lama + trx.berat as i64),
-            );
-            obj.insert(
-                "total_nilai".to_string(),
-                serde_json::json!(rupiah_lama + trx.total_nilai as i64),
-            );
+                obj.insert(
+                    "total_berat".to_string(),
+                    serde_json::json!(berat_lama + trx.berat as i64),
+                );
+                obj.insert(
+                    "total_nilai".to_string(),
+                    serde_json::json!(rupiah_lama + trx.total_nilai as i64),
+                );
+            }
         }
     }
 

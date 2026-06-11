@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import AdminLayout from '../../components/AdminLayout';
 import bannerImg from '../../assets/DB-gambar-banner.png';
 
@@ -17,6 +18,12 @@ function AdminDashboardPage() {
 
   const [aktivitasTerbaru, setAktivitasTerbaru] = useState([]);
   const [riwayatTerbaru, setRiwayatTerbaru] = useState([]);
+  
+  const [lineData, setLineData] = useState([]);
+  const [barData, setBarData] = useState([]);
+  const [pieKategori, setPieKategori] = useState([]);
+
+  const COLORS_KATEGORI = ['#125B2A', '#F4A300', '#8FA57A', '#EAE5DA'];
 
   useEffect(() => {
     const fetchAdminDashboard = async () => {
@@ -56,6 +63,15 @@ function AdminDashboardPage() {
           newStats[1].badge = 'Total Berat Disetor';
           newStats[2].value = formatRp(dashData.rekap_seluruh_ipb?.total_rupiah || 0);
           newStats[2].badge = 'Total Nilai Terkumpul';
+          
+          if (dashData.grafik_bulanan && Array.isArray(dashData.grafik_bulanan)) {
+            setLineData(dashData.grafik_bulanan.map(g => ({ name: g.bulan, berat: g.total_berat / 1000 })));
+            setBarData(dashData.grafik_bulanan.map(g => ({ name: g.bulan, nilai: g.total_nilai })));
+          }
+
+          if (dashData.breakdown_kategori && Array.isArray(dashData.breakdown_kategori)) {
+             setPieKategori(dashData.breakdown_kategori.map(k => ({ name: k.kategori, value: k.total_berat / 1000 })));
+          }
         }
         
         if (wilData.status === 'sukses') {
@@ -160,48 +176,64 @@ function AdminDashboardPage() {
         ))}
       </div>
 
-      {/* GRAFIK (SESUAI FOTO 1) */}
+      {/* GRAFIK DINAMIS DARI BACKEND */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         {/* Line Chart Card */}
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 lg:col-span-1">
           <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Tren Sampah Bulanan</h3>
-          <div className="h-48 flex items-end justify-between px-2 relative">
-            <svg className="absolute inset-0 w-full h-full p-4" viewBox="0 0 100 40">
-              <path d="M0 35 Q 25 30, 50 20 T 100 5" fill="none" stroke="#125B2A" strokeWidth="2" />
-              <circle cx="0" cy="35" r="2" fill="#125B2A" />
-              <circle cx="25" cy="30" r="2" fill="#125B2A" />
-              <circle cx="50" cy="20" r="2" fill="#125B2A" />
-              <circle cx="75" cy="15" r="2" fill="#125B2A" />
-              <circle cx="100" cy="5" r="2" fill="#125B2A" />
-            </svg>
-            <div className="w-full flex justify-between mt-auto pt-4 text-[10px] font-bold text-gray-400">
-              <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>Mei</span>
-            </div>
+          <div className="h-48">
+            {lineData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={lineData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={35} />
+                  <Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 2}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => [`${value} kg`, 'Berat']} />
+                  <Line type="monotone" dataKey="berat" stroke="#125B2A" strokeWidth={3} dot={{r: 4, fill: '#125B2A'}} activeDot={{r: 6}} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full bg-gray-50 flex items-center justify-center rounded-xl"><p className="text-gray-400 text-xs">Belum ada data</p></div>
+            )}
           </div>
         </div>
 
         {/* Bar Chart Card */}
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 lg:col-span-1">
           <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Nilai Ekonomi Bulanan</h3>
-          <div className="h-48 flex items-end justify-between px-4">
-            {[40, 55, 70, 85, 100].map((h, i) => (
-              <div key={i} className="flex flex-col items-center gap-2 w-full">
-                <div style={{ height: `${h}%` }} className="w-8 bg-[#125B2A] rounded-t-lg transition-all hover:opacity-80"></div>
-                <span className="text-[10px] font-bold text-gray-400">{['Jan','Feb','Mar','Apr','Mei'][i]}</span>
-              </div>
-            ))}
+          <div className="h-48">
+            {barData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={45} tickFormatter={(val) => `${val/1000}k`} />
+                  <Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `Rp ${val.toLocaleString()}`} />
+                  <Bar dataKey="nilai" fill="#125B2A" radius={[4, 4, 0, 0]} barSize={30} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full bg-gray-50 flex items-center justify-center rounded-xl"><p className="text-gray-400 text-xs">Belum ada data</p></div>
+            )}
           </div>
         </div>
 
         {/* Pie Chart Card */}
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 lg:col-span-1">
           <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Kategori Sampah Terbanyak</h3>
-          <div className="flex justify-center items-center h-48 relative">
-             <div className="w-32 h-32 rounded-full" style={{ background: 'conic-gradient(#125B2A 0% 45%, #F4A300 45% 75%, #EAE5DA 75% 100%)' }}></div>
-             <div className="absolute right-0 text-[10px] font-bold text-[#0B4D1E] space-y-2">
-               <div className="flex items-center gap-1"><div className="w-2 h-2 bg-[#125B2A] rounded-full"></div> Plastik 45%</div>
-               <div className="flex items-center gap-1"><div className="w-2 h-2 bg-[#F4A300] rounded-full"></div> Kertas 30%</div>
-             </div>
+          <div className="h-48 relative">
+            {pieKategori.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => `${value} kg`} />
+                  <Pie data={pieKategori} innerRadius={35} outerRadius={70} paddingAngle={2} dataKey="value" label={({name}) => `${name}`} labelLine={false} style={{fontSize: '10px', fontWeight: 'bold'}}>
+                    {pieKategori.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS_KATEGORI[index % COLORS_KATEGORI.length]} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full bg-gray-50 flex items-center justify-center rounded-xl"><p className="text-gray-400 text-xs">Belum ada data</p></div>
+            )}
           </div>
         </div>
       </div>

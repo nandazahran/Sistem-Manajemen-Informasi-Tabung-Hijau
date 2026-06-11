@@ -184,8 +184,8 @@ function DashboardPage() {
           
           <div className="w-full h-64 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex items-end justify-between p-4 gap-2">
             {grafikBulanan.map((g, i) => {
-               const maxBerat = Math.max(...grafikBulanan.map(x => x.total_berat || x.berat), 1);
-               const b = g.total_berat !== undefined ? g.total_berat : g.berat;
+               const maxBerat = Math.max(...grafikBulanan.map(x => (x.total_berat !== undefined ? x.total_berat : x.berat) || 0), 1);
+               const b = g.total_berat !== undefined ? g.total_berat : (g.berat || 0);
                const heightPct = Math.max((b / maxBerat) * 100, 2); 
                return (
                  <div key={i} className="flex flex-col items-center justify-end w-full h-full gap-2 group">

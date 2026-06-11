@@ -6,6 +6,13 @@ function NotifikasiPage() {
   
   const [notifikasi, setNotifikasi] = useState([]);
 
+  const formatWaktuDB = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
   useEffect(() => {
     const fetchNotifikasi = async () => {
       try {
@@ -17,15 +24,15 @@ function NotifikasiPage() {
         });
         const resData = await response.json();
         
-        if (resData.status === 'sukses') {
+        if (resData.status === 'sukses' && Array.isArray(resData.data)) {
           // Mapping data riil dari API
           const mappedNotif = resData.data.map(n => ({
             id: n.id,
             type: n.tipe === 'transaksi' ? 'check' : n.tipe === 'hapus_transaksi' ? 'alert' : n.tipe === 'update_transaksi' ? 'wallet' : 'up',
             title: n.judul,
-            desc: n.deskripsi,
-            time: n.waktu,
-            read: n.isRead
+            desc: n.deskripsi || n.pesan || '',
+            time: formatWaktuDB(n.waktu),
+            read: n.isRead || false
           }));
 
           // Tetap tambahkan notif sistem 

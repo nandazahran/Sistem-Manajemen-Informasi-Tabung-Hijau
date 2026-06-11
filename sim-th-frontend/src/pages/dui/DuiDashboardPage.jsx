@@ -55,7 +55,7 @@ function DuiDashboardPage() {
           if (dashData.grafik_bulanan && Array.isArray(dashData.grafik_bulanan) && dashData.grafik_bulanan.length > 0) {
             setLineData(dashData.grafik_bulanan.map(g => ({
               name: g.bulan,
-              berat: g.total_berat
+              berat: g.total_berat / 1000
             })));
             setBarData(dashData.grafik_bulanan.map(g => ({
               name: g.bulan,
@@ -66,14 +66,14 @@ function DuiDashboardPage() {
           if (dashData.breakdown_kategori && Array.isArray(dashData.breakdown_kategori) && dashData.breakdown_kategori.length > 0) {
              setPieKategori(dashData.breakdown_kategori.map(k => ({
                name: k.kategori,
-               value: k.total_berat
+               value: k.total_berat / 1000
              })));
 
              // Update Stats Kategori Terbanyak
              const topKategori = [...dashData.breakdown_kategori].sort((a, b) => b.total_berat - a.total_berat)[0];
              if (topKategori) {
                newStats[5].value = topKategori.kategori;
-               newStats[5].badge = `${topKategori.total_berat} kg`;
+               newStats[5].badge = `${topKategori.total_berat / 1000} kg`;
              }
           } else {
              newStats[5].value = '-';

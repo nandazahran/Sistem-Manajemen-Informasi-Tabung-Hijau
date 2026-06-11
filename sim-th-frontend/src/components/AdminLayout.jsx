@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 function AdminLayout({ children }) {
@@ -7,12 +7,42 @@ function AdminLayout({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
 
-  // Data Dummy Dropdown Notif
-  const notifDropdown = [
-    { id: 1, title: 'Transaksi baru dari BEM FATETA', desc: 'Plastik 25kg', time: '5 menit lalu', unread: true },
-    { id: 2, title: 'User baru ditambahkan', desc: 'BEM FAPET berhasil ditambahkan', time: '10 menit lalu', unread: true },
-    { id: 3, title: 'Harga kategori diperbarui', desc: 'Plastik: Rp 4.500/kg', time: '1 jam lalu', unread: false },
-  ];
+  const [dataNotif, setDataNotif] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchNavbarNotifications = async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token || !baseUrl) return;
+
+      const response = await fetch(`${baseUrl}/notifikasi`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const resData = await response.json();
+
+      if (resData.status === 'sukses' && Array.isArray(resData.data)) {
+        setDataNotif(resData.data.slice(0, 5));
+        const hitungBelumDibaca = resData.data.filter(n => !n.isRead).length;
+        setUnreadCount(hitungBelumDibaca);
+      }
+    } catch (error) {
+      console.error("Gagal sinkronisasi notifikasi navbar:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchNavbarNotifications();
+    const interval = setInterval(fetchNavbarNotifications, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatWaktuNotif = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  };
 
   const adminMenuItems = [
     { name: 'Dashboard', path: '/admin/dashboard', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
@@ -95,30 +125,38 @@ function AdminLayout({ children }) {
             
             {/* WRAPPER NOTIFIKASI DROPDOWN */}
             <div className="relative">
-              <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="relative p-2 rounded-full hover:bg-gray-100 transition-colors">
+              <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="relative p-2 rounded-full hover:bg-gray-100 transition-colors focus:outline-none">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                <span className="absolute top-0 right-0 w-5 h-5 bg-[#F4A300] text-white text-[11px] font-bold flex items-center justify-center rounded-full border-2 border-white">2</span>
+                {unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 w-5 h-5 bg-[#F4A300] text-white text-[11px] font-bold flex items-center justify-center rounded-full border-2 border-white animate-pulse">
+                    {unreadCount}
+                  </span>
+                )}
               </button>
 
               {isNotifOpen && (
-                <div className="absolute top-full right-0 mt-4 w-80 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-fade-in-up">
+                <div className="absolute top-full right-0 mt-4 w-80 bg-white rounded-3xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border border-gray-100 overflow-hidden z-50 animate-fade-in-up">
                   <div className="p-5 border-b border-gray-100">
                     <h3 className="font-extrabold text-[#0B4D1E] text-lg">Notifikasi</h3>
-                    <p className="text-gray-400 text-xs font-medium mt-1">2 belum dibaca</p>
+                    <p className="text-gray-400 text-xs font-medium mt-1">{unreadCount} belum dibaca</p>
                   </div>
                   <div className="max-h-80 overflow-y-auto custom-scrollbar">
-                    {notifDropdown.map((item) => (
-                      <div key={item.id} className="p-5 border-b border-gray-50 hover:bg-[#FDF6EA] cursor-pointer flex gap-4 transition-colors">
-                        <div className="mt-1.5 flex-shrink-0">
-                          {item.unread ? <div className="w-2.5 h-2.5 rounded-full bg-[#F4A300]"></div> : <div className="w-2.5 h-2.5"></div>}
+                    {dataNotif.length > 0 ? (
+                      dataNotif.map((item) => (
+                        <div key={item.id} className="p-5 border-b border-gray-50 hover:bg-[#FDF6EA] cursor-pointer flex gap-4 transition-colors">
+                          <div className="mt-1.5 flex-shrink-0">
+                            {!item.isRead ? <div className="w-2.5 h-2.5 rounded-full bg-[#F4A300]"></div> : <div className="w-2.5 h-2.5"></div>}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-[#0B4D1E]">{item.judul || 'Pemberitahuan'}</p>
+                            <p className="text-xs text-gray-500 mt-1 font-medium">{item.deskripsi || item.pesan}</p>
+                            <p className="text-[10px] text-gray-400 mt-1.5 font-bold">{formatWaktuNotif(item.waktu || item.created_at)}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-bold text-[#0B4D1E]">{item.title}</p>
-                          <p className="text-xs text-gray-500 mt-1 font-medium">{item.desc}</p>
-                          <p className="text-[10px] text-gray-400 mt-1.5 font-bold">{item.time}</p>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <div className="p-6 text-center text-sm text-gray-400 italic">Belum ada notifikasi baru.</div>
+                    )}
                   </div>
                   <div className="p-4 text-center bg-white border-t border-gray-100 hover:bg-gray-50 transition-colors">
                     <button onClick={() => { setIsNotifOpen(false); navigate('/admin/notifikasi'); }} className="text-[#0B4D1E] font-bold text-sm hover:text-[#F4A300] flex items-center justify-center gap-2 w-full transition-colors">
