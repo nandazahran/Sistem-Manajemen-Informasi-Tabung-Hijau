@@ -3504,69 +3504,90 @@ pub async fn seed_data(
         }
     };
 
+    // ===== FASE 0: CLEANUP DATA LAMA (agar bisa re-seed tanpa duplikasi) =====
+    // Hapus data yang tergantung relasi terlebih dahulu (child → parent)
+    let _ = riwayat_harga::Entity::delete_many().exec(&db).await;
+    let _ = riwayat_penarikan::Entity::delete_many().exec(&db).await;
+    let _ = tabungan_sampah::Entity::delete_many().exec(&db).await;
+    let _ = transaksi_sampah::Entity::delete_many().exec(&db).await;
+    let _ = notifikasi::Entity::delete_many().exec(&db).await;
+    let _ = rekening_wilayah::Entity::delete_many().exec(&db).await;
+    // Hapus user dummy (semua kecuali admin, superadmin, dui)
+    let _ = user::Entity::delete_many()
+        .filter(user::Column::Role.is_not_in(["admin", "superadmin", "dui"]))
+        .exec(&db).await;
+    let _ = kategori_sampah::Entity::delete_many().exec(&db).await;
+    let _ = wilayah::Entity::delete_many().exec(&db).await;
+
     let charset: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
 
-    // 2. Buat Wilayah Sesuai Daftar Sebenarnya
+    // ===== FASE 1: Buat Wilayah Sesuai Daftar Sebenarnya =====
     let wilayah_data = vec![
-        ("BEM FAPERTA", "bem_faperta"), ("BEM SKHB", "bem_skhb"), ("BEM FPIK", "bem_fpik"), 
-        ("BEM FAPET", "bem_fapet"), ("BEM FAHUTAN", "bem_fahutan"), ("BEM FATETA", "bem_fateta"), 
-        ("BEM FMIPA", "bem_fmipa"), ("BEM FEM", "bem_fem"), ("BEM FEMA", "bem_fema"), 
-        ("BEM VOKASI", "bem_vokasi"), ("BEM SB", "bem_sb"), ("BEM FK", "bem_fk"), 
+        ("BEM FAPERTA", "bem_faperta"), ("BEM SKHB", "bem_skhb"), ("BEM FPIK", "bem_fpik"),
+        ("BEM FAPET", "bem_fapet"), ("BEM FAHUTAN", "bem_fahutan"), ("BEM FATETA", "bem_fateta"),
+        ("BEM FMIPA", "bem_fmipa"), ("BEM FEM", "bem_fem"), ("BEM FEMA", "bem_fema"),
+        ("BEM VOKASI", "bem_vokasi"), ("BEM SB", "bem_sb"), ("BEM FK", "bem_fk"),
         ("BEM SSMI", "bem_ssmi"), ("Ormawa Eksekutif PPKU", "ormawa_ppku")
     ];
     let mut wilayah_ids = Vec::new();
     for (nama, _) in &wilayah_data {
-        let existing = wilayah::Entity::find().filter(wilayah::Column::Nama.eq(*nama)).one(&db).await.unwrap_or(None);
-        let w_id = if let Some(w) = existing {
-            w.id
-        } else {
-            let model = wilayah::ActiveModel {
-                nama: Set(nama.to_string()),
-                status: Set("Aktif".to_string()),
-                ..Default::default()
-            };
-            let res = model.insert(&db).await.unwrap();
-            res.id
+        let model = wilayah::ActiveModel {
+            nama: Set(nama.to_string()),
+            status: Set("Aktif".to_string()),
+            ..Default::default()
         };
-        wilayah_ids.push(w_id);
+        let res = model.insert(&db).await.unwrap();
+        wilayah_ids.push(res.id);
     }
 
-    // 3. Buat Kategori Dummy
-    let kategori_names = vec!["Plastik Dummy", "Kertas Dummy", "Logam Dummy"];
+    // ===== FASE 2: Buat Kategori Sampah (nama real, bukan "Dummy") =====
+    let kategori_list = vec![
+        ("Plastik", 4500),
+        ("Kertas", 2500),
+        ("Logam", 7500),
+        ("Kaca", 2000),
+    ];
     let mut kategori_ids = Vec::new();
-    for (i, nama) in kategori_names.iter().enumerate() {
-        let existing = kategori_sampah::Entity::find().filter(kategori_sampah::Column::NamaKategori.eq(*nama)).one(&db).await.unwrap_or(None);
-        let k_id = if let Some(k) = existing {
-            k.id
-        } else {
-            let model = kategori_sampah::ActiveModel {
-                nama_kategori: Set(nama.to_string()),
-                harga_per_kg: Set((i as i32 + 1) * 2000),
-                ..Default::default()
-            };
-            let res = model.insert(&db).await.unwrap();
-            res.id
+    for (nama, harga) in &kategori_list {
+        let model = kategori_sampah::ActiveModel {
+            nama_kategori: Set(nama.to_string()),
+            harga_per_kg: Set(*harga),
+            ..Default::default()
         };
-        kategori_ids.push(k_id);
+        let res = model.insert(&db).await.unwrap();
+        kategori_ids.push(res.id);
     }
 
-    // 4. Buat User Dummy (1 user per wilayah mewakili admin wilayah)
-    let mut user_ids = Vec::new();
-    
+    // ===== FASE 3: Buat Rekening Wilayah (1 per wilayah) =====
+    let bank_names = vec!["BRI", "BNI", "Mandiri", "BSI", "BCA"];
+    for (idx, &w_id) in wilayah_ids.iter().enumerate() {
+        let (nama_wil, _) = wilayah_data[idx];
+        let bank = bank_names[idx % bank_names.len()];
+        let no_rek = format!("{}{}", 100000000 + (idx * 11111), idx);
+        let model = rekening_wilayah::ActiveModel {
+            wilayah_id: Set(w_id),
+            nama_bank: Set(bank.to_string()),
+            no_rekening: Set(no_rek),
+            atas_nama: Set(format!("Bendahara {}", nama_wil)),
+            is_utama: Set(true),
+            ..Default::default()
+        };
+        let _ = model.insert(&db).await;
+    }
+
+    // ===== FASE 4: Buat User Dummy (1 admin sosling per wilayah) =====
+    let mut user_ids_per_wilayah: Vec<(i32, i32)> = Vec::new(); // (user_id, wilayah_id)
+
     for (idx, &w_id) in wilayah_ids.iter().enumerate() {
         let (nama_wilayah, role_wilayah) = wilayah_data[idx];
-        
+
         let random_suffix: String = (0..5).map(|_| {
-            let idx = rand::rng().random_range(0..charset.len());
-            charset[idx] as char
+            let i = rand::rng().random_range(0..charset.len());
+            charset[i] as char
         }).collect();
         let username = format!("{}_{}", role_wilayah, random_suffix.to_lowercase());
-        let password_plain: String = (0..20).map(|_| {
-            let idx = rand::rng().random_range(0..charset.len());
-            charset[idx] as char
-        }).collect();
         let email = format!("{}@dummy.com", username);
-        let password_hash = hash(&password_plain, DEFAULT_COST).unwrap_or_else(|_| "dummyhash".to_string());
+        let password_hash = hash("password123", DEFAULT_COST).unwrap_or_else(|_| "dummyhash".to_string());
 
         let model = user::ActiveModel {
             username: Set(username.clone()),
@@ -3579,7 +3600,7 @@ pub async fn seed_data(
             ..Default::default()
         };
         if let Ok(res) = model.insert(&db).await {
-            user_ids.push(res.id);
+            user_ids_per_wilayah.push((res.id, w_id));
         }
     }
 
@@ -3597,7 +3618,6 @@ pub async fn seed_data(
         bem_km_admin_id = u.id;
         bem_km_admin_username = u.username;
     } else {
-        // Buat user bem_km baru
         let password_hash = hash("bemkm123", DEFAULT_COST).unwrap_or_else(|_| "dummyhash".to_string());
         let model = user::ActiveModel {
             username: Set("admin_bem_km".to_string()),
@@ -3614,74 +3634,113 @@ pub async fn seed_data(
         bem_km_admin_username = res.username;
     }
 
-    // 5. Buat Transaksi Dummy (2 sesi / 4 bulan terakhir dengan trend positif)
-    // Sesi 1: 4 bulan lalu
-    // Sesi 2: 2 bulan lalu
+    // Buat juga user DUI jika belum ada
+    let dui_user = user::Entity::find()
+        .filter(user::Column::Role.eq("dui"))
+        .one(&db)
+        .await
+        .unwrap_or(None);
+    if dui_user.is_none() {
+        let password_hash = hash("dui123", DEFAULT_COST).unwrap_or_else(|_| "dummyhash".to_string());
+        let model = user::ActiveModel {
+            username: Set("admin_dui".to_string()),
+            email: Set("dui@simth.ipb.ac.id".to_string()),
+            password: Set(password_hash),
+            nama: Set("Admin DUI".to_string()),
+            role: Set("dui".to_string()),
+            status: Set("Aktif".to_string()),
+            wilayah_id: Set(None),
+            ..Default::default()
+        };
+        let _ = model.insert(&db).await;
+    }
+
+    // ===== FASE 5: Buat Transaksi Dummy (6 bulan terakhir, trend positif) =====
+    let now = Utc::now().naive_utc();
     let mut total_saldo_wilayah: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
 
-    if !user_ids.is_empty() {
-        let now = Utc::now().naive_utc();
-        let sesi_4_bulan = now - Duration::days(120);
-        let sesi_2_bulan = now - Duration::days(60);
+    // 6 sesi: bulan -6, -5, -4, -3, -2, -1 (trend naik)
+    for bulan_lalu in (1..=6).rev() {
+        let tanggal_base = now - Duration::days(bulan_lalu * 30);
+        // Multiplier naik seiring waktu: bulan lama = kecil, bulan baru = besar
+        let multiplier = (7 - bulan_lalu) as i32; // 1..6
 
-        let sesi_dates = vec![sesi_4_bulan, sesi_2_bulan];
+        for &w_id in &wilayah_ids {
+            // 3-5 transaksi per wilayah per bulan
+            let num_trx = 3 + rand::rng().random_range(0..3_i64);
+            for t in 0..num_trx {
+                let k_idx = rand::rng().random_range(0..kategori_ids.len());
+                let k_id = kategori_ids[k_idx];
+                let harga_per_kg = kategori_list[k_idx].1;
 
-        for (sesi_idx, date) in sesi_dates.iter().enumerate() {
-            // Trend positif: sesi 2 (idx=1) lebih tinggi nilainya dari sesi 1 (idx=0)
-            let multiplier = if sesi_idx == 0 { 1 } else { 2 };
+                // Berat naik seiring waktu (dalam gram)
+                let berat = (2000 + rand::rng().random_range(500..3000)) * multiplier;
+                let total_nilai = (berat / 1000) * harga_per_kg;
 
-            for _u_id in &user_ids {
-                // 2 transaksi per user per sesi
-                for _ in 0..2 {
-                    let w_id = wilayah_ids[rand::rng().random_range(0..wilayah_ids.len())];
-                    let k_id = kategori_ids[rand::rng().random_range(0..kategori_ids.len())];
-                    
-                    // Poin dan berat cenderung tinggi dan naik
-                    let poin_kualitas = 80 + (rand::rng().random_range(0..10) * multiplier);
-                    let poin_kualitas = if poin_kualitas > 100 { 100 } else { poin_kualitas };
-                    
-                    let berat = 5000 + (rand::rng().random_range(1000..5000) * multiplier); // dalam gram
-                    let harga_acak: i32 = rand::rng().random_range(2000..5000);
-                    let total_nilai = (berat / 1000) * harga_acak;
+                let poin_kualitas = std::cmp::min(100, 70 + rand::rng().random_range(0..15) * multiplier / 2);
 
-                    let model = transaksi_sampah::ActiveModel {
-                        tanggal: Set(*date),
-                        berat: Set(berat),
-                        total_nilai: Set(total_nilai),
-                        status: Set("Selesai".to_string()),
-                        poin_kualitas: Set(poin_kualitas),
-                        catatan: Set(Some("Dummy transaksi positif".to_string())),
-                        kategori_id: Set(k_id),
-                        wilayah_id: Set(w_id),
-                        input_by: Set(bem_km_admin_id),
-                        ..Default::default()
-                    };
-                    let _ = model.insert(&db).await;
+                // Variasi tanggal di dalam bulan
+                let offset_hari = rand::rng().random_range(0..15_i64);
+                let tanggal = tanggal_base + Duration::days(offset_hari);
 
-                    *total_saldo_wilayah.entry(w_id).or_insert(0) += total_nilai;
-                }
+                let catatan_list = vec![
+                    "Sampah terpilah dengan baik",
+                    "Setoran rutin bulanan",
+                    "Hasil bank sampah fakultas",
+                    "Kontribusi kegiatan lingkungan",
+                    "Sampah dari kantin fakultas",
+                ];
+                let catatan = catatan_list[rand::rng().random_range(0..catatan_list.len())];
+
+                let model = transaksi_sampah::ActiveModel {
+                    tanggal: Set(tanggal),
+                    berat: Set(berat),
+                    total_nilai: Set(total_nilai),
+                    status: Set("Selesai".to_string()),
+                    poin_kualitas: Set(poin_kualitas),
+                    catatan: Set(Some(catatan.to_string())),
+                    kategori_id: Set(k_id),
+                    wilayah_id: Set(w_id),
+                    input_by: Set(bem_km_admin_id),
+                    ..Default::default()
+                };
+                let _ = model.insert(&db).await;
+
+                *total_saldo_wilayah.entry(w_id).or_insert(0) += total_nilai;
             }
         }
     }
 
-    // 6. Generate Tabungan dan Riwayat Penarikan
-    let now = Utc::now().naive_utc();
+    // ===== FASE 6: Generate Tabungan dan Riwayat Penarikan =====
     let sesi_1_bulan = now - Duration::days(30);
+    let sesi_2_bulan = now - Duration::days(60);
 
-    for (w_id, saldo_terkumpul) in total_saldo_wilayah {
-        // Buat penarikan dummy 1 bulan lalu
-        let ditarik = saldo_terkumpul / 4; // Tarik 25% dari saldo
-        let saldo_akhir = saldo_terkumpul - ditarik;
+    for (&w_id, &saldo_terkumpul) in &total_saldo_wilayah {
+        // Buat 2 penarikan: 2 bulan lalu dan 1 bulan lalu
+        let ditarik_1 = saldo_terkumpul / 5;
+        let ditarik_2 = saldo_terkumpul / 6;
+        let total_ditarik = ditarik_1 + ditarik_2;
+        let saldo_akhir = saldo_terkumpul - total_ditarik;
 
-        if ditarik > 0 {
-            let riwayat_penarikan_model = riwayat_penarikan::ActiveModel {
+        if ditarik_1 > 0 {
+            let model = riwayat_penarikan::ActiveModel {
                 wilayah_id: Set(w_id),
-                nominal: Set(ditarik),
+                nominal: Set(ditarik_1),
+                tanggal_penarikan: Set(sesi_2_bulan),
+                ditarik_oleh: Set(bem_km_admin_username.clone()),
+                ..Default::default()
+            };
+            let _ = riwayat_penarikan::Entity::insert(model).exec(&db).await;
+        }
+        if ditarik_2 > 0 {
+            let model = riwayat_penarikan::ActiveModel {
+                wilayah_id: Set(w_id),
+                nominal: Set(ditarik_2),
                 tanggal_penarikan: Set(sesi_1_bulan),
                 ditarik_oleh: Set(bem_km_admin_username.clone()),
                 ..Default::default()
             };
-            let _ = riwayat_penarikan::Entity::insert(riwayat_penarikan_model).exec(&db).await;
+            let _ = riwayat_penarikan::Entity::insert(model).exec(&db).await;
         }
 
         let tabungan_model = tabungan_sampah::ActiveModel {
@@ -3693,26 +3752,69 @@ pub async fn seed_data(
         let _ = tabungan_sampah::Entity::insert(tabungan_model).exec(&db).await;
     }
 
-    // 7. Tambah riwayat harga untuk tiap kategori (harga sebelumnya)
-    for k_id in &kategori_ids {
-        let harga_lama: i32 = rand::rng().random_range(2000..4000);
-        let harga_baru = harga_lama + 500; // Harga baru naik 500
-        
-        let sesi_3_bulan = now - Duration::days(90);
+    // ===== FASE 7: Riwayat Harga (2 perubahan per kategori) =====
+    for (k_idx, k_id) in kategori_ids.iter().enumerate() {
+        let harga_awal = kategori_list[k_idx].1 - 1000;
+        let harga_tengah = kategori_list[k_idx].1 - 500;
+        let harga_akhir = kategori_list[k_idx].1;
 
-        let model_riwayat = riwayat_harga::ActiveModel {
+        // Perubahan pertama: 5 bulan lalu
+        let model1 = riwayat_harga::ActiveModel {
             kategori_id: Set(*k_id),
-            harga_lama: Set(harga_lama),
-            harga_baru: Set(harga_baru),
-            tanggal_perubahan: Set(sesi_3_bulan),
+            harga_lama: Set(harga_awal),
+            harga_baru: Set(harga_tengah),
+            tanggal_perubahan: Set(now - Duration::days(150)),
             diubah_oleh: Set(bem_km_admin_username.clone()),
             ..Default::default()
         };
-        let _ = riwayat_harga::Entity::insert(model_riwayat).exec(&db).await;
+        let _ = riwayat_harga::Entity::insert(model1).exec(&db).await;
+
+        // Perubahan kedua: 2 bulan lalu
+        let model2 = riwayat_harga::ActiveModel {
+            kategori_id: Set(*k_id),
+            harga_lama: Set(harga_tengah),
+            harga_baru: Set(harga_akhir),
+            tanggal_perubahan: Set(now - Duration::days(60)),
+            diubah_oleh: Set(bem_km_admin_username.clone()),
+            ..Default::default()
+        };
+        let _ = riwayat_harga::Entity::insert(model2).exec(&db).await;
     }
+
+    // ===== FASE 8: Notifikasi Dummy =====
+    let notif_data = vec![
+        ("broadcast", "Pengumuman Sistem", "Selamat datang di SIM Tabung Hijau! Sistem telah diperbarui."),
+        ("broadcast", "Jadwal Setoran", "Setoran sampah bulan ini dibuka mulai tanggal 1-15."),
+        ("transaksi", "Transaksi Baru Dicatat", "Transaksi sampah plastik 25kg telah berhasil dicatat ke sistem."),
+        ("broadcast", "Pemenang Leaderboard", "Selamat kepada BEM FATETA sebagai juara KPI bulan lalu!"),
+        ("sistem", "Pemeliharaan Sistem", "Sistem akan maintenance pada hari Sabtu pukul 23:00-01:00."),
+        ("broadcast", "Target Bulanan", "Mari capai target 500kg sampah terkelola bulan ini!"),
+        ("transaksi", "Penarikan Saldo", "Penarikan saldo Rp 500.000 telah diproses untuk BEM FAPET."),
+        ("broadcast", "Harga Sampah Update", "Harga sampah plastik naik menjadi Rp 4.500/kg efektif hari ini."),
+    ];
+    for (i, (tipe, judul, deskripsi)) in notif_data.iter().enumerate() {
+        let waktu = now - Duration::days((notif_data.len() - i) as i64 * 3);
+        let target_role = if *tipe == "broadcast" { Some(serde_json::json!(["all"]).to_string()) } else { Some(serde_json::json!(["admin", "bem_km"]).to_string()) };
+        let model = notifikasi::ActiveModel {
+            tipe: Set(tipe.to_string()),
+            judul: Set(judul.to_string()),
+            deskripsi: Set(deskripsi.to_string()),
+            target_role: Set(target_role),
+            target_wilayah_id: Set(None),
+            ..Default::default()
+        };
+        let _ = model.insert(&db).await;
+    }
+
+    let total_wilayah = wilayah_ids.len();
+    let total_kategori = kategori_ids.len();
+    let total_trx: i32 = total_saldo_wilayah.values().count() as i32;
 
     (StatusCode::CREATED, Json(ResponPesan {
         status: "sukses".to_string(),
-        pesan: "Data dummy untuk 2 sesi beserta tabungan dan riwayat lengkap berhasil di-generate!".to_string()
+        pesan: format!(
+            "Data dummy komprehensif berhasil di-generate! {} wilayah, {} kategori, 6 bulan transaksi, tabungan, riwayat penarikan, riwayat harga, rekening, dan notifikasi.",
+            total_wilayah, total_kategori
+        )
     }))
 }

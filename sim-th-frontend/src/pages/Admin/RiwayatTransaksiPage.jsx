@@ -1,16 +1,64 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../components/AdminLayout';
 
 function RiwayatTransaksiPage() {
   const [selectedTrx, setSelectedTrx] = useState(null);
+  const [historyData, setHistoryData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Dummy Data disesuaikan biar pas dengan struktur desain Figma
-  const [historyData] = useState([
-    { id: 1, id_trx: '#0001', tanggal: '9 Mei 2026', wilayah: 'BEM FATETA', user: 'Ahmad Fauzi', kategori: 'Plastik', berat: '25 kg', nilai: 'Rp 50.000', status: 'Selesai', catatan: 'Botol plastik bersih' },
-    { id: 2, id_trx: '#0002', tanggal: '8 Mei 2026', wilayah: 'BEM FAPET', user: 'Budi Santoso', kategori: 'Kertas', berat: '15 kg', nilai: 'Rp 37.500', status: 'Selesai', catatan: 'Kardus bekas' },
-    { id: 3, id_trx: '#0003', tanggal: '7 Mei 2026', wilayah: 'BEM FEM', user: 'Siti Aminah', kategori: 'Logam', berat: '10 kg', nilai: 'Rp 75.000', status: 'Menunggu', catatan: 'Kaleng aluminium' },
-    { id: 4, id_trx: '#0004', tanggal: '28 Apr 2026', wilayah: 'BEM FAHUTAN', user: 'Rizky Pratama', kategori: 'Kaca', berat: '20 kg', nilai: 'Rp 40.000', status: 'Selesai', catatan: 'Pecahan botol' },
-  ]);
+  // Summary computed from data
+  const totalBerat = historyData.reduce((acc, item) => acc + (item.berat_raw || 0), 0);
+  const totalNilai = historyData.reduce((acc, item) => acc + (item.nilai_raw || 0), 0);
+  const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+
+  useEffect(() => {
+    const fetchRiwayat = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const baseUrl = import.meta.env.VITE_API_URL;
+        if (!baseUrl || !token) return;
+
+        const response = await fetch(`${baseUrl}/transaksi`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+
+        if (result.status === 'sukses' && result.data) {
+          const mapped = result.data.map((item, idx) => ({
+            id: item.id,
+            id_trx: `#${String(item.id).padStart(4, '0')}`,
+            tanggal: new Date(item.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+            wilayah: item.nama_wilayah || '-',
+            user: item.nama_petugas || '-',
+            kategori: item.nama_kategori || '-',
+            berat: `${(item.berat / 1000).toFixed(1)} kg`,
+            berat_raw: item.berat,
+            nilai: formatRp(item.total_nilai),
+            nilai_raw: item.total_nilai,
+            status: item.status || 'Selesai',
+            catatan: item.catatan || '-'
+          }));
+          setHistoryData(mapped);
+        }
+      } catch (error) {
+        console.error('Gagal fetch riwayat:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRiwayat();
+  }, []);
+
+  const filteredData = historyData.filter(item => {
+    const term = searchTerm.toLowerCase();
+    return item.wilayah.toLowerCase().includes(term) ||
+           item.kategori.toLowerCase().includes(term) ||
+           item.user.toLowerCase().includes(term) ||
+           item.tanggal.toLowerCase().includes(term) ||
+           item.catatan.toLowerCase().includes(term);
+  });
 
   return (
     <AdminLayout>
@@ -27,26 +75,9 @@ function RiwayatTransaksiPage() {
 
       {/* FILTER & SEARCH */}
       <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 mb-8">
-        <div className="relative mb-4">
+        <div className="relative">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-          <input type="text" placeholder="Cari wilayah, kategori, user, tanggal, catatan..." className="w-full bg-[#F5EFE6] px-14 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-all" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[
-            ['Semua Wilayah', 'FATETA', 'FAPET'],
-            ['Semua Kategori', 'Plastik', 'Kertas'],
-            ['Semua Bulan', 'Mei', 'April'],
-            ['2026', '2025']
-          ].map((opts, i) => (
-            <div key={i} className="relative">
-              <select className="w-full bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-3.5 rounded-xl outline-none border border-transparent focus:border-[#F4A300] cursor-pointer appearance-none">
-                {opts.map(opt => <option key={opt}>{opt}</option>)}
-              </select>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute right-4 top-1/2 transform -translate-y-1/2 text-[#0B4D1E] pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </div>
-          ))}
+          <input type="text" placeholder="Cari wilayah, kategori, user, tanggal, catatan..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#F5EFE6] px-14 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-all" />
         </div>
       </div>
 
@@ -54,24 +85,29 @@ function RiwayatTransaksiPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
           <p className="text-gray-400 text-sm font-medium mb-1">Total Transaksi</p>
-          <h3 className="text-4xl font-extrabold text-[#0B4D1E]">{historyData.length}</h3>
+          <h3 className="text-4xl font-extrabold text-[#0B4D1E]">{filteredData.length}</h3>
         </div>
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
           <p className="text-gray-400 text-sm font-medium mb-1">Total Berat</p>
-          <h3 className="text-4xl font-extrabold text-[#0B4D1E]">70 kg</h3>
+          <h3 className="text-4xl font-extrabold text-[#0B4D1E]">{(totalBerat / 1000).toFixed(0)} kg</h3>
         </div>
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
           <p className="text-gray-400 text-sm font-medium mb-1">Total Nilai</p>
-          <h3 className="text-4xl font-extrabold text-green-600">Rp 202.500</h3>
+          <h3 className="text-4xl font-extrabold text-green-600">{formatRp(totalNilai)}</h3>
         </div>
       </div>
 
-      {/* DAFTAR TRANSAKSI (CLICKABLE) */}
+      {/* DAFTAR TRANSAKSI */}
       <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-8">
         <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-6">Daftar Transaksi</h3>
         
+        {loading ? (
+          <div className="text-center py-10 text-gray-400 font-bold">Memuat data...</div>
+        ) : filteredData.length === 0 ? (
+          <div className="text-center py-10 text-gray-400 font-bold">Belum ada data transaksi.</div>
+        ) : (
         <div className="max-h-[400px] overflow-y-auto pr-2 space-y-4 custom-scrollbar">
-          {historyData.map((item) => (
+          {filteredData.map((item) => (
             <div 
               key={item.id} 
               onClick={() => setSelectedTrx(item)} 
@@ -99,14 +135,13 @@ function RiwayatTransaksiPage() {
             </div>
           ))}
         </div>
+        )}
       </div>
 
-      {/* FLOATING MODAL DETAIL (PERSIS GAMBAR FIGMA) */}
+      {/* MODAL DETAIL */}
       {selectedTrx && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-opacity">
           <div className="bg-white w-full max-w-md rounded-[2rem] p-8 shadow-2xl relative animate-fade-in-up">
-            
-            {/* Header Modal */}
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-4">
                 <div className="bg-[#E8F5E9] p-3 rounded-full text-[#125B2A]">
@@ -118,58 +153,38 @@ function RiwayatTransaksiPage() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-
-            {/* List Body Modal */}
             <div className="flex flex-col">
-              <div className="flex justify-between items-center py-4 border-b border-gray-100">
-                <span className="text-gray-400 font-medium text-sm">ID Transaksi</span>
-                <span className="font-extrabold text-[#0B4D1E] text-sm">{selectedTrx.id_trx}</span>
-              </div>
-              <div className="flex justify-between items-center py-4 border-b border-gray-100">
-                <span className="text-gray-400 font-medium text-sm">Tanggal</span>
-                <span className="font-extrabold text-[#0B4D1E] text-sm">{selectedTrx.tanggal}</span>
-              </div>
-              <div className="flex justify-between items-center py-4 border-b border-gray-100">
-                <span className="text-gray-400 font-medium text-sm">Wilayah</span>
-                <span className="font-extrabold text-[#0B4D1E] text-sm">{selectedTrx.wilayah}</span>
-              </div>
-              <div className="flex justify-between items-center py-4 border-b border-gray-100">
-                <span className="text-gray-400 font-medium text-sm">User</span>
-                <span className="font-extrabold text-[#0B4D1E] text-sm">{selectedTrx.user}</span>
-              </div>
-              <div className="flex justify-between items-center py-4 border-b border-gray-100">
-                <span className="text-gray-400 font-medium text-sm">Kategori</span>
-                <span className="bg-[#F5EFE6] text-[#0B4D1E] px-3 py-1 rounded-full text-xs font-bold">{selectedTrx.kategori}</span>
-              </div>
-              <div className="flex justify-between items-center py-4 border-b border-gray-100">
-                <span className="text-gray-400 font-medium text-sm">Berat</span>
-                <span className="font-extrabold text-[#0B4D1E] text-sm">{selectedTrx.berat}</span>
-              </div>
-              <div className="flex justify-between items-center py-4 border-b border-gray-100">
-                <span className="text-gray-400 font-medium text-sm">Nilai</span>
-                <span className="font-extrabold text-green-600 text-sm">{selectedTrx.nilai}</span>
-              </div>
-              <div className="flex justify-between items-center py-4 border-b border-gray-100">
-                <span className="text-gray-400 font-medium text-sm">Status</span>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${selectedTrx.status === 'Selesai' ? 'bg-[#E8F5E9] text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                  {selectedTrx.status}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-4 border-b border-gray-100">
-                <span className="text-gray-400 font-medium text-sm">Catatan</span>
-                <span className="font-extrabold text-[#0B4D1E] text-sm">{selectedTrx.catatan}</span>
-              </div>
+              {[
+                ['ID Transaksi', selectedTrx.id_trx],
+                ['Tanggal', selectedTrx.tanggal],
+                ['Wilayah', selectedTrx.wilayah],
+                ['User', selectedTrx.user],
+                ['Kategori', selectedTrx.kategori],
+                ['Berat', selectedTrx.berat],
+                ['Nilai', selectedTrx.nilai],
+                ['Status', selectedTrx.status],
+                ['Catatan', selectedTrx.catatan],
+              ].map(([label, value], idx) => (
+                <div key={idx} className="flex justify-between items-center py-4 border-b border-gray-100">
+                  <span className="text-gray-400 font-medium text-sm">{label}</span>
+                  {label === 'Kategori' ? (
+                    <span className="bg-[#F5EFE6] text-[#0B4D1E] px-3 py-1 rounded-full text-xs font-bold">{value}</span>
+                  ) : label === 'Status' ? (
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${value === 'Selesai' ? 'bg-[#E8F5E9] text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{value}</span>
+                  ) : label === 'Nilai' ? (
+                    <span className="font-extrabold text-green-600 text-sm">{value}</span>
+                  ) : (
+                    <span className="font-extrabold text-[#0B4D1E] text-sm">{value}</span>
+                  )}
+                </div>
+              ))}
             </div>
-
-            {/* Button Tutup (Full Round) */}
             <button onClick={() => setSelectedTrx(null)} className="w-full bg-[#125B2A] text-white py-4 rounded-full font-bold mt-8 hover:bg-[#0B4D1E] transition-all">
               Tutup
             </button>
-            
           </div>
         </div>
       )}
-
     </AdminLayout>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../../components/AdminLayout';
 
@@ -15,12 +15,44 @@ function KelolaKategoriPage() {
   const [filterJenis, setFilterJenis] = useState('Semua Jenis');
   const [isJenisOpen, setIsJenisOpen] = useState(false);
 
-  const categories = [
-    { id: 1, name: 'Plastik', jenis: 'Daur Ulang', harga: '4.500', setoran: '850 kg', update: '8 Mei 2026' },
-    { id: 2, name: 'Kertas', jenis: 'Daur Ulang', harga: '2.500', setoran: '620 kg', update: '7 Mei 2026' },
-    { id: 3, name: 'Logam', jenis: 'Daur Ulang', harga: '7.500', setoran: '280 kg', update: '6 Mei 2026' },
-    { id: 4, name: 'Sisa Makanan', jenis: 'Organik', harga: '500', setoran: '450 kg', update: '5 Mei 2026' },
-  ];
+  // Data from backend
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Form state for add/edit
+  const [formName, setFormName] = useState('');
+  const [formHarga, setFormHarga] = useState('');
+
+  const getToken = () => localStorage.getItem('token') || sessionStorage.getItem('token');
+  const baseUrl = import.meta.env.VITE_API_URL;
+
+  const fetchCategories = async () => {
+    try {
+      setLoading(true);
+      const token = getToken();
+      if (!token || !baseUrl) return;
+      const res = await fetch(`${baseUrl}/kategori`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const result = await res.json();
+      if (result.status === 'sukses' && result.data) {
+        const mapped = result.data.map(c => ({
+          id: c.id,
+          name: c.nama_kategori,
+          jenis: 'Daur Ulang',
+          harga: c.harga_per_kg.toLocaleString('id-ID'),
+          harga_raw: c.harga_per_kg,
+          setoran: '-',
+          update: '-'
+        }));
+        setCategories(mapped);
+      }
+    } catch (error) {
+      console.error('Gagal fetch kategori:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchCategories(); }, []);
 
   // Logic Filter
   const filteredCategories = categories.filter(c => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../components/AdminLayout';
 
 function KelolaWilayahPage() {
@@ -19,14 +19,71 @@ function KelolaWilayahPage() {
   // Form State
   const [formData, setFormData] = useState({ name: '', email: '', status: 'Aktif' });
 
-  // Data Dummy Diperbanyak & Ada yang Nonaktif
-  const [wilayahData, setWilayahData] = useState([
-    { id: 1, name: 'BEM FATETA', email: 'bem.fateta@ipb.ac.id', ranking: '#1', kontribusi: '385', kpi: '925', transaksi: '124', nilaiCard: '1250k', nilaiFull: '1.250.000', status: 'Aktif', desc: 'Fakultas Teknologi Pertanian - Leading dalam pemilahan sampah organik dan daur ulang' },
-    { id: 2, name: 'BEM FAPET', email: 'bem.fapet@ipb.ac.id', ranking: '#2', kontribusi: '360', kpi: '890', transaksi: '118', nilaiCard: '1180k', nilaiFull: '1.180.000', status: 'Aktif', desc: 'Fakultas Peternakan - Konsisten dalam kampanye zero waste' },
-    { id: 3, name: 'BEM FEM', email: 'bem.fem@ipb.ac.id', ranking: '#3', kontribusi: '210', kpi: '750', transaksi: '85', nilaiCard: '850k', nilaiFull: '850.000', status: 'Aktif', desc: 'Fakultas Ekonomi dan Manajemen - Fokus pada nilai ekonomi sampah daur ulang' },
-    { id: 4, name: 'BEM FAHUTAN', email: 'bem.fahutan@ipb.ac.id', ranking: '-', kontribusi: '0', kpi: '0', transaksi: '0', nilaiCard: '0', nilaiFull: '0', status: 'Nonaktif', desc: 'Fakultas Kehutanan - Akun sedang dibekukan sementara' },
-    { id: 5, name: 'BEM FPIK', email: 'bem.fpik@ipb.ac.id', ranking: '-', kontribusi: '150', kpi: '600', transaksi: '45', nilaiCard: '450k', nilaiFull: '450.000', status: 'Nonaktif', desc: 'Fakultas Perikanan dan Ilmu Kelautan - Sedang proses perpanjangan akun' },
-  ]);
+  // Data dari Backend
+  const [wilayahData, setWilayahData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const getToken = () => localStorage.getItem('token') || sessionStorage.getItem('token');
+  const baseUrl = import.meta.env.VITE_API_URL;
+  const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+
+  // FETCH DATA WILAYAH + LEADERBOARD
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const token = getToken();
+      if (!token || !baseUrl) return;
+      const headers = { 'Authorization': `Bearer ${token}` };
+
+      // Fetch all wilayah
+      const wilRes = await fetch(`${baseUrl}/wilayah`, { headers });
+      const wilResult = await wilRes.json();
+
+      // Fetch leaderboard for KPI data
+      const lbRes = await fetch(`${baseUrl}/dashboard/leaderboard`, { headers });
+      const lbResult = await lbRes.json();
+
+      // Build lookup from leaderboard
+      const kpiMap = {};
+      if (lbResult.status === 'sukses' && lbResult.data) {
+        lbResult.data.forEach((item) => {
+          kpiMap[item.nama_wilayah] = {
+            ranking: `#${item.peringkat}`,
+            kontribusi: (item.total_berat_gram / 1000).toFixed(0),
+            kpi: item.poin_kpi.toString(),
+            nilaiCard: formatRp(item.total_rupiah),
+            nilaiFull: item.total_rupiah.toLocaleString('id-ID'),
+          };
+        });
+      }
+
+      if (wilResult.status === 'sukses' && wilResult.data) {
+        const mapped = wilResult.data.map((w) => {
+          const kpi = kpiMap[w.nama] || { ranking: '-', kontribusi: '0', kpi: '0', nilaiCard: 'Rp 0', nilaiFull: '0' };
+          return {
+            id: w.id,
+            name: w.nama,
+            email: '',
+            ranking: kpi.ranking,
+            kontribusi: kpi.kontribusi,
+            kpi: kpi.kpi,
+            transaksi: '-',
+            nilaiCard: kpi.nilaiCard,
+            nilaiFull: kpi.nilaiFull,
+            status: w.status,
+            desc: `Wilayah ${w.nama} - Status: ${w.status}`
+          };
+        });
+        setWilayahData(mapped);
+      }
+    } catch (error) {
+      console.error('Gagal fetch wilayah:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, []);
 
   // Logic Filter
   const filteredWilayah = wilayahData.filter(w => {
@@ -55,20 +112,61 @@ function KelolaWilayahPage() {
     setFormData({ name: '', email: '', status: 'Aktif' });
   };
 
-  const confirmAction = (action) => {
-    if (action === 'delete') { 
-      showToast(`Wilayah ${selectedWilayah.name} berhasil dihapus!`); 
-      closeModals(); 
+  const confirmAction = async (action) => {
+    const token = getToken();
+    const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+    try {
+      if (action === 'add') {
+        const res = await fetch(`${baseUrl}/wilayah`, {
+          method: 'POST', headers,
+          body: JSON.stringify({ nama: formData.name, status: formData.status })
+        });
+        const result = await res.json();
+        if (result.status === 'sukses') {
+          showToast('Wilayah baru berhasil ditambahkan!');
+          fetchData();
+        } else {
+          showToast(result.pesan || 'Gagal menambah wilayah');
+        }
+      }
+      if (action === 'edit') {
+        const res = await fetch(`${baseUrl}/wilayah/${selectedWilayah.id}`, {
+          method: 'PUT', headers,
+          body: JSON.stringify({ nama: formData.name, status: formData.status })
+        });
+        const result = await res.json();
+        if (result.status === 'sukses') {
+          showToast(`Data ${selectedWilayah.name} berhasil diperbarui!`);
+          fetchData();
+        } else {
+          showToast(result.pesan || 'Gagal mengupdate wilayah');
+        }
+      }
+      if (action === 'delete') {
+        const res = await fetch(`${baseUrl}/wilayah/${selectedWilayah.id}`, {
+          method: 'DELETE', headers
+        });
+        const result = await res.json();
+        if (result.status === 'sukses') {
+          showToast(`Wilayah ${selectedWilayah.name} berhasil dihapus!`);
+          fetchData();
+        } else {
+          showToast(result.pesan || 'Gagal menghapus wilayah');
+        }
+      }
+    } catch (error) {
+      console.error('CRUD error:', error);
+      showToast('Terjadi kesalahan pada server');
     }
-    if (action === 'add') {
-      showToast('Wilayah baru berhasil ditambahkan!');
-      closeModals();
-    }
-    if (action === 'edit') {
-      showToast(`Data ${selectedWilayah.name} berhasil diperbarui!`);
-      closeModals();
-    }
+    closeModals();
   };
+
+  // Compute summary from data
+  const totalWilayah = wilayahData.length;
+  const wilayahAktif = wilayahData.filter(w => w.status === 'Aktif').length;
+  const totalSampah = wilayahData.reduce((acc, w) => acc + parseInt(w.kontribusi || 0), 0);
+  const avgKpi = wilayahData.length > 0 ? Math.round(wilayahData.reduce((acc, w) => acc + parseInt(w.kpi || 0), 0) / wilayahData.length) : 0;
 
   return (
     <AdminLayout>
@@ -152,10 +250,10 @@ function KelolaWilayahPage() {
 
       {/* SUMMARY CARDS BAWAH */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100"><p className="text-gray-400 text-sm font-medium mb-1">Total Wilayah</p><h3 className="text-3xl font-extrabold text-[#0B4D1E]">{wilayahData.length}</h3></div>
-        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100"><p className="text-gray-400 text-sm font-medium mb-1">Wilayah Aktif</p><h3 className="text-3xl font-extrabold text-[#2E7D32]">3</h3></div>
-        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100"><p className="text-gray-400 text-sm font-medium mb-1">Total Sampah</p><h3 className="text-3xl font-extrabold text-[#0B4D1E]">1105 kg</h3></div>
-        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100"><p className="text-gray-400 text-sm font-medium mb-1">KPI Rata-rata</p><h3 className="text-3xl font-extrabold text-[#F4A300]">633</h3></div>
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100"><p className="text-gray-400 text-sm font-medium mb-1">Total Wilayah</p><h3 className="text-3xl font-extrabold text-[#0B4D1E]">{totalWilayah}</h3></div>
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100"><p className="text-gray-400 text-sm font-medium mb-1">Wilayah Aktif</p><h3 className="text-3xl font-extrabold text-[#2E7D32]">{wilayahAktif}</h3></div>
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100"><p className="text-gray-400 text-sm font-medium mb-1">Total Sampah</p><h3 className="text-3xl font-extrabold text-[#0B4D1E]">{totalSampah} kg</h3></div>
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100"><p className="text-gray-400 text-sm font-medium mb-1">KPI Rata-rata</p><h3 className="text-3xl font-extrabold text-[#F4A300]">{avgKpi}</h3></div>
       </div>
 
       {/* MODAL TAMBAH WILAYAH */}
