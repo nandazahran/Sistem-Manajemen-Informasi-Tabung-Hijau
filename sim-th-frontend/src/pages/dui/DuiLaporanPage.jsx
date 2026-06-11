@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import DuiLayout from '../../components/DuiLayout';
 
@@ -11,24 +11,135 @@ function DuiLaporanPage() {
   // State Custom Dropdown di Modal Export
   const [isPeriodeOpen, setIsPeriodeOpen] = useState(false);
   const [exportPeriode, setExportPeriode] = useState('Mei - Jun 2026');
+  
+  const [loading, setLoading] = useState(true);
 
-  const rekapData = [
-    { id: 1, wilayah: 'BEM FATETA', totalTx: 124, berat: '385 kg', nilai: 'Rp 1.250k', kpi: 925 },
-    { id: 2, wilayah: 'BEM FAPET', totalTx: 118, berat: '360 kg', nilai: 'Rp 1.180k', kpi: 890 },
-    { id: 3, wilayah: 'BEM FEM', totalTx: 112, berat: '340 kg', nilai: 'Rp 1.100k', kpi: 875 },
-    { id: 4, wilayah: 'BEM FAHUTAN', totalTx: 105, berat: '310 kg', nilai: 'Rp 950k', kpi: 820 },
-  ];
+  // Data dari Backend
+  const [rekapData, setRekapData] = useState([]);
+  const [lineData, setLineData] = useState([]);
+  const [barData, setBarData] = useState([]);
+  const [pieData, setPieData] = useState([]);
+  const [summaryCards, setSummaryCards] = useState([
+    { t: 'Total Transaksi', v: '0', b: 'Memuat...' },
+    { t: 'Total Sampah', v: '0 kg', b: 'Memuat...' },
+    { t: 'Nilai Ekonomi', v: 'Rp 0', b: 'Memuat...', c: 'text-green-600' },
+    { t: 'Wilayah Aktif', v: '0', b: 'Memuat...' }
+  ]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const baseUrl = import.meta.env.VITE_API_URL;
+        if (!baseUrl || !token) return;
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        // Fetch Dashboard (for grafik bulanan & summary)
+        const dashRes = await fetch(`${baseUrl}/dashboard`, { headers });
+        const dashData = await dashRes.json();
+
+        // Fetch Leaderboard (for rekap per wilayah)
+        const lbRes = await fetch(`${baseUrl}/dashboard/leaderboard`, { headers });
+        const lbData = await lbRes.json();
+
+        // Fetch Wilayah Aktif
+        const wilRes = await fetch(`${baseUrl}/wilayah/aktif`, { headers });
+        const wilData = await wilRes.json();
+
+        const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+
+        // Summary Cards
+        if (dashData.status === 'sukses') {
+          const totalBerat = (dashData.rekap_seluruh_ipb?.total_berat_gram || 0) / 1000;
+          const totalRupiah = dashData.rekap_seluruh_ipb?.total_rupiah || 0;
+          const totalTrx = dashData.rekap_seluruh_ipb?.jumlah_transaksi || 0;
+          const wilAktif = wilData.status === 'sukses' ? wilData.data.length : 0;
+
+          setSummaryCards([
+            { t: 'Total Transaksi', v: totalTrx.toLocaleString('id-ID'), b: 'Seluruh wilayah' },
+            { t: 'Total Sampah', v: `${totalBerat.toLocaleString('id-ID')} kg`, b: 'Total terkumpul' },
+            { t: 'Nilai Ekonomi', v: formatRp(totalRupiah), b: 'Total nilai', c: 'text-green-600' },
+            { t: 'Wilayah Aktif', v: wilAktif.toString(), b: `dari ${wilAktif} total` }
+          ]);
+
+          // Line chart: grafik bulanan
+          if (dashData.grafik_bulanan) {
+            setLineData(dashData.grafik_bulanan.map(g => ({
+              name: g.bulan,
+              berat: (g.berat || g.total_berat || 0) / 1000
+            })));
+          }
+
+          // Pie chart: breakdown kategori
+          if (dashData.breakdown_kategori) {
+            setPieData(dashData.breakdown_kategori.map(k => ({
+              name: k.kategori || k.nama_kategori,
+              value: (k.total_berat || k.total_berat_gram || 0) / 1000
+            })));
+          }
+        }
+
+        // Leaderboard → rekap tabel + bar chart
+        if (lbData.status === 'sukses' && lbData.data) {
+          const rekap = lbData.data.map(item => ({
+            id: item.peringkat,
+            wilayah: item.nama_wilayah,
+            totalTx: '-',
+            berat: `${(item.total_berat_gram / 1000).toFixed(0)} kg`,
+            nilai: formatRp(item.total_rupiah),
+            kpi: item.poin_kpi
+          }));
+          setRekapData(rekap);
+
+          setBarData(lbData.data.slice(0, 6).map(item => ({
+            name: item.nama_wilayah.replace('BEM ', ''),
+            nilai: item.total_rupiah / 1000
+          })));
+        }
+      } catch (error) {
+        console.error('Gagal fetch data laporan:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const filteredRekap = rekapData.filter(r => r.wilayah.toLowerCase().includes(searchTerm.toLowerCase()));
   const handleRowClick = (row) => { setSelectedRow(row); setIsDetailOpen(true); };
 
-  // Data Grafiks
-  const lineData = [{ name: 'Jan', berat: 1200 }, { name: 'Feb', berat: 1350 }, { name: 'Mar', berat: 1580 }, { name: 'Apr', berat: 1720 }, { name: 'Mei', berat: 1890 }];
-  const barData = [{ name: 'FATETA', nilai: 1250 }, { name: 'FAPET', nilai: 1180 }, { name: 'FEM', nilai: 1100 }, { name: 'FAHUTAN', nilai: 950 }];
-  const pieData = [{ name: 'FATETA', value: 385 }, { name: 'FAPET', value: 360 }, { name: 'FEM', value: 340 }, { name: 'FAHUTAN', value: 310 }, { name: 'Lainnya', value: 495 }];
   const COLORS = ['#125B2A', '#F4A300', '#8FA57A', '#517D3B', '#D1D5DB'];
-
   const periodeOptions = ['Jan - Feb 2026', 'Mar - Apr 2026', 'Mei - Jun 2026', 'Jul - Ags 2026', 'Sep - Okt 2026', 'Nov - Des 2026'];
+
+  // Export handler
+  const handleExport = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const baseUrl = import.meta.env.VITE_API_URL;
+      if (!baseUrl || !token) { alert('Tidak dapat mengexport: Token atau URL tidak ditemukan'); return; }
+
+      const response = await fetch(`${baseUrl}/transaksi/export`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `laporan_dui_${exportPeriode.replace(/ /g, '_')}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        alert('Gagal mengexport laporan');
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Gagal mengexport laporan');
+    }
+    setIsExportOpen(false);
+  };
 
   return (
     <DuiLayout>
@@ -65,62 +176,65 @@ function DuiLaporanPage() {
 
       {/* SUMMARY INFO CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        {[
-          { t: 'Total Transaksi', v: '1,284', b: '+12% dari bulan lalu' },
-          { t: 'Total Sampah', v: '1,890 kg', b: '+8% dari bulan lalu' },
-          { t: 'Nilai Ekonomi', v: 'Rp 6,1jt', b: '+15% dari bulan lalu', c: 'text-green-600' },
-          { t: 'Wilayah Aktif', v: '8', b: 'dari 8 total' }
-        ].map((c,i) => (
+        {summaryCards.map((c,i) => (
           <div key={i} className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100"><p className="text-gray-400 text-sm font-medium mb-1">{c.t}</p><h3 className={`text-3xl font-extrabold ${c.c || 'text-[#0B4D1E]'}`}>{c.v}</h3><p className="text-[10px] text-green-500 font-bold mt-1">{c.b}</p></div>
         ))}
       </div>
 
-      {/* CHARTS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
-          <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Tren Sampah per Kategori</h3>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={lineData}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} /><YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={40} /><Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 2}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} /><Line type="monotone" dataKey="berat" stroke="#125B2A" strokeWidth={3} dot={{r: 4, fill: '#125B2A'}} activeDot={{r: 6}} /></LineChart>
-            </ResponsiveContainer>
+      {loading ? (
+        <div className="text-center py-20 text-gray-400 font-bold text-lg">Memuat data laporan...</div>
+      ) : (
+        <>
+          {/* CHARTS */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+              <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Tren Sampah per Kategori</h3>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={lineData}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} /><YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={40} /><Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 2}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} /><Line type="monotone" dataKey="berat" stroke="#125B2A" strokeWidth={3} dot={{r: 4, fill: '#125B2A'}} activeDot={{r: 6}} /></LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+              <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Nilai Ekonomi per Wilayah</h3>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={barData}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} /><YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={40} /><Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `Rp ${val}k`} /><Bar dataKey="nilai" fill="#125B2A" radius={[4, 4, 0, 0]} /></BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
-          <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Nilai Ekonomi per Wilayah</h3>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} /><YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={40} /><Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `Rp ${val}k`} /><Bar dataKey="nilai" fill="#125B2A" radius={[4, 4, 0, 0]} /></BarChart>
-            </ResponsiveContainer>
+
+          {pieData.length > 0 && (
+          <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-8 h-80 flex flex-col">
+            <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Kontribusi Wilayah (kg)</h3>
+            <div className="flex-1 relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart><Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} /><Pie data={pieData} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value">{pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}</Pie></PieChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
-      </div>
+          )}
 
-      <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-8 h-80 flex flex-col">
-        <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Kontribusi Wilayah (kg)</h3>
-        <div className="flex-1 relative">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart><Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} /><Pie data={pieData} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value">{pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}</Pie></PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* REKAP TABEL */}
-      <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden mb-10 p-2">
-        <h3 className="font-extrabold text-xl text-[#0B4D1E] m-6">Rekap Transaksi</h3>
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-[#F5EFE6] text-[#0B4D1E]">
-            <tr><th className="px-8 py-5 font-bold rounded-l-xl">Wilayah</th><th className="px-8 py-5 font-bold">Total Transaksi</th><th className="px-8 py-5 font-bold">Total Berat</th><th className="px-8 py-5 font-bold">Nilai Ekonomi</th><th className="px-8 py-5 font-bold rounded-r-xl">KPI</th></tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {filteredRekap.map((r) => (
-              <tr key={r.id} onClick={() => handleRowClick(r)} className="hover:bg-[#FDF6EA] transition-colors cursor-pointer group">
-                <td className="px-8 py-5 font-extrabold text-[#0B4D1E] group-hover:text-[#F4A300] transition-colors">{r.wilayah}</td>
-                <td className="px-8 py-5 font-medium text-gray-500">{r.totalTx}</td><td className="px-8 py-5 font-bold text-[#0B4D1E]">{r.berat}</td><td className="px-8 py-5 font-extrabold text-green-600">{r.nilai}</td><td className="px-8 py-5 font-extrabold text-[#F4A300]">{r.kpi}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          {/* REKAP TABEL */}
+          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden mb-10 p-2">
+            <h3 className="font-extrabold text-xl text-[#0B4D1E] m-6">Rekap Transaksi</h3>
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-[#F5EFE6] text-[#0B4D1E]">
+                <tr><th className="px-8 py-5 font-bold rounded-l-xl">Wilayah</th><th className="px-8 py-5 font-bold">Total Transaksi</th><th className="px-8 py-5 font-bold">Total Berat</th><th className="px-8 py-5 font-bold">Nilai Ekonomi</th><th className="px-8 py-5 font-bold rounded-r-xl">KPI</th></tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredRekap.map((r) => (
+                  <tr key={r.id} onClick={() => handleRowClick(r)} className="hover:bg-[#FDF6EA] transition-colors cursor-pointer group">
+                    <td className="px-8 py-5 font-extrabold text-[#0B4D1E] group-hover:text-[#F4A300] transition-colors">{r.wilayah}</td>
+                    <td className="px-8 py-5 font-medium text-gray-500">{r.totalTx}</td><td className="px-8 py-5 font-bold text-[#0B4D1E]">{r.berat}</td><td className="px-8 py-5 font-extrabold text-green-600">{r.nilai}</td><td className="px-8 py-5 font-extrabold text-[#F4A300]">{r.kpi}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {/* MODAL EXPORT LAPORAN (SESUAI GAMBAR 1 BEM WILAYAH) */}
       {isExportOpen && (
@@ -140,7 +254,7 @@ function DuiLaporanPage() {
               </button>
             </div>
             
-            <form onSubmit={(e) => { e.preventDefault(); setIsExportOpen(false); alert('Laporan format Excel berhasil didownload!'); }} className="space-y-6">
+            <form onSubmit={handleExport} className="space-y-6">
               
               {/* Dropdown Periode (2 Bulanan) */}
               <div>

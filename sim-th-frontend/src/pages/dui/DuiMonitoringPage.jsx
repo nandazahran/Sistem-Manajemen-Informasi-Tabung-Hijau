@@ -37,14 +37,25 @@ function DuiMonitoringPage() {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (!token) return;
 
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/leaderboard`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const resData = await response.json();
+        const [lbRes, wilRes] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_URL}/dashboard/leaderboard`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${import.meta.env.VITE_API_URL}/wilayah`, { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
+        
+        const lbData = await lbRes.json();
+        const wilData = await wilRes.json();
 
-        if (resData.status === 'sukses') {
+        // Create a map of wilayah status
+        const statusMap = {};
+        if (wilData.status === 'sukses' && wilData.data) {
+          wilData.data.forEach(w => {
+            statusMap[w.id] = w.status === 'aktif' ? 'Aktif' : 'Nonaktif';
+          });
+        }
+
+        if (lbData.status === 'sukses') {
           const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
-          const mappedData = resData.data.map(item => ({
+          const mappedData = lbData.data.map(item => ({
             id: item.wilayah_id,
             rank: `#${item.peringkat}`,
             wilayah: item.nama_wilayah,
@@ -52,7 +63,7 @@ function DuiMonitoringPage() {
             transaksi: item.jumlah_transaksi,
             nilai: formatRp(item.total_rupiah),
             kpi: item.poin_kpi,
-            status: 'Aktif' // Dummy sementara karena API leaderboard tidak memuat status wilayah
+            status: statusMap[item.wilayah_id] || 'Aktif'
           }));
           setMonitoringData(mappedData);
         }
