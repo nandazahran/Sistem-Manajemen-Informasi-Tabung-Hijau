@@ -5,7 +5,7 @@ function DuiLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  
+
   // State Profil (Auto-sync dari backend)
   const [namaProfil, setNamaProfil] = useState('Memuat...');
   const [roleProfil, setRoleProfil] = useState('DUI');
@@ -38,7 +38,7 @@ function DuiLayout({ children }) {
         if (data.status === 'sukses') {
           const myUser = data.data.find(u => u.username === username);
           if (myUser) {
-            setNamaProfil(myUser.nama); 
+            setNamaProfil(myUser.nama);
             // Handle role admin_dui atau dui
             setRoleProfil(myUser.role === 'admin_dui' || myUser.role === 'dui' ? 'DUI' : myUser.role);
           }
@@ -61,7 +61,7 @@ function DuiLayout({ children }) {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const resData = await response.json();
-      
+
       if (resData.status === 'sukses' && Array.isArray(resData.data)) {
         // Ambil 5 notifikasi teratas untuk modal dropdown
         setDataNotif(resData.data.slice(0, 5));
@@ -88,13 +88,11 @@ function DuiLayout({ children }) {
     return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
-  const handleLogout = () => navigate('/login');
-
   // SMART SEARCHBAR ROUTING
   const handleSearch = (e) => {
     if (e.key === 'Enter' && searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase().trim();
-      
+
       if (query.includes('monitoring') || query.includes('wilayah')) {
         navigate('/dui/monitoring');
       } else if (query.includes('leaderboard') || query.includes('kpi') || query.includes('peringkat')) {
@@ -124,7 +122,6 @@ function DuiLayout({ children }) {
     { name: 'Profil', path: '/dui/profil', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
   ];
 
-<<<<<<< HEAD
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -133,17 +130,9 @@ function DuiLayout({ children }) {
     navigate('/login');
   };
 
-  const handleSearch = (e) => {
-    if (e.key === 'Enter' && e.target.value) {
-      navigate('/dui/monitoring');
-    }
-  };
-
-=======
->>>>>>> be376d125984431aca11b5400927e93286b2e46e
   return (
     <div className="min-h-screen bg-[#F5EFE6] flex font-sans animate-fade-in">
-      
+
       <aside className={`w-72 bg-[#0B4D1E] text-white flex flex-col fixed h-full z-40 transition-transform duration-500 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-8 flex items-center gap-3">
           <div className="bg-[#F4A300] p-2 rounded-lg">
@@ -176,7 +165,7 @@ function DuiLayout({ children }) {
       </aside>
 
       <div className={`flex-1 flex flex-col transition-all duration-500 ease-in-out ${isSidebarOpen ? 'ml-72' : 'ml-0'}`}>
-        
+
         <header className="h-24 bg-white flex items-center justify-between px-10 sticky top-0 z-30 shadow-sm border-b border-gray-100">
           <div className="flex items-center gap-6 flex-1">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 bg-gray-50 rounded-xl shadow-sm text-gray-600 hover:text-[#0B4D1E] hover:bg-gray-100 transition-all border border-gray-200">
@@ -184,19 +173,19 @@ function DuiLayout({ children }) {
             </button>
             <div className="relative w-full max-w-2xl">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleSearch}
-                placeholder="Cari halaman, monitoring, laporan (Tekan Enter)..." 
-                className="w-full bg-[#F5EFE6] px-14 py-4 rounded-full focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-all text-sm font-medium placeholder-gray-500" 
+                placeholder="Cari halaman, monitoring, laporan (Tekan Enter)..."
+                className="w-full bg-[#F5EFE6] px-14 py-4 rounded-full focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-all text-sm font-medium placeholder-gray-500"
               />
             </div>
           </div>
 
           <div className="flex items-center gap-6">
-            
+
             {/* WRAPPER NOTIFIKASI DROPDOWN (ZERO DUMMY) */}
             <div className="relative">
               <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="relative p-2 rounded-full hover:bg-gray-100 transition-colors focus:outline-none">
@@ -234,7 +223,7 @@ function DuiLayout({ children }) {
                   </div>
                   <div className="p-4 text-center bg-white border-t border-gray-100 hover:bg-gray-50 transition-colors">
                     <button onClick={() => { setIsNotifOpen(false); navigate('/dui/notifikasi'); }} className="text-[#0B4D1E] font-bold text-sm hover:text-[#F4A300] flex items-center justify-center gap-2 w-full transition-colors">
-                      Lihat Semua Notifikasi 
+                      Lihat Semua Notifikasi
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                     </button>
                   </div>
@@ -243,7 +232,7 @@ function DuiLayout({ children }) {
             </div>
 
             <div className="h-10 w-px bg-gray-200"></div>
-            
+
             <Link to="/dui/profil" className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity">
               <div className="text-right hidden md:block">
                 <p className="font-extrabold text-[#0B4D1E] text-sm">{namaProfil}</p>
@@ -261,8 +250,8 @@ function DuiLayout({ children }) {
         </main>
 
         <footer className="py-8 text-center text-sm border-t border-gray-200/50 mt-10">
-           <p className="font-semibold text-[#0B4D1E]/70 text-lg mb-1">SIM-TH © 2026</p>
-           <p className="text-[#0B4D1E]/50 font-medium">Developed for Program Tabung Hijau IPB University</p>
+          <p className="font-semibold text-[#0B4D1E]/70 text-lg mb-1">SIM-TH © 2026</p>
+          <p className="text-[#0B4D1E]/50 font-medium">Developed for Program Tabung Hijau IPB University</p>
         </footer>
       </div>
     </div>
