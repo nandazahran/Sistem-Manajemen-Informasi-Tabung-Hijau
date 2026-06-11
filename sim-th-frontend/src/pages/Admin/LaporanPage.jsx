@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import AdminLayout from '../../components/AdminLayout';
+import * as XLSX from "xlsx";
 
 function LaporanPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -122,6 +123,19 @@ function LaporanPage() {
 
   const COLORS = ['#125B2A', '#F4A300', '#8FA57A', '#517D3B', '#D1D5DB'];
 
+  const getPeriode = (isoString) => {
+    if (!isoString) return '-';
+    const d = new Date(isoString);
+    const m = d.getMonth();
+    const y = d.getFullYear();
+    if (m <= 1) return `Jan - Feb ${y}`;
+    if (m <= 3) return `Mar - Apr ${y}`;
+    if (m <= 5) return `Mei - Jun ${y}`;
+    if (m <= 7) return `Jul - Ags ${y}`;
+    if (m <= 9) return `Sep - Okt ${y}`;
+    return `Nov - Des ${y}`;
+  };
+
   // Export handler
   const handleExport = async (e) => {
     e.preventDefault();
@@ -134,13 +148,32 @@ function LaporanPage() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `laporan_${exportPeriode.replace(/ /g, '_')}.xlsx`;
-        a.click();
-        window.URL.revokeObjectURL(url);
+        const resJson = await response.json();
+        let dataToExport = resJson.data;
+
+        if (exportPeriode !== 'Semua Periode') {
+          dataToExport = dataToExport.filter(t => getPeriode(t.tanggal) === exportPeriode);
+        }
+
+        if (dataToExport.length === 0) {
+          alert("Tidak ada data untuk diexport pada periode ini.");
+          return;
+        }
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport.map(t => ({
+          "ID Transaksi": t.id,
+          "Tanggal": new Date(t.tanggal).toLocaleDateString('id-ID'),
+          "Wilayah": t.nama_wilayah,
+          "Kategori": t.nama_kategori,
+          "Berat (kg)": (t.berat || t.berat_gram || 0) / 1000,
+          "Total Nilai (Rp)": t.total_nilai,
+          "Petugas": t.nama_petugas,
+          "Status": t.status
+        })));
+        
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Data Laporan");
+        XLSX.writeFile(workbook, `Laporan_Admin_SIMTH_${exportPeriode.replace(/ /g, '')}.xlsx`);
       } else {
         alert('Gagal mengexport laporan');
       }
