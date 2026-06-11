@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import ProtectedRoute from './components/ProtectedRoute'
 
 // Rute BEM Wilayah
 import DashboardPage from './pages/DashboardPage'
@@ -54,41 +55,41 @@ function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         
         {/* Rute BEM Wilayah */}
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/input-transaksi" element={<InputTransaksiPage />} />
-        <Route path="/riwayat" element={<RiwayatTransaksiPage />} />
-        <Route path="/tabungan" element={<BukuTabunganPage />} />
-        <Route path="/leaderboard" element={<LeaderboardPage />} />
-        <Route path="/laporan" element={<LaporanPage />} />
-        <Route path="/profil" element={<ProfilPage />} />
-        <Route path="/notifikasi" element={<NotifikasiPage />} />
-        <Route path="/aktivitas" element={<AktivitasPage />} />
+        <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['bem_wilayah']}><DashboardPage /></ProtectedRoute>} />
+        <Route path="/input-transaksi" element={<ProtectedRoute allowedRoles={['bem_wilayah']}><InputTransaksiPage /></ProtectedRoute>} />
+        <Route path="/riwayat" element={<ProtectedRoute allowedRoles={['bem_wilayah']}><RiwayatTransaksiPage /></ProtectedRoute>} />
+        <Route path="/tabungan" element={<ProtectedRoute allowedRoles={['bem_wilayah']}><BukuTabunganPage /></ProtectedRoute>} />
+        <Route path="/leaderboard" element={<ProtectedRoute allowedRoles={['bem_wilayah']}><LeaderboardPage /></ProtectedRoute>} />
+        <Route path="/laporan" element={<ProtectedRoute allowedRoles={['bem_wilayah']}><LaporanPage /></ProtectedRoute>} />
+        <Route path="/profil" element={<ProtectedRoute allowedRoles={['bem_wilayah']}><ProfilPage /></ProtectedRoute>} />
+        <Route path="/notifikasi" element={<ProtectedRoute allowedRoles={['bem_wilayah']}><NotifikasiPage /></ProtectedRoute>} />
+        <Route path="/aktivitas" element={<ProtectedRoute allowedRoles={['bem_wilayah']}><AktivitasPage /></ProtectedRoute>} />
         
         {/* Rute Auth */}
         <Route path="/otp" element={<OtpPage />} />
  
         {/* Rute Admin */}
-        <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-        <Route path="/admin/kelola-transaksi" element={<KelolaTransaksiPage />} />
-        <Route path="/admin/riwayat-transaksi" element={<AdminRiwayatTransaksiPage />} />
-        <Route path="/admin/kelola-user" element={<KelolaUserPage />} />
-        <Route path="/admin/kelola-wilayah" element={<KelolaWilayahPage />} />
-        <Route path="/admin/kelola-kategori" element={<KelolaKategoriPage />} />
-        <Route path="/admin/leaderboard" element={<AdminLeaderboardPage />} /> 
-        <Route path="/admin/laporan" element={<AdminLaporanPage />} />
-        <Route path="/admin/profil" element={<AdminProfilPage />} />
-        <Route path="/admin/aktivitas" element={<AktivitasAdminPage />} />
-        <Route path="/admin/riwayat-harga" element={<RiwayatHargaPage />} />  
-        <Route path="/admin/notifikasi" element={<AdminNotifikasiPage />} /> {/* <--- RUTE BARU ADMIN NOTIF */}
+        <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'superadmin', 'bem_km']}><AdminDashboardPage /></ProtectedRoute>} />
+        <Route path="/admin/kelola-transaksi" element={<ProtectedRoute allowedRoles={['admin', 'superadmin', 'bem_km']}><KelolaTransaksiPage /></ProtectedRoute>} />
+        <Route path="/admin/riwayat-transaksi" element={<ProtectedRoute allowedRoles={['admin', 'superadmin', 'bem_km']}><AdminRiwayatTransaksiPage /></ProtectedRoute>} />
+        <Route path="/admin/kelola-user" element={<ProtectedRoute allowedRoles={['admin', 'superadmin', 'bem_km']}><KelolaUserPage /></ProtectedRoute>} />
+        <Route path="/admin/kelola-wilayah" element={<ProtectedRoute allowedRoles={['admin', 'superadmin', 'bem_km']}><KelolaWilayahPage /></ProtectedRoute>} />
+        <Route path="/admin/kelola-kategori" element={<ProtectedRoute allowedRoles={['admin', 'superadmin', 'bem_km']}><KelolaKategoriPage /></ProtectedRoute>} />
+        <Route path="/admin/leaderboard" element={<ProtectedRoute allowedRoles={['admin', 'superadmin', 'bem_km']}><AdminLeaderboardPage /></ProtectedRoute>} /> 
+        <Route path="/admin/laporan" element={<ProtectedRoute allowedRoles={['admin', 'superadmin', 'bem_km']}><AdminLaporanPage /></ProtectedRoute>} />
+        <Route path="/admin/profil" element={<ProtectedRoute allowedRoles={['admin', 'superadmin', 'bem_km']}><AdminProfilPage /></ProtectedRoute>} />
+        <Route path="/admin/aktivitas" element={<ProtectedRoute allowedRoles={['admin', 'superadmin', 'bem_km']}><AktivitasAdminPage /></ProtectedRoute>} />
+        <Route path="/admin/riwayat-harga" element={<ProtectedRoute allowedRoles={['admin', 'superadmin', 'bem_km']}><RiwayatHargaPage /></ProtectedRoute>} />  
+        <Route path="/admin/notifikasi" element={<ProtectedRoute allowedRoles={['admin', 'superadmin', 'bem_km']}><AdminNotifikasiPage /></ProtectedRoute>} /> {/* <--- RUTE BARU ADMIN NOTIF */}
 
         {/* Rute DUI */}
-        <Route path="/dui/dashboard" element={<DuiDashboardPage />} />
-        <Route path="/dui/monitoring" element={<DuiMonitoringPage />} />
-        <Route path="/dui/leaderboard" element={<DuiLeaderboardPage />} />
-        <Route path="/dui/laporan" element={<DuiLaporanPage />} />
-        <Route path="/dui/aktivitas" element={<DuiAktivitasPage />} />
-        <Route path="/dui/profil" element={<DuiProfilPage />} />
-        <Route path="/dui/notifikasi" element={<DuiNotifikasiPage />} />
+        <Route path="/dui/dashboard" element={<ProtectedRoute allowedRoles={['dui']}><DuiDashboardPage /></ProtectedRoute>} />
+        <Route path="/dui/monitoring" element={<ProtectedRoute allowedRoles={['dui']}><DuiMonitoringPage /></ProtectedRoute>} />
+        <Route path="/dui/leaderboard" element={<ProtectedRoute allowedRoles={['dui']}><DuiLeaderboardPage /></ProtectedRoute>} />
+        <Route path="/dui/laporan" element={<ProtectedRoute allowedRoles={['dui']}><DuiLaporanPage /></ProtectedRoute>} />
+        <Route path="/dui/aktivitas" element={<ProtectedRoute allowedRoles={['dui']}><DuiAktivitasPage /></ProtectedRoute>} />
+        <Route path="/dui/profil" element={<ProtectedRoute allowedRoles={['dui']}><DuiProfilPage /></ProtectedRoute>} />
+        <Route path="/dui/notifikasi" element={<ProtectedRoute allowedRoles={['dui']}><DuiNotifikasiPage /></ProtectedRoute>} />
         
       </Routes>
     </Router>

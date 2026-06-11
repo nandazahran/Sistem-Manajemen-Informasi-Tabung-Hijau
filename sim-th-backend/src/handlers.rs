@@ -1995,7 +1995,12 @@ pub async fn export_transaksi(
     if let (Some(mulai), Some(akhir)) = (filter.tanggal_mulai, filter.tanggal_akhir) {
         let start = format!("{} 00:00:00", mulai);
         let end = format!("{} 23:59:59", akhir);
-        query = query.filter(transaksi_sampah::Column::Tanggal.between(start, end));
+        if let (Ok(start_dt), Ok(end_dt)) = (
+            chrono::NaiveDateTime::parse_from_str(&start, "%Y-%m-%d %H:%M:%S"),
+            chrono::NaiveDateTime::parse_from_str(&end, "%Y-%m-%d %H:%M:%S"),
+        ) {
+            query = query.filter(transaksi_sampah::Column::Tanggal.between(start_dt, end_dt));
+        }
     }
 
     // Urutkan dari transaksi terbaru ke terlama
@@ -2877,7 +2882,12 @@ pub async fn lihat_leaderboard(
     if let (Some(mulai), Some(akhir)) = (filter.tanggal_mulai, filter.tanggal_akhir) {
         let start = format!("{} 00:00:00", mulai);
         let end = format!("{} 23:59:59", akhir);
-        query = query.filter(transaksi_sampah::Column::Tanggal.between(start, end));
+        if let (Ok(start_dt), Ok(end_dt)) = (
+            chrono::NaiveDateTime::parse_from_str(&start, "%Y-%m-%d %H:%M:%S"),
+            chrono::NaiveDateTime::parse_from_str(&end, "%Y-%m-%d %H:%M:%S"),
+        ) {
+            query = query.filter(transaksi_sampah::Column::Tanggal.between(start_dt, end_dt));
+        }
     }
 
     let semua_transaksi = query
@@ -2885,6 +2895,8 @@ pub async fn lihat_leaderboard(
         .all(&db)
         .await
         .unwrap_or_default();
+
+
 
     // Menyimpan agregasi data: (total_berat, total_nilai, total_poin_kualitas, jumlah_transaksi)
     let mut rekap_wilayah: HashMap<String, (i64, i64, i64, i64)> = HashMap::new();
