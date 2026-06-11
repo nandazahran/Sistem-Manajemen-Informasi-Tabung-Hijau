@@ -13,7 +13,7 @@ function DuiDashboardPage() {
     { title: 'Wilayah Aktif', value: '0', badge: 'Memuat...', icon: 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z' },
     { title: 'Total Transaksi', value: '0', badge: 'Memuat...', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
     { title: 'KPI Tertinggi', value: '0', badge: '-', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
-    { title: 'Kategori Terbanyak', value: 'Plastik', badge: '45%', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+    { title: 'Kategori Terbanyak', value: '-', badge: '-', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
   ]);
 
   const [lineData, setLineData] = useState([]);
@@ -52,7 +52,7 @@ function DuiDashboardPage() {
           newStats[3].value = (dashData.rekap_seluruh_ipb?.jumlah_transaksi || 0).toString();
           newStats[3].badge = 'Total Seluruh Wilayah';
           
-          if (dashData.grafik_bulanan) {
+          if (dashData.grafik_bulanan && Array.isArray(dashData.grafik_bulanan) && dashData.grafik_bulanan.length > 0) {
             setLineData(dashData.grafik_bulanan.map(g => ({
               name: g.bulan,
               berat: g.total_berat
@@ -63,20 +63,30 @@ function DuiDashboardPage() {
             })));
           }
 
-          if (dashData.breakdown_kategori) {
+          if (dashData.breakdown_kategori && Array.isArray(dashData.breakdown_kategori) && dashData.breakdown_kategori.length > 0) {
              setPieKategori(dashData.breakdown_kategori.map(k => ({
                name: k.kategori,
                value: k.total_berat
              })));
+
+             // Update Stats Kategori Terbanyak
+             const topKategori = [...dashData.breakdown_kategori].sort((a, b) => b.total_berat - a.total_berat)[0];
+             if (topKategori) {
+               newStats[5].value = topKategori.kategori;
+               newStats[5].badge = `${topKategori.total_berat} kg`;
+             }
+          } else {
+             newStats[5].value = '-';
+             newStats[5].badge = '0 kg';
           }
         }
         
-        if (wilData.status === 'sukses') {
+        if (wilData.status === 'sukses' && Array.isArray(wilData.data)) {
           newStats[2].value = wilData.data.length.toString();
           newStats[2].badge = 'Wilayah Status Aktif';
         }
         
-        if (lbData.status === 'sukses' && lbData.data.length > 0) {
+        if (lbData.status === 'sukses' && Array.isArray(lbData.data) && lbData.data.length > 0) {
           newStats[4].value = lbData.data[0].poin_kpi.toString();
           newStats[4].badge = lbData.data[0].nama_wilayah;
           
@@ -84,6 +94,9 @@ function DuiDashboardPage() {
             name: w.nama_wilayah,
             value: w.total_berat_gram / 1000 // dalam satuan kg
           })));
+        } else {
+          newStats[4].value = '0';
+          newStats[4].badge = 'Belum ada data';
         }
 
         setStats(newStats);
@@ -141,15 +154,21 @@ function DuiDashboardPage() {
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
           <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-6">Tren Sampah Bulanan</h3>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={lineData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} width={40} />
-                <Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 2}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => [`${value} kg`, 'Berat']} />
-                <Line type="monotone" dataKey="berat" stroke="#125B2A" strokeWidth={4} dot={{r: 5, fill: '#125B2A'}} activeDot={{r: 8}} />
-              </LineChart>
-            </ResponsiveContainer>
+            {lineData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={lineData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} width={40} />
+                  <Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 2}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => [`${value} kg`, 'Berat']} />
+                  <Line type="monotone" dataKey="berat" stroke="#125B2A" strokeWidth={4} dot={{r: 5, fill: '#125B2A'}} activeDot={{r: 8}} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
+                 <p className="text-gray-400 font-medium">Belum ada data tren sampah bulanan.</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -157,15 +176,21 @@ function DuiDashboardPage() {
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
           <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-6">Pertumbuhan Nilai Ekonomi</h3>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} width={60} tickFormatter={(val) => `${val/1000000}jt`} />
-                <Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `Rp ${val.toLocaleString()}`} />
-                <Bar dataKey="nilai" fill="#125B2A" radius={[6, 6, 0, 0]} barSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
+            {barData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} width={60} tickFormatter={(val) => `${val/1000}k`} />
+                  <Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `Rp ${val.toLocaleString()}`} />
+                  <Bar dataKey="nilai" fill="#125B2A" radius={[6, 6, 0, 0]} barSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
+                 <p className="text-gray-400 font-medium">Belum ada data nilai ekonomi.</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -173,14 +198,20 @@ function DuiDashboardPage() {
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
           <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-6">Kategori Sampah Terbanyak</h3>
           <div className="h-64 relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => `${value / 1000} kg`} />
-                <Pie data={pieKategori} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" label={({name, value}) => `${name}`} labelLine={false}>
-                  {pieKategori.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS_KATEGORI[index % COLORS_KATEGORI.length]} />)}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
+            {pieKategori.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => `${value} kg`} />
+                  <Pie data={pieKategori} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" label={({name, value}) => `${name}`} labelLine={false}>
+                    {pieKategori.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS_KATEGORI[index % COLORS_KATEGORI.length]} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
+                 <p className="text-gray-400 font-medium">Belum ada data kategori sampah.</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -188,14 +219,20 @@ function DuiDashboardPage() {
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
           <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-6">Kontribusi Wilayah (kg)</h3>
           <div className="h-64 relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => `${value} kg`} />
-                <Pie data={pieWilayah} innerRadius={0} outerRadius={100} paddingAngle={1} dataKey="value" label={({name}) => name} labelLine={false}>
-                  {pieWilayah.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS_WILAYAH[index % COLORS_WILAYAH.length]} />)}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
+            {pieWilayah.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => `${value} kg`} />
+                  <Pie data={pieWilayah} innerRadius={0} outerRadius={100} paddingAngle={1} dataKey="value" label={({name}) => name} labelLine={false}>
+                    {pieWilayah.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS_WILAYAH[index % COLORS_WILAYAH.length]} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
+                 <p className="text-gray-400 font-medium">Belum ada data kontribusi wilayah.</p>
+              </div>
+            )}
           </div>
         </div>
 
