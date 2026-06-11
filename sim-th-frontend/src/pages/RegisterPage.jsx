@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 
-// Daftar Lengkap BEM + 2 Tambahan Baru
+// Daftar Lengkap BEM yang tersinkron dengan handlers.rs
 const ROLES_DATA = [
   { id: 'bem_km', label: 'BEM KM IPB' },
   { id: 'bem_faperta', label: 'BEM FAPERTA' },
@@ -33,8 +33,8 @@ function RegisterPage() {
   const [showConfirm, setShowConfirm] = useState(false)
 
   // State buat Custom Searchable Dropdown
-  const [roleID, setRoleID] = useState('') // Yang dikirim ke BE
-  const [searchRole, setSearchRole] = useState('') // Yang ditampilin di layar
+  const [roleID, setRoleID] = useState('') 
+  const [searchRole, setSearchRole] = useState('') 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   const [isLoading, setIsLoading] = useState(false)
@@ -53,29 +53,37 @@ function RegisterPage() {
     setErrorMsg('')
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/register`, {
+      const baseUrl = import.meta.env.VITE_API_URL;
+      if(!baseUrl) throw new Error("API URL tidak ditemukan");
+
+      const response = await fetch(`${baseUrl}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nama: nama, email: email, username: email.split('@')[0], password: password, role: roleID, wilayah_id: null
+          nama: nama, 
+          email: email, 
+          username: email.split('@')[0], 
+          password: password, 
+          role: roleID
         })
-      })
+      });
 
-      const data = await response.json()
-      if (response.status === 201) {
-        alert("Pendaftaran berhasil! Silakan login.")
-        navigate('/login')
+      const data = await response.json();
+      
+      if (response.ok && data.status === 'sukses') {
+        alert("Pendaftaran berhasil! Silakan login.");
+        navigate('/login');
       } else {
-        setErrorMsg(data.pesan || "Pendaftaran gagal.")
+        setErrorMsg(data.pesan || "Pendaftaran gagal. Periksa kembali data Anda.");
       }
     } catch (error) {
-      setErrorMsg("Koneksi gagal. Pastikan backend sudah menyala.")
+      setErrorMsg("Koneksi gagal. Pastikan backend server sudah berjalan.");
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Komponen Ikon Mata biar rapi
+  // Komponen Ikon Mata
   const EyeIcon = ({ isOpen, toggle }) => (
     <button type="button" onClick={toggle} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-[#0B4D1E]">
       {isOpen ? (
@@ -89,7 +97,7 @@ function RegisterPage() {
   return (
     <AuthLayout title="Daftar Akun" subtitle="Buat akun baru untuk memulai">
       <form onSubmit={handleRegister} className="flex flex-col gap-4">
-        {errorMsg && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl text-sm">{errorMsg}</div>}
+        {errorMsg && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl text-sm font-medium">{errorMsg}</div>}
 
         <div><label className="block text-sm font-bold text-gray-700 mb-1">Nama Lengkap</label><input type="text" value={nama} onChange={(e) => setNama(e.target.value)} required className="w-full bg-[#F5F5F5] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] text-sm" placeholder="Nama lengkap" /></div>
         
@@ -123,20 +131,20 @@ function RegisterPage() {
               setIsDropdownOpen(true)
             }}
             onFocus={() => setIsDropdownOpen(true)}
-            onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)} // Delay biar list bisa di-klik
+            onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
             required={!roleID}
             className="w-full bg-white border border-gray-300 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B4D1E] text-sm"
             placeholder="Ketik untuk mencari wilayah/organisasi..." 
           />
           
-          {/* List yang muncul cuma kalau di-klik/ketik (Tinggi dibatasi untuk 3-4 item pakai max-h-40) */}
           {isDropdownOpen && (
             <ul className="absolute z-50 w-full bg-white mt-1 rounded-xl shadow-xl max-h-40 overflow-y-auto border border-gray-100">
               {filteredRoles.length > 0 ? (
                 filteredRoles.map(role => (
                   <li 
                     key={role.id}
-                    onClick={() => {
+                    // FIX: Pake onMouseDown biar tereksekusi duluan sebelum input onBlur
+                    onMouseDown={() => {
                       setRoleID(role.id)
                       setSearchRole(role.label)
                       setIsDropdownOpen(false)
