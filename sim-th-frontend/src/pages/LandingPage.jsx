@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 
@@ -14,6 +14,28 @@ import icon5 from '../assets/LP-HDIW-Icon-5.png';
 
 function LandingPage() {
   const [activeSection, setActiveSection] = useState('home');
+  const navigate = useNavigate();
+
+  // Auto-redirect jika sudah login
+  useEffect(() => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+    
+    if (token && userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (['admin', 'superadmin', 'bem_km'].includes(user.role)) {
+          navigate('/admin/dashboard');
+        } else if (user.role === 'dui') {
+          navigate('/dui/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
+      } catch (err) {
+        // Abaikan jika error parsing
+      }
+    }
+  }, [navigate]);
 
   // State untuk form kontak
   const [nama, setNama] = useState('');

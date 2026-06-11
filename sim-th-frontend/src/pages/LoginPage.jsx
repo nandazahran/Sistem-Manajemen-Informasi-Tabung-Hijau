@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 
@@ -13,6 +13,27 @@ function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const navigate = useNavigate()
+
+  // Auto-redirect jika sudah punya token (fitur Ingat Saya bekerja)
+  useEffect(() => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+    
+    if (token && userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (['admin', 'superadmin', 'bem_km'].includes(user.role)) {
+          navigate('/admin/dashboard');
+        } else if (user.role === 'dui') {
+          navigate('/dui/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
+      } catch (err) {
+        console.error("Gagal parsing data user", err);
+      }
+    }
+  }, [navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
