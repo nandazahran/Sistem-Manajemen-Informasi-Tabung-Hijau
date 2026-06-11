@@ -16,10 +16,10 @@ function KelolaTransaksiPage() {
 
   // States Filter & Search
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterWilayah, setFilterWilayah] = useState('Semua Wilayah');
-  const [filterKategori, setFilterKategori] = useState('Semua Kategori');
-  const [filterBulan, setFilterBulan] = useState('Semua Bulan');
-  const [filterStatus, setFilterStatus] = useState('Semua Status');
+  const [filterWilayah, setFilterWilayah] = useState('');
+  const [filterKategori, setFilterKategori] = useState('');
+  const [filterBulan, setFilterBulan] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   
   const [isWilayahOpen, setIsWilayahOpen] = useState(false);
   const [isKategoriOpen, setIsKategoriOpen] = useState(false);
@@ -28,6 +28,7 @@ function KelolaTransaksiPage() {
 
   // Data from Backend
   const [transactions, setTransactions] = useState([]);
+  const [wilayahs, setWilayahs] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,20 +46,20 @@ function KelolaTransaksiPage() {
       if (!token || !baseUrl) return;
       const headers = { 'Authorization': `Bearer ${token}` };
 
-      const [txRes, catRes] = await Promise.all([
+      const [txRes, catRes, wilRes] = await Promise.all([
         fetch(`${baseUrl}/transaksi`, { headers }),
-        fetch(`${baseUrl}/kategori`, { headers })
+        fetch(`${baseUrl}/kategori`, { headers }),
+        fetch(`${baseUrl}/wilayah`, { headers })
       ]);
 
       const txResult = await txRes.json();
       const catResult = await catRes.json();
+      const wilResult = await wilRes.json();
 
-      if (catResult.status === 'sukses' && catResult.data) {
-        setCategories(catResult.data);
-      }
+      if (catResult.status === 'sukses' && catResult.data) setCategories(catResult.data);
+      if (wilResult.status === 'sukses' && wilResult.data) setWilayahs(wilResult.data);
 
       if (txResult.status === 'sukses' && txResult.data) {
-        // Reverse evaluation strings from poin (rough estimation for UI purposes)
         const getEvalStrings = (poin) => {
           if (poin === 0) return { kebersihan: '', pemilahan: '', kondisi: '' };
           if (poin >= 25) return { kebersihan: 'Sangat Baik', pemilahan: 'Baik', kondisi: 'Sangat Baik' };
@@ -94,18 +95,21 @@ function KelolaTransaksiPage() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Derived unique months from transactions for filter
+  const uniqueMonths = [...new Set(transactions.map(tx => tx.tanggal.split(' ').slice(1).join(' ')))];
+
   // Logic Filter
   const filteredTransactions = transactions.filter(tx => {
     const matchSearch = tx.wilayah.toLowerCase().includes(searchTerm.toLowerCase()) || tx.tanggal.toLowerCase().includes(searchTerm.toLowerCase()) || tx.catatan.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchWilayah = filterWilayah === 'Semua Wilayah' || tx.wilayah === filterWilayah;
-    const matchKategori = filterKategori === 'Semua Kategori' || tx.kategori === filterKategori;
-    const matchBulan = filterBulan === 'Semua Bulan' || tx.tanggal.includes(filterBulan.split(' ')[0]);
-    const matchStatus = filterStatus === 'Semua Status' || tx.status === filterStatus;
+    const matchWilayah = !filterWilayah || tx.wilayah.toLowerCase().includes(filterWilayah.toLowerCase());
+    const matchKategori = !filterKategori || tx.kategori.toLowerCase().includes(filterKategori.toLowerCase());
+    const matchBulan = !filterBulan || tx.tanggal.includes(filterBulan);
+    const matchStatus = !filterStatus || tx.status === filterStatus;
     return matchSearch && matchWilayah && matchKategori && matchBulan && matchStatus;
   });
 
   const showToast = (msg, type='success') => { setToastMessage({msg, type}); setTimeout(() => setToastMessage(''), 3000); };
-  const closeAllDropdowns = () => { setIsWilayahOpen(false); setIsKategoriOpen(false); setIsBulanOpen(false); setIsStatusOpen(false); };
+  const closeAllDropdowns = () => {}; // No longer needed with datalist
 
   const handleView = (tx) => { 
     setSelectedTx(tx); 
@@ -224,7 +228,10 @@ function KelolaTransaksiPage() {
 
   return (
     <AdminLayout>
-      <style>{`@keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+      <style>{`@keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        /* Hilangkan dropdown panah default datalist di beberapa browser */
+        input::-webkit-calendar-picker-indicator { opacity: 0; }
+      `}</style>
 
       {/* BANNER UTAMA */}
       <div className="bg-[#0B4D1E] rounded-[2rem] p-10 flex flex-col md:flex-row items-start md:items-center justify-between shadow-sm mt-2 mb-8">
@@ -234,69 +241,67 @@ function KelolaTransaksiPage() {
         </div>
       </div>
 
-      {/* FILTER & SEARCHBAR */}
+      {/* FILTER & SEARCHBAR (Searchable Combobox / Datalist) */}
       <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 mb-8 flex flex-col gap-4">
         <div className="relative">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-          <input type="text" placeholder="Cari wilayah, tanggal, catatan..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#F5EFE6] px-14 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-all" />
+          <input type="text" placeholder="Cari global wilayah, tanggal, catatan..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#F5EFE6] px-14 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-all" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Filter Wilayah */}
+          
+          {/* Dropdown Wilayah */}
           <div className="relative">
-            <div onClick={() => { closeAllDropdowns(); setIsWilayahOpen(!isWilayahOpen); }} className="bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors">
-              <span className="truncate">{filterWilayah}</span>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-            </div>
-            {isWilayahOpen && (
-              <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 shadow-xl rounded-xl z-50 overflow-hidden py-1">
-                {['Semua Wilayah', 'BEM FATETA', 'BEM FAPET', 'BEM FEM', 'BEM FAHUTAN'].map(opt => (
-                  <div key={opt} onClick={() => { setFilterWilayah(opt); setIsWilayahOpen(false); }} className={`px-5 py-2.5 cursor-pointer text-sm font-medium ${filterWilayah === opt ? 'bg-[#1a73e8] text-white' : 'text-[#0B4D1E] hover:bg-gray-100'}`}>{opt}</div>
-                ))}
-              </div>
-            )}
+            <select
+              value={filterWilayah}
+              onChange={(e) => setFilterWilayah(e.target.value)}
+              className="w-full bg-[#F5EFE6] px-5 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E] appearance-none cursor-pointer"
+            >
+              <option value="">Semua Wilayah</option>
+              {wilayahs.map(w => <option key={w.id} value={w.nama}>{w.nama}</option>)}
+            </select>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute right-4 top-1/2 -translate-y-1/2 text-[#0B4D1E] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
           </div>
-          {/* Filter Kategori */}
+
+          {/* Dropdown Kategori */}
           <div className="relative">
-            <div onClick={() => { closeAllDropdowns(); setIsKategoriOpen(!isKategoriOpen); }} className="bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors">
-              <span className="truncate">{filterKategori}</span>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-            </div>
-            {isKategoriOpen && (
-              <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 shadow-xl rounded-xl z-50 overflow-hidden py-1">
-                {['Semua Kategori', 'Plastik', 'Kertas', 'Logam', 'Kaca'].map(opt => (
-                  <div key={opt} onClick={() => { setFilterKategori(opt); setIsKategoriOpen(false); }} className={`px-5 py-2.5 cursor-pointer text-sm font-medium ${filterKategori === opt ? 'bg-[#1a73e8] text-white' : 'text-[#0B4D1E] hover:bg-gray-100'}`}>{opt}</div>
-                ))}
-              </div>
-            )}
+            <select
+              value={filterKategori}
+              onChange={(e) => setFilterKategori(e.target.value)}
+              className="w-full bg-[#F5EFE6] px-5 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E] appearance-none cursor-pointer"
+            >
+              <option value="">Semua Kategori</option>
+              {categories.map(c => <option key={c.id} value={c.nama_kategori}>{c.nama_kategori}</option>)}
+            </select>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute right-4 top-1/2 -translate-y-1/2 text-[#0B4D1E] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
           </div>
-          {/* Filter Bulan */}
+
+          {/* Dropdown Bulan */}
           <div className="relative">
-            <div onClick={() => { closeAllDropdowns(); setIsBulanOpen(!isBulanOpen); }} className="bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors">
-              <span className="truncate">{filterBulan}</span>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-            </div>
-            {isBulanOpen && (
-              <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 shadow-xl rounded-xl z-50 overflow-hidden py-1">
-                {['Semua Bulan', 'Mei 2026', 'Apr 2026'].map(opt => (
-                  <div key={opt} onClick={() => { setFilterBulan(opt); setIsBulanOpen(false); }} className={`px-5 py-2.5 cursor-pointer text-sm font-medium ${filterBulan === opt ? 'bg-[#1a73e8] text-white' : 'text-[#0B4D1E] hover:bg-gray-100'}`}>{opt}</div>
-                ))}
-              </div>
-            )}
+            <select
+              value={filterBulan}
+              onChange={(e) => setFilterBulan(e.target.value)}
+              className="w-full bg-[#F5EFE6] px-5 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E] appearance-none cursor-pointer"
+            >
+              <option value="">Semua Bulan</option>
+              {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute right-4 top-1/2 -translate-y-1/2 text-[#0B4D1E] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
           </div>
-          {/* Filter Status */}
+
+          {/* Dropdown Status */}
           <div className="relative">
-            <div onClick={() => { closeAllDropdowns(); setIsStatusOpen(!isStatusOpen); }} className="bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors">
-              <span className="truncate">{filterStatus}</span>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-            </div>
-            {isStatusOpen && (
-              <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 shadow-xl rounded-xl z-50 overflow-hidden py-1">
-                {['Semua Status', 'Sudah Dinilai', 'Belum Dinilai'].map(opt => (
-                  <div key={opt} onClick={() => { setFilterStatus(opt); setIsStatusOpen(false); }} className={`px-5 py-2.5 cursor-pointer text-sm font-medium ${filterStatus === opt ? 'bg-[#1a73e8] text-white' : 'text-[#0B4D1E] hover:bg-gray-100'}`}>{opt}</div>
-                ))}
-              </div>
-            )}
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="w-full bg-[#F5EFE6] px-5 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E] appearance-none cursor-pointer"
+            >
+              <option value="">Semua Status</option>
+              <option value="Sudah Dinilai">Sudah Dinilai</option>
+              <option value="Belum Dinilai">Belum Dinilai</option>
+            </select>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute right-4 top-1/2 -translate-y-1/2 text-[#0B4D1E] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
           </div>
+
         </div>
       </div>
 
@@ -415,10 +420,7 @@ function KelolaTransaksiPage() {
               <div>
                 <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Wilayah</label>
                 <div className="relative">
-                  <select value={editForm.wilayah} onChange={(e) => setEditForm({...editForm, wilayah: e.target.value})} className="w-full bg-[#F5EFE6] px-5 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E] appearance-none cursor-pointer">
-                    <option value="BEM FATETA">FATETA</option><option value="BEM FAPET">FAPET</option><option value="BEM FEM">FEM</option><option value="BEM FAHUTAN">FAHUTAN</option>
-                  </select>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute right-4 top-1/2 -translate-y-1/2 text-[#0B4D1E] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  <input type="text" value={editForm.wilayah} disabled className="w-full bg-[#EAE5DA] px-5 py-4 rounded-2xl font-bold text-gray-500 cursor-not-allowed border border-gray-200" title="Wilayah tidak dapat diubah" />
                 </div>
               </div>
               <div>

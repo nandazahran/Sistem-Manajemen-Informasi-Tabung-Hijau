@@ -1229,14 +1229,26 @@ pub async fn tambah_wilayah(
 pub async fn lihat_wilayah(
     State(db): State<DatabaseConnection>,
     // Extension ini berisi data dari Token JWT yang sudah dibongkar Satpam
-    Extension(role_user): Extension<String>,
-    Extension(id_wilayah_user): Extension<Option<i32>>,
+    Extension(username_jwt): Extension<String>,
 ) -> (StatusCode, Json<serde_json::Value>) {
+    // Cari data user untuk mengecek Role dan wilayah_id-nya
+    let pencarian_user = user::Entity::find()
+        .filter(user::Column::Username.eq(username_jwt))
+        .one(&db)
+        .await
+        .unwrap();
+
+    let (role_user, id_wilayah_user) = match pencarian_user {
+        Some(u) => (u.role, u.wilayah_id),
+        None => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "status": "gagal", "pesan": "User tidak valid" }))),
+    };
+
     // LOGIKA FILTER:
-    // 1. Jika bem_km -> Ambil semua baris di tabel wilayah
+    // 1. Jika admin/superadmin/bem_km/dui -> Ambil semua baris di tabel wilayah
     // 2. Jika bukan -> Ambil yang ID-nya cocok dengan wilayah si user
 
-    let query = if role_user == "bem_km" || role_user == "admin" || role_user == "dui" {
+    let role_lower = role_user.to_lowercase();
+    let query = if role_lower == "bem_km" || role_lower == "admin" || role_lower == "superadmin" || role_lower == "dui" {
         wilayah::Entity::find()
     } else {
         wilayah::Entity::find().filter(wilayah::Column::Id.eq(id_wilayah_user))
