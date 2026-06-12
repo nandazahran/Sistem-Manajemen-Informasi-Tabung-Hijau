@@ -192,9 +192,7 @@ function DuiDashboardPage() {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Kategori Sampah Terbanyak */}
+        </div>        {/* Kategori Sampah Terbanyak */}
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
           <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-6">Kategori Sampah Terbanyak</h3>
           <div className="h-64 relative">
@@ -202,14 +200,14 @@ function DuiDashboardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => `${value} kg`} />
-                  <Pie data={pieKategori} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" label={({name, value}) => `${name}`} labelLine={false}>
+                  <Pie data={pieKategori} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" label={({name}) => `${name}`} labelLine={false} style={{fontSize: '11px', fontWeight: 'bold'}}>
                     {pieKategori.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS_KATEGORI[index % COLORS_KATEGORI.length]} />)}
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
             ) : (
               <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
-                 <p className="text-gray-400 font-medium">Belum ada data kategori sampah.</p>
+                  <p className="text-gray-400 font-medium">Belum ada data kategori sampah.</p>
               </div>
             )}
           </div>
@@ -223,14 +221,14 @@ function DuiDashboardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => `${value} kg`} />
-                  <Pie data={pieWilayah} innerRadius={0} outerRadius={100} paddingAngle={1} dataKey="value" label={({name}) => name} labelLine={false}>
+                  <Pie data={pieWilayah} innerRadius={0} outerRadius={100} paddingAngle={1} dataKey="value" label={({name}) => name} labelLine={false} style={{fontSize: '11px', fontWeight: 'bold'}}>
                     {pieWilayah.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS_WILAYAH[index % COLORS_WILAYAH.length]} />)}
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
             ) : (
               <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
-                 <p className="text-gray-400 font-medium">Belum ada data kontribusi wilayah.</p>
+                  <p className="text-gray-400 font-medium">Belum ada data kontribusi wilayah.</p>
               </div>
             )}
           </div>

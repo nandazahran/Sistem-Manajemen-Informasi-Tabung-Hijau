@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
 import AdminLayout from '../../components/AdminLayout';
 import * as XLSX from "xlsx";
 
@@ -13,9 +13,11 @@ function LaporanPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBulanUtama, setFilterBulanUtama] = useState('Semua Periode');
   const [filterTahunUtama, setFilterTahunUtama] = useState('2026');
+  const [selectedWilayahId, setSelectedWilayahId] = useState('Semua Wilayah');
   
   // State Toggle Dropdown
   const [isBulanUtamaOpen, setIsBulanUtamaOpen] = useState(false);
+  const [isWilayahDropdownOpen, setIsWilayahDropdownOpen] = useState(false);
 
   // States Modal Export
   const [exportPeriode, setExportPeriode] = useState('Semua Periode');
@@ -27,8 +29,10 @@ function LaporanPage() {
 
   // Data dari Backend
   const [dataTrx, setDataTrx] = useState([]);
+  const uniqueCategories = Array.from(new Set(dataTrx.map(t => t.nama_kategori).filter(Boolean)));
   const [dataLb, setDataLb] = useState([]);
   const [wilAktifCount, setWilAktifCount] = useState(0);
+  const [listWilayah, setListWilayah] = useState([]);
 
   const getBulanPeriode = (isoString) => {
     if (!isoString) return '-';
@@ -79,8 +83,9 @@ function LaporanPage() {
           setDataLb([]);
         }
 
-        if (wilData.status === 'sukses') {
+        if (wilData.status === 'sukses' && Array.isArray(wilData.data)) {
           setWilAktifCount(wilData.data.length);
+          setListWilayah(wilData.data);
         }
       } catch (error) {
         console.error('Gagal fetch data laporan:', error);
@@ -96,7 +101,8 @@ function LaporanPage() {
     const matchBulan = filterBulanUtama === 'Semua Periode' || getBulanPeriode(t.tanggal) === filterBulanUtama;
     const matchTahun = getTahun(t.tanggal) === filterTahunUtama;
     const matchSearch = searchTerm === '' || t.nama_wilayah?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchBulan && matchTahun && matchSearch;
+    const matchWilayah = selectedWilayahId === 'Semua Wilayah' || t.wilayah_id === parseInt(selectedWilayahId);
+    return matchBulan && matchTahun && matchSearch && matchWilayah;
   });
 
   const totalTransaksi = filteredData.length;
@@ -137,9 +143,14 @@ function LaporanPage() {
     };
   }).sort((a, b) => b.beratRaw - a.beratRaw);
 
-  const barData = filteredRekap.slice(0, 6).map(r => ({
+  const barData = filteredRekap.slice(0, 5).map(r => ({
     name: r.wilayah.replace('BEM ', ''),
-    nilai: r.nilaiRaw / 1000
+    nilai: r.nilaiRaw
+  }));
+
+  const pieDataWilayah = filteredRekap.slice(0, 5).map(r => ({
+    name: r.wilayah.replace('BEM ', ''),
+    value: r.beratRaw
   }));
 
   const pieMap = {};
@@ -170,14 +181,23 @@ function LaporanPage() {
     }
 
     for (let i = startMonth; i <= endMonth; i++) {
-      tempChart[monthNames[i]] = { name: monthNames[i], berat: 0 };
+      let monthKey = monthNames[i];
+      const initObj = { name: monthNames[i] };
+      uniqueCategories.forEach(kat => {
+        initObj[kat] = 0;
+      });
+      tempChart[monthKey] = initObj;
     }
 
     filteredData.forEach(item => {
       const d = new Date(item.tanggal);
       const m = monthNames[d.getMonth()];
       if (tempChart[m]) {
-        tempChart[m].berat += (item.berat || item.berat_gram || 0) / 1000;
+        const kat = item.nama_kategori;
+        const beratKg = (item.berat || item.berat_gram || 0) / 1000;
+        if (kat && tempChart[m].hasOwnProperty(kat)) {
+          tempChart[m][kat] += beratKg;
+        }
       }
     });
 
@@ -247,6 +267,28 @@ function LaporanPage() {
           <input type="text" placeholder="Cari wilayah..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#F5EFE6] px-14 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E] transition-shadow" />
         </div>
         
+        {/* Combo Box Filter Wilayah */}
+        <div className="relative w-full md:w-64">
+          <div onClick={() => setIsWilayahDropdownOpen(!isWilayahDropdownOpen)} className="bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors h-[56px]">
+            <span className="truncate">
+              {selectedWilayahId === 'Semua Wilayah' ? 'Semua Wilayah' : (listWilayah.find(w => w.id === parseInt(selectedWilayahId))?.nama || 'Semua Wilayah')}
+            </span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </div>
+          {isWilayahDropdownOpen && (
+            <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 shadow-xl rounded-xl z-50 overflow-hidden py-1 max-h-60 overflow-y-auto">
+              <div onClick={() => { setSelectedWilayahId('Semua Wilayah'); setIsWilayahDropdownOpen(false); }} className={`px-5 py-2.5 cursor-pointer text-sm font-medium transition-colors ${selectedWilayahId === 'Semua Wilayah' ? 'bg-[#0B4D1E] text-white' : 'text-[#0B4D1E] hover:bg-gray-100'}`}>
+                Semua Wilayah
+              </div>
+              {listWilayah.map(wil => (
+                <div key={wil.id} onClick={() => { setSelectedWilayahId(wil.id.toString()); setIsWilayahDropdownOpen(false); }} className={`px-5 py-2.5 cursor-pointer text-sm font-medium transition-colors ${selectedWilayahId === wil.id.toString() ? 'bg-[#0B4D1E] text-white' : 'text-[#0B4D1E] hover:bg-gray-100'}`}>
+                  {wil.nama}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Combo Box Filter Bulan */}
         <div className="relative w-full md:w-64">
           <div onClick={() => setIsBulanUtamaOpen(!isBulanUtamaOpen)} className="bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors h-[56px]">
@@ -293,33 +335,96 @@ function LaporanPage() {
         <>
           {/* CHARTS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {/* Tren Sampah per Kategori */}
             <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
-              <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Tren Sampah per Bulan (kg)</h3>
+              <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Tren Sampah per Kategori</h3>
               <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={lineData}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} /><YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={40} /><Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 2}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} /><Line type="monotone" dataKey="berat" stroke="#125B2A" strokeWidth={3} dot={{r: 4, fill: '#125B2A'}} activeDot={{r: 6}} /></LineChart>
-                </ResponsiveContainer>
+                {lineData.length > 0 && lineData.some(d => uniqueCategories.some(kat => d[kat] > 0)) ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={lineData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} />
+                      <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={40} />
+                      <Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 2}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `${val.toFixed(1)} kg`} />
+                      {uniqueCategories.map((kat, index) => (
+                        <Line key={kat} type="monotone" name={kat} dataKey={kat} stroke={COLORS[index % COLORS.length]} strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full bg-gray-50 rounded-2xl flex items-center justify-center border border-dashed border-gray-200">
+                    <span className="text-gray-400 font-medium text-sm">Belum ada data tren sampah</span>
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* Nilai Ekonomi per Wilayah */}
             <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
-              <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Nilai Ekonomi per Wilayah (Rp ribu)</h3>
+              <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Nilai Ekonomi per Wilayah (Top 5)</h3>
               <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={barData}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} /><YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={40} /><Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `Rp ${val}k`} /><Bar dataKey="nilai" fill="#125B2A" radius={[4, 4, 0, 0]} /></BarChart>
-                </ResponsiveContainer>
+                {barData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={barData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} />
+                      <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={55} tickFormatter={(v) => `${v/1000}k`} />
+                      <Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => formatRp(val)} />
+                      <Bar dataKey="nilai" fill="#125B2A" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full bg-gray-50 rounded-2xl flex items-center justify-center border border-dashed border-gray-200">
+                    <span className="text-gray-400 font-medium text-sm">Belum ada data ekonomi wilayah</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Kontribusi Wilayah */}
+            <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 h-80 flex flex-col justify-between">
+              <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-2">Kontribusi Wilayah (kg) (Top 5)</h3>
+              <div className="flex-1 relative">
+                {pieDataWilayah.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `${val.toFixed(1)} kg`} />
+                      <Legend iconType="square" wrapperStyle={{ fontSize: '12px' }} />
+                      <Pie data={pieDataWilayah} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" nameKey="name" label={({name}) => name} labelLine={false} style={{fontSize: '11px', fontWeight: 'bold'}}>
+                        {pieDataWilayah.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full bg-gray-50 rounded-2xl flex items-center justify-center border border-dashed border-gray-200">
+                    <span className="text-gray-400 font-medium text-sm">Belum ada data kontribusi wilayah</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Kontribusi per Kategori */}
+            <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 h-80 flex flex-col justify-between">
+              <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-2">Kontribusi per Kategori (kg)</h3>
+              <div className="flex-1 relative">
+                {pieData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `${val.toFixed(1)} kg`} />
+                      <Legend iconType="square" wrapperStyle={{ fontSize: '12px' }} />
+                      <Pie data={pieData} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" nameKey="name" label={({name}) => name} labelLine={false} style={{fontSize: '11px', fontWeight: 'bold'}}>
+                        {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full bg-gray-50 rounded-2xl flex items-center justify-center border border-dashed border-gray-200">
+                    <span className="text-gray-400 font-medium text-sm">Belum ada data kontribusi kategori</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-          {pieData.length > 0 && (
-          <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-8 h-80 flex flex-col">
-            <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Kontribusi per Kategori (kg)</h3>
-            <div className="flex-1 relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart><Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} /><Pie data={pieData} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value">{pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}</Pie></PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-          )}
 
           {/* REKAP TABEL */}
           <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden mb-10 p-2">

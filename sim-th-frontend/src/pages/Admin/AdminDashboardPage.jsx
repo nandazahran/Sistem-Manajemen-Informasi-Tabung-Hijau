@@ -22,6 +22,7 @@ function AdminDashboardPage() {
   const [lineData, setLineData] = useState([]);
   const [barData, setBarData] = useState([]);
   const [pieKategori, setPieKategori] = useState([]);
+  const [pieWilayah, setPieWilayah] = useState([]);
 
   const COLORS_KATEGORI = ['#125B2A', '#F4A300', '#8FA57A', '#EAE5DA'];
 
@@ -87,6 +88,10 @@ function AdminDashboardPage() {
         if (lbData.status === 'sukses' && lbData.data.length > 0) {
           newStats[5].value = lbData.data[0].poin_kpi.toString();
           newStats[5].badge = lbData.data[0].nama_wilayah;
+          setPieWilayah(lbData.data.map(w => ({
+            name: w.nama_wilayah,
+            value: w.total_berat_gram / 1000
+          })));
         }
 
         setStats(newStats);
@@ -177,65 +182,94 @@ function AdminDashboardPage() {
       </div>
 
       {/* GRAFIK DINAMIS DARI BACKEND */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        {/* Line Chart Card */}
-        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 lg:col-span-1">
-          <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Tren Sampah Bulanan</h3>
-          <div className="h-48">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10 mt-6">
+        
+        {/* Tren Sampah Bulanan */}
+        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+          <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-6">Tren Sampah Bulanan</h3>
+          <div className="h-64">
             {lineData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={lineData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={35} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} width={40} />
                   <Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 2}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => [`${value} kg`, 'Berat']} />
-                  <Line type="monotone" dataKey="berat" stroke="#125B2A" strokeWidth={3} dot={{r: 4, fill: '#125B2A'}} activeDot={{r: 6}} />
+                  <Line type="monotone" dataKey="berat" stroke="#125B2A" strokeWidth={4} dot={{r: 5, fill: '#125B2A'}} activeDot={{r: 8}} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="w-full h-full bg-gray-50 flex items-center justify-center rounded-xl"><p className="text-gray-400 text-xs">Belum ada data</p></div>
+              <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
+                 <p className="text-gray-400 font-medium">Belum ada data tren sampah bulanan.</p>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Bar Chart Card */}
-        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 lg:col-span-1">
-          <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Nilai Ekonomi Bulanan</h3>
-          <div className="h-48">
+        {/* Pertumbuhan Nilai Ekonomi */}
+        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+          <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-6">Pertumbuhan Nilai Ekonomi</h3>
+          <div className="h-64">
             {barData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={45} tickFormatter={(val) => `${val/1000}k`} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} width={60} tickFormatter={(val) => `${val/1000}k`} />
                   <Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `Rp ${val.toLocaleString()}`} />
-                  <Bar dataKey="nilai" fill="#125B2A" radius={[4, 4, 0, 0]} barSize={30} />
+                  <Bar dataKey="nilai" fill="#125B2A" radius={[6, 6, 0, 0]} barSize={40} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="w-full h-full bg-gray-50 flex items-center justify-center rounded-xl"><p className="text-gray-400 text-xs">Belum ada data</p></div>
+              <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
+                 <p className="text-gray-400 font-medium">Belum ada data nilai ekonomi.</p>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Pie Chart Card */}
-        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 lg:col-span-1">
-          <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Kategori Sampah Terbanyak</h3>
-          <div className="h-48 relative">
+        {/* Kategori Sampah Terbanyak */}
+        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+          <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-6">Kategori Sampah Terbanyak</h3>
+          <div className="h-64 relative">
             {pieKategori.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => `${value} kg`} />
-                  <Pie data={pieKategori} innerRadius={35} outerRadius={70} paddingAngle={2} dataKey="value" label={({name}) => `${name}`} labelLine={false} style={{fontSize: '10px', fontWeight: 'bold'}}>
+                  <Pie data={pieKategori} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" label={({name}) => `${name}`} labelLine={false} style={{fontSize: '11px', fontWeight: 'bold'}}>
                     {pieKategori.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS_KATEGORI[index % COLORS_KATEGORI.length]} />)}
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="w-full h-full bg-gray-50 flex items-center justify-center rounded-xl"><p className="text-gray-400 text-xs">Belum ada data</p></div>
+              <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
+                 <p className="text-gray-400 font-medium">Belum ada data kategori sampah.</p>
+              </div>
             )}
           </div>
         </div>
+
+        {/* Kontribusi Wilayah */}
+        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+          <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-6">Kontribusi Wilayah (kg)</h3>
+          <div className="h-64 relative">
+            {pieWilayah.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => `${value.toFixed(1)} kg`} />
+                  <Pie data={pieWilayah} innerRadius={0} outerRadius={100} paddingAngle={1} dataKey="value" label={({name}) => name} labelLine={false} style={{fontSize: '11px', fontWeight: 'bold'}}>
+                    {pieWilayah.map((entry, index) => <Cell key={`cell-${index}`} fill={['#125B2A', '#F4A300', '#8FA57A', '#517D3B', '#D1D5DB'][index % 5]} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
+                 <p className="text-gray-400 font-medium">Belum ada data kontribusi wilayah.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
 
       {/* AKTIVITAS & RIWAYAT */}

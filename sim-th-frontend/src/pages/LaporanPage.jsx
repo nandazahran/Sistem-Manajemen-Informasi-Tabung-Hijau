@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import * as XLSX from "xlsx";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 function LaporanPage() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -24,6 +24,9 @@ function LaporanPage() {
   // State untuk Data Riil
   const [dataTrx, setDataTrx] = useState([]);
   const [saldoTotal, setSaldoTotal] = useState(0);
+
+  const uniqueCategories = Array.from(new Set(dataTrx.map(t => t.nama_kategori).filter(Boolean)));
+  const COLORS = ['#125B2A', '#F4A300', '#8FA57A', '#517D3B', '#D1D5DB', '#3B82F6', '#EF4444', '#10B981'];
 
   // Opsi Filter 2 Bulanan
   const periodeOptions = [
@@ -122,10 +125,11 @@ function LaporanPage() {
 
     for (let i = startMonth; i <= endMonth; i++) {
       let monthKey = monthNames[i];
-      tempChart[monthKey] = {
-        bulan: monthKey, Pemasukan: 0, SaldoTabungan: 0, 
-        Plastik: 0, Kertas: 0, Logam: 0 
-      };
+      const initObj = { bulan: monthKey, Pemasukan: 0, SaldoTabungan: 0 };
+      uniqueCategories.forEach(kat => {
+        initObj[kat] = 0;
+      });
+      tempChart[monthKey] = initObj;
     }
 
     const ascData = [...filteredData].sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
@@ -137,12 +141,12 @@ function LaporanPage() {
       if (tempChart[monthKey]) {
         tempChart[monthKey].Pemasukan += item.total_nilai || 0;
         
-        const kat = (item.nama_kategori || '').toLowerCase();
+        const kat = item.nama_kategori;
         const beratKg = (item.berat || item.berat_gram || 0) / 1000;
         
-        if (kat.includes('plastik')) tempChart[monthKey].Plastik += beratKg;
-        else if (kat.includes('kertas') || kat.includes('kardus')) tempChart[monthKey].Kertas += beratKg;
-        else if (kat.includes('logam') || kat.includes('besi')) tempChart[monthKey].Logam += beratKg;
+        if (kat && tempChart[monthKey].hasOwnProperty(kat)) {
+          tempChart[monthKey][kat] += beratKg;
+        }
       }
     });
 
@@ -154,6 +158,17 @@ function LaporanPage() {
   };
 
   const chartDataBulanan = generateChartData();
+
+  const getPieDataKategori = () => {
+    const pieMap = {};
+    filteredData.forEach(t => {
+       const kat = t.nama_kategori || 'Unknown';
+       if (!pieMap[kat]) pieMap[kat] = 0;
+       pieMap[kat] += (t.berat || t.berat_gram || 0) / 1000;
+    });
+    return Object.keys(pieMap).map(k => ({ name: k, value: pieMap[k] })).filter(item => item.value > 0);
+  };
+  const pieDataKategori = getPieDataKategori();
 
   const handleExport = () => {
     let dataToExport = dataTrx.filter(t => getTahun(t.tanggal) === exportYear);
@@ -292,28 +307,58 @@ function LaporanPage() {
           </div>
         </div>
 
-        {/* GRAFIK 2: BAR CHART BREAKDOWN KATEGORI */}
-        <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 mb-10">
-          <h3 className="font-extrabold text-2xl text-[#0B4D1E] mb-8">Breakdown Kategori per Bulan</h3>
-          <div className="w-full h-80 pt-4">
-            {chartDataBulanan.length > 0 && chartDataBulanan.some(d => d.Plastik > 0 || d.Kertas > 0 || d.Logam > 0) ? (
-               <ResponsiveContainer width="100%" height="100%">
-                 <BarChart data={chartDataBulanan} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                   <XAxis dataKey="bulan" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />
-                   <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />
-                   <Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `${val.toFixed(1)} kg`} />
-                   <Legend iconType="square" wrapperStyle={{ paddingTop: '20px' }} />
-                   <Bar name="Plastik (kg)" dataKey="Plastik" fill="#125B2A" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-                   <Bar name="Kertas (kg)" dataKey="Kertas" fill="#F4A300" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-                   <Bar name="Logam (kg)" dataKey="Logam" fill="#8FA57A" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-                 </BarChart>
-               </ResponsiveContainer>
-            ) : (
-               <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
-                 <p className="text-gray-400 font-medium">Belum ada data berat sampah (kg) pada periode ini.</p>
-               </div>
-            )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+          {/* GRAFIK 2: BAR CHART BREAKDOWN KATEGORI */}
+          <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col justify-between">
+            <div>
+              <h3 className="font-extrabold text-2xl text-[#0B4D1E] mb-2">Breakdown Kategori per Bulan</h3>
+              <p className="text-gray-500 text-sm mb-6">Berat setoran per kategori per bulan (kg)</p>
+            </div>
+            <div className="w-full h-80 pt-4">
+              {chartDataBulanan.length > 0 && chartDataBulanan.some(d => uniqueCategories.some(kat => d[kat] > 0)) ? (
+                 <ResponsiveContainer width="100%" height="100%">
+                   <BarChart data={chartDataBulanan} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                     <XAxis dataKey="bulan" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />
+                     <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />
+                     <Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `${val.toFixed(1)} kg`} />
+                     <Legend iconType="square" wrapperStyle={{ paddingTop: '20px' }} />
+                     {uniqueCategories.map((kat, index) => (
+                       <Bar key={kat} name={`${kat} (kg)`} dataKey={kat} fill={COLORS[index % COLORS.length]} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                     ))}
+                   </BarChart>
+                 </ResponsiveContainer>
+              ) : (
+                 <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
+                   <p className="text-gray-400 font-medium">Belum ada data berat sampah (kg) pada periode ini.</p>
+                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* GRAFIK 3: PIE CHART KONTRIBUSI KATEGORI */}
+          <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col justify-between">
+            <div>
+              <h3 className="font-extrabold text-2xl text-[#0B4D1E] mb-2">Kontribusi Kategori</h3>
+              <p className="text-gray-500 text-sm mb-6">Total pengumpulan sampah berdasarkan kategori (kg)</p>
+            </div>
+            <div className="w-full h-80 pt-4 relative flex items-center justify-center">
+              {pieDataKategori.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => `${value.toFixed(1)} kg`} />
+                    <Legend iconType="square" wrapperStyle={{ paddingTop: '20px' }} />
+                    <Pie data={pieDataKategori} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" nameKey="name" label={({name}) => name} labelLine={false} style={{fontSize: '12px', fontWeight: 'bold'}}>
+                      {pieDataKategori.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
+                  <p className="text-gray-400 font-medium">Belum ada data kontribusi kategori pada periode ini.</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

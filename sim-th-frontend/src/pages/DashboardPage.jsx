@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import bannerImg from '../assets/DB-gambar-banner.png';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
 
 function DashboardPage() {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ function DashboardPage() {
   const [aktivitas, setAktivitas] = useState([]);
   const [namaWilayah, setNamaWilayah] = useState('Memuat...');
   const [grafikBulanan, setGrafikBulanan] = useState([]);
+  const [breakdownKategori, setBreakdownKategori] = useState([]);
 
   // ==========================================
   // FETCH DATA ASLI DARI API & LOCALSTORAGE
@@ -102,6 +104,12 @@ function DashboardPage() {
               }));
               if (resData.grafik_bulanan && Array.isArray(resData.grafik_bulanan)) {
                 setGrafikBulanan(resData.grafik_bulanan);
+              }
+              if (resData.breakdown_kategori && Array.isArray(resData.breakdown_kategori)) {
+                setBreakdownKategori(resData.breakdown_kategori.map(k => ({
+                  name: k.nama_kategori,
+                  value: k.total_berat_gram / 1000
+                })));
               }
             }
           }
@@ -199,64 +207,89 @@ function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        <div onClick={() => navigate('/laporan')} className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 lg:col-span-2 hover:-translate-y-1 transition-transform duration-300 cursor-pointer group">
-          <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-1 group-hover:text-[#F4A300] transition-colors">Aktivitas Bulanan <span className="text-sm font-normal text-gray-400 ml-2">(Klik untuk detail)</span></h3>
-          <p className="text-gray-500 text-sm mb-6">Pengumpulan sampah per bulan (kg)</p>
-          
-          <div className="w-full h-64 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex items-end justify-between p-4 gap-2">
-            {grafikBulanan.map((g, i) => {
-               const maxBerat = Math.max(...grafikBulanan.map(x => (x.total_berat !== undefined ? x.total_berat : x.berat) || 0), 1);
-               const b = g.total_berat !== undefined ? g.total_berat : (g.berat || 0);
-               const heightPct = Math.max((b / maxBerat) * 100, 2); 
-               return (
-                 <div key={i} className="flex flex-col items-center justify-end w-full h-full gap-2 group">
-                   <div className="w-full bg-[#8FA57A] rounded-t-md relative group-hover:bg-[#F4A300] transition-colors" style={{ height: `${heightPct}%` }}>
-                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity z-10">
-                        {b / 1000} kg
-                      </div>
-                   </div>
-                   <span className="text-[10px] text-gray-500 font-bold">{g.bulan}</span>
-                 </div>
-               )
-            })}
+      {/* SECTION GRAFIK (3 KOLOM) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+        
+        {/* Tren Sampah Bulanan */}
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
+          <div>
+            <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-1">Tren Sampah Bulanan</h3>
+            <p className="text-gray-500 text-sm mb-6">Pengumpulan sampah per bulan (kg)</p>
+          </div>
+          <div className="h-64">
+            {grafikBulanan.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={grafikBulanan.map(g => ({ name: g.bulan, berat: (g.total_berat !== undefined ? g.total_berat : g.berat || 0) / 1000 }))}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} width={30} />
+                  <Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 2}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => [`${value} kg`, 'Berat']} />
+                  <Line type="monotone" dataKey="berat" stroke="#125B2A" strokeWidth={4} dot={{r: 5, fill: '#125B2A'}} activeDot={{r: 8}} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
+                 <p className="text-gray-400 font-medium">Belum ada data tren sampah.</p>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 hover:-translate-y-1 transition-transform duration-300">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-yellow-100 rounded-lg text-[#F4A300]">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
-            </div>
-            <h3 className="font-extrabold text-xl text-[#0B4D1E]">Top 3 Wilayah</h3>
+        {/* Pertumbuhan Nilai Ekonomi */}
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
+          <div>
+            <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-1">Nilai Ekonomi Bulanan</h3>
+            <p className="text-gray-500 text-sm mb-6">Pendapatan wilayah dari setoran sampah (Rp)</p>
           </div>
-          
-          <div className="space-y-4">
-            {top3.map((item, index) => {
-              const icons = ['🏆', '🥈', '🥉'];
-              const bgs = ['bg-yellow-400', 'bg-gray-400', 'bg-[#CD7F32]'];
-              const isMe = item.nama_wilayah === namaWilayah;
-              return (
-                <div key={index} className={`flex items-center gap-4 p-3 rounded-2xl ${isMe ? 'border-2 border-[#F4A300] bg-orange-50' : 'bg-[#F5EFE6]'}`}>
-                  <div className={`w-10 h-10 ${bgs[index]} rounded-full flex items-center justify-center text-white text-xl`}>{icons[index]}</div>
-                  <div>
-                    <p className="font-bold text-[#0B4D1E]">{item.nama_wilayah} {isMe && <span className="ml-2 bg-[#F4A300] text-white text-[10px] px-2 py-0.5 rounded-full">You</span>}</p>
-                    <p className="text-xs text-gray-500">{item.poin_kpi} poin</p>
-                  </div>
-                </div>
-              );
-            })}
-            {top3.length === 0 && <p className="text-sm text-gray-500 italic text-center py-4">Belum ada data KPI</p>}
+          <div className="h-64">
+            {grafikBulanan.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={grafikBulanan.map(g => ({ name: g.bulan, nilai: g.total_nilai !== undefined ? g.total_nilai : g.rupiah || 0 }))}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} width={55} tickFormatter={(val) => `${val/1000}k`} />
+                  <Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `Rp ${val.toLocaleString()}`} />
+                  <Bar dataKey="nilai" fill="#F4A300" radius={[6, 6, 0, 0]} barSize={35} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
+                 <p className="text-gray-400 font-medium">Belum ada data nilai ekonomi.</p>
+              </div>
+            )}
           </div>
-          <Link to="/leaderboard" className="w-full mt-6 text-sm font-bold text-[#0B4D1E] hover:text-[#F4A300] flex items-center justify-center gap-2">
-            Lihat Semua Peringkat <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-          </Link>
         </div>
+
+        {/* Kategori Sampah Terbanyak */}
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
+          <div>
+            <h3 className="font-extrabold text-xl text-[#0B4D1E] mb-1">Kategori Sampah Terbanyak</h3>
+            <p className="text-gray-500 text-sm mb-6">Proporsi setoran berdasarkan kategori (kg)</p>
+          </div>
+          <div className="h-64 relative flex items-center justify-center">
+            {breakdownKategori.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(value) => `${value.toFixed(1)} kg`} />
+                  <Pie data={breakdownKategori} innerRadius={55} outerRadius={90} paddingAngle={2} dataKey="value" nameKey="name" label={({name}) => name} labelLine={false} style={{fontSize: '11px', fontWeight: 'bold'}}>
+                    {breakdownKategori.map((entry, index) => <Cell key={`cell-${index}`} fill={['#125B2A', '#F4A300', '#8FA57A', '#EAE5DA'][index % 4]} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex items-center justify-center">
+                 <p className="text-gray-400 font-medium">Belum ada data kategori sampah.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
 
+      {/* ROW 2: TRANSAKSI TERBARU & LEADERBOARD */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 lg:col-span-2 hover:-translate-y-1 transition-transform duration-300">
-            <div className="flex justify-between items-center mb-6">
+          <div className="flex justify-between items-center mb-6">
             <h3 className="font-extrabold text-xl text-[#0B4D1E]">Transaksi Terbaru</h3>
             <Link to="/riwayat" className="text-sm font-bold text-[#0B4D1E] hover:text-[#F4A300] flex items-center gap-1 transition-colors">
               Lihat Selengkapnya 
@@ -274,18 +307,54 @@ function DashboardPage() {
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 hover:-translate-y-1 transition-transform duration-300 flex flex-col">
-           <div className="flex items-center gap-3 mb-8">
+        {/* Top 3 Wilayah */}
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 hover:-translate-y-1 transition-transform duration-300 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-yellow-100 rounded-lg text-[#F4A300]">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+              </div>
+              <h3 className="font-extrabold text-xl text-[#0B4D1E]">Top 3 Wilayah</h3>
+            </div>
+            
+            <div className="space-y-4">
+              {top3.map((item, index) => {
+                const icons = ['🏆', '🥈', '🥉'];
+                const bgs = ['bg-yellow-400', 'bg-gray-400', 'bg-[#CD7F32]'];
+                const isMe = item.nama_wilayah === namaWilayah;
+                return (
+                  <div key={index} className={`flex items-center gap-4 p-3 rounded-2xl ${isMe ? 'border-2 border-[#F4A300] bg-orange-50' : 'bg-[#F5EFE6]'}`}>
+                    <div className={`w-10 h-10 ${bgs[index]} rounded-full flex items-center justify-center text-white text-xl`}>{icons[index]}</div>
+                    <div>
+                      <p className="font-bold text-[#0B4D1E]">{item.nama_wilayah} {isMe && <span className="ml-2 bg-[#F4A300] text-white text-[10px] px-2 py-0.5 rounded-full">You</span>}</p>
+                      <p className="text-xs text-gray-500">{item.poin_kpi} poin</p>
+                    </div>
+                  </div>
+                );
+              })}
+              {top3.length === 0 && <p className="text-sm text-gray-500 italic text-center py-4">Belum ada data KPI</p>}
+            </div>
+          </div>
+          <Link to="/leaderboard" className="w-full mt-6 text-sm font-bold text-[#0B4D1E] hover:text-[#F4A300] flex items-center justify-center gap-2">
+            Lihat Semua Peringkat <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+          </Link>
+        </div>
+      </div>
+
+      {/* ROW 3: AKTIVITAS */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 hover:-translate-y-1 transition-transform duration-300 flex flex-col lg:col-span-3">
+          <div className="flex items-center gap-3 mb-6">
             <div className="p-2 bg-green-100 rounded-lg text-green-600">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
             </div>
             <h3 className="font-extrabold text-xl text-[#0B4D1E]">Aktivitas</h3>
           </div>
           
-          <div className="relative border-l-2 border-gray-100 ml-6 space-y-10 flex-1">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-2">
             {aktivitas.map((akt, idx) => (
-              <div key={idx} className="relative pl-8">
-                <div className={`absolute -left-[19px] top-0 w-9 h-9 rounded-full border-4 border-white flex items-center justify-center shadow-sm ${idx % 2 === 0 ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-[#F4A300]'}`}>
+              <div key={idx} className="relative pl-12 border-l-2 border-green-100 py-2">
+                <div className={`absolute -left-[19px] top-2 w-9 h-9 rounded-full border-4 border-white flex items-center justify-center shadow-sm ${idx % 2 === 0 ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-[#F4A300]'}`}>
                   {idx % 2 === 0 ? (
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   ) : (
@@ -297,12 +366,12 @@ function DashboardPage() {
                 <p className="text-xs text-gray-400 mt-1">{akt.waktu}</p>
               </div>
             ))}
-            {aktivitas.length === 0 && <p className="text-sm text-gray-500 italic py-4">Belum ada riwayat aktivitas</p>}
+            {aktivitas.length === 0 && <p className="text-sm text-gray-500 italic py-4 col-span-3 text-center">Belum ada riwayat aktivitas</p>}
           </div>
-            <Link to="/aktivitas" className="w-full mt-8 text-sm font-bold text-[#0B4D1E] hover:text-[#F4A300] flex items-center justify-center gap-2 transition-colors">
+          <Link to="/aktivitas" className="w-full mt-8 text-sm font-bold text-[#0B4D1E] hover:text-[#F4A300] flex items-center justify-center gap-2 transition-colors">
             Lihat Semua Aktivitas
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-           </Link>
+          </Link>
         </div>
       </div>
     </DashboardLayout>

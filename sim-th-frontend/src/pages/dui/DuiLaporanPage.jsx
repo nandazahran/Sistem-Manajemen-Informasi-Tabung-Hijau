@@ -13,6 +13,8 @@ function DuiLaporanPage() {
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState('Semua Periode');
   const [selectedYear, setSelectedYear] = useState('2026');
+  const [selectedWilayahId, setSelectedWilayahId] = useState('Semua Wilayah');
+  const [isWilayahDropdownOpen, setIsWilayahDropdownOpen] = useState(false);
 
   // State Modal Export (Terpisah Bulan & Tahun)
   const [isExportPeriodeOpen, setIsExportPeriodeOpen] = useState(false);
@@ -21,7 +23,9 @@ function DuiLaporanPage() {
   
   // Data Asli dari Backend
   const [dataTrx, setDataTrx] = useState([]);
+  const uniqueCategories = Array.from(new Set(dataTrx.map(t => t.nama_kategori).filter(Boolean)));
   const [dataLb, setDataLb] = useState([]); 
+  const [listWilayah, setListWilayah] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Opsi Bulan tanpa Tahun
@@ -59,13 +63,15 @@ function DuiLaporanPage() {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}` };
         
-        const [resTrx, resLb] = await Promise.all([
+        const [resTrx, resLb, wilRes] = await Promise.all([
           fetch(`${baseUrl}/transaksi`, { headers }),
-          fetch(`${baseUrl}/dashboard/leaderboard`, { headers })
+          fetch(`${baseUrl}/dashboard/leaderboard`, { headers }),
+          fetch(`${baseUrl}/wilayah/aktif`, { headers })
         ]);
 
         const trx = await resTrx.json();
         const lb = await resLb.json();
+        const wilData = await wilRes.json();
 
         if (trx.status === 'sukses' && Array.isArray(trx.data)) {
           setDataTrx(trx.data.sort((a, b) => b.id - a.id));
@@ -77,6 +83,10 @@ function DuiLaporanPage() {
           setDataLb(lb.data);
         } else {
           setDataLb([]);
+        }
+
+        if (wilData.status === 'sukses' && Array.isArray(wilData.data)) {
+          setListWilayah(wilData.data);
         }
       } catch (error) {
         console.error("Gagal mengambil data laporan DUI:", error);
@@ -94,7 +104,8 @@ function DuiLaporanPage() {
     const matchBulan = selectedMonth === 'Semua Periode' || getBulanPeriode(t.tanggal) === selectedMonth;
     const matchTahun = getTahun(t.tanggal) === selectedYear;
     const matchSearch = searchTerm === '' || t.nama_wilayah?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchBulan && matchTahun && matchSearch;
+    const matchWilayah = selectedWilayahId === 'Semua Wilayah' || t.wilayah_id === parseInt(selectedWilayahId);
+    return matchBulan && matchTahun && matchSearch && matchWilayah;
   });
 
   const totalTransaksi = filteredData.length;
@@ -128,9 +139,17 @@ function DuiLaporanPage() {
     };
   }).sort((a, b) => b.beratRaw - a.beratRaw);
 
-  const barData = rekapTableData.slice(0, 5).map(r => ({ name: r.wilayah, nilai: r.nilaiRaw }));
-  const pieData = rekapTableData.slice(0, 5).map(r => ({ name: r.wilayah, value: r.beratRaw }));
+  const barData = rekapTableData.slice(0, 5).map(r => ({ name: r.wilayah.replace('BEM ', ''), nilai: r.nilaiRaw }));
+  const pieDataWilayah = rekapTableData.slice(0, 5).map(r => ({ name: r.wilayah.replace('BEM ', ''), value: r.beratRaw }));
   const COLORS = ['#125B2A', '#F4A300', '#8FA57A', '#517D3B', '#D1D5DB'];
+
+  const pieMap = {};
+  filteredData.forEach(t => {
+     const kat = t.nama_kategori || 'Unknown';
+     if (!pieMap[kat]) pieMap[kat] = 0;
+     pieMap[kat] += (t.berat || t.berat_gram || 0) / 1000;
+  });
+  const pieDataKategori = Object.keys(pieMap).map(k => ({ name: k, value: pieMap[k] }));
 
   const generateLineChart = () => {
     if (filteredData.length === 0) return [];
@@ -152,18 +171,23 @@ function DuiLaporanPage() {
     }
 
     for (let i = startMonth; i <= endMonth; i++) {
-      tempChart[monthNames[i]] = { name: monthNames[i], Plastik: 0, Kertas: 0, Logam: 0 };
+      let monthKey = monthNames[i];
+      const initObj = { name: monthNames[i] };
+      uniqueCategories.forEach(kat => {
+        initObj[kat] = 0;
+      });
+      tempChart[monthKey] = initObj;
     }
 
     filteredData.forEach(item => {
       const d = new Date(item.tanggal);
       const m = monthNames[d.getMonth()];
       if (tempChart[m]) {
-        const kat = (item.nama_kategori || '').toLowerCase();
+        const kat = item.nama_kategori;
         const beratKg = (item.berat || item.berat_gram || 0) / 1000;
-        if (kat.includes('plastik')) tempChart[m].Plastik += beratKg;
-        else if (kat.includes('kertas') || kat.includes('kardus')) tempChart[m].Kertas += beratKg;
-        else if (kat.includes('logam') || kat.includes('besi')) tempChart[m].Logam += beratKg;
+        if (kat && tempChart[m].hasOwnProperty(kat)) {
+          tempChart[m][kat] += beratKg;
+        }
       }
     });
 
@@ -220,6 +244,39 @@ function DuiLaporanPage() {
           <input type="text" placeholder="Cari berdasarkan nama BEM/Wilayah..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#F5EFE6] px-14 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E]" />
         </div>
         
+        {/* DROPDOWN WILAYAH */}
+        <div className="relative w-full md:w-64">
+          <button 
+            onClick={() => setIsWilayahDropdownOpen(!isWilayahDropdownOpen)}
+            className="w-full bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl flex items-center justify-between shadow-sm hover:bg-[#EAE5DA] transition-all h-[56px]"
+          >
+            <span className="truncate pr-2">
+              {selectedWilayahId === 'Semua Wilayah' ? 'Semua Wilayah' : (listWilayah.find(w => w.id === parseInt(selectedWilayahId))?.nama || 'Semua Wilayah')}
+            </span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0B4D1E]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </button>
+          
+          {isWilayahDropdownOpen && (
+            <div className="absolute top-full mt-3 right-0 w-72 bg-white p-4 rounded-[2rem] shadow-2xl border border-gray-100 z-50 flex flex-col gap-2 max-h-60 overflow-y-auto">
+              <button 
+                onClick={() => { setSelectedWilayahId('Semua Wilayah'); setIsWilayahDropdownOpen(false); }} 
+                className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all text-center ${selectedWilayahId === 'Semua Wilayah' ? 'bg-[#0B4D1E] text-white shadow-md' : 'bg-[#F3F4F6] text-[#4B5563] hover:bg-[#E5E7EB]'}`}
+              >
+                Semua Wilayah
+              </button>
+              {listWilayah.map(wil => (
+                <button 
+                  key={wil.id} 
+                  onClick={() => { setSelectedWilayahId(wil.id.toString()); setIsWilayahDropdownOpen(false); }} 
+                  className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all text-center ${selectedWilayahId === wil.id.toString() ? 'bg-[#0B4D1E] text-white shadow-md' : 'bg-[#F5EFE6] text-[#0B4D1E] hover:bg-[#EAE5DA]'}`}
+                >
+                  {wil.nama}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* DROPDOWN BULAN */}
         <div className="relative w-full md:w-56">
           <button 
@@ -285,16 +342,16 @@ function DuiLaporanPage() {
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
           <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Tren Sampah per Kategori</h3>
           <div className="h-48">
-            {lineData.length > 0 && lineData.some(d => d.Plastik > 0 || d.Kertas > 0 || d.Logam > 0) ? (
+            {lineData.length > 0 && lineData.some(d => uniqueCategories.some(kat => d[kat] > 0)) ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={lineData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} />
                   <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={40} />
                   <Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 2}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `${val.toFixed(1)} kg`} />
-                  <Line type="monotone" name="Plastik" dataKey="Plastik" stroke="#125B2A" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
-                  <Line type="monotone" name="Kertas" dataKey="Kertas" stroke="#F4A300" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
-                  <Line type="monotone" name="Logam" dataKey="Logam" stroke="#8FA57A" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
+                  {uniqueCategories.map((kat, index) => (
+                    <Line key={kat} type="monotone" name={kat} dataKey={kat} stroke={COLORS[index % COLORS.length]} strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
+                  ))}
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -314,7 +371,7 @@ function DuiLaporanPage() {
                 <BarChart data={barData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={50} tickFormatter={(v) => `${v/1000}k`} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={55} tickFormatter={(v) => `${v/1000}k`} />
                   <Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => formatRp(val)} />
                   <Bar dataKey="nilai" fill="#125B2A" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -326,28 +383,51 @@ function DuiLaporanPage() {
             )}
           </div>
         </div>
-      </div>
 
-      {/* Pie Chart */}
-      <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-8 h-80 flex flex-col">
-        <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Kontribusi Wilayah (kg) (Top 5)</h3>
-        <div className="flex-1 relative">
-          {pieData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `${val.toFixed(1)} kg`} />
-                <Legend iconType="square" wrapperStyle={{ fontSize: '12px' }} />
-                <Pie data={pieData} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" nameKey="name">
-                  {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="w-full h-full bg-gray-50 rounded-2xl flex items-center justify-center border border-dashed border-gray-200">
-              <span className="text-gray-400 font-medium text-sm">Belum ada data kontribusi wilayah</span>
-            </div>
-          )}
+        {/* Pie Chart Wilayah */}
+        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 h-80 flex flex-col justify-between">
+          <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-2">Kontribusi Wilayah (kg) (Top 5)</h3>
+          <div className="flex-1 relative">
+            {pieDataWilayah.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `${val.toFixed(1)} kg`} />
+                  <Legend iconType="square" wrapperStyle={{ fontSize: '12px' }} />
+                  <Pie data={pieDataWilayah} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" nameKey="name" label={({name}) => name} labelLine={false} style={{fontSize: '11px', fontWeight: 'bold'}}>
+                    {pieDataWilayah.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full bg-gray-50 rounded-2xl flex items-center justify-center border border-dashed border-gray-200">
+                <span className="text-gray-400 font-medium text-sm">Belum ada data kontribusi wilayah</span>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Pie Chart Kategori */}
+        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 h-80 flex flex-col justify-between">
+          <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-2">Kontribusi per Kategori (kg)</h3>
+          <div className="flex-1 relative">
+            {pieDataKategori.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `${val.toFixed(1)} kg`} />
+                  <Legend iconType="square" wrapperStyle={{ fontSize: '12px' }} />
+                  <Pie data={pieDataKategori} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" nameKey="name" label={({name}) => name} labelLine={false} style={{fontSize: '11px', fontWeight: 'bold'}}>
+                    {pieDataKategori.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full bg-gray-50 rounded-2xl flex items-center justify-center border border-dashed border-gray-200">
+                <span className="text-gray-400 font-medium text-sm">Belum ada data kontribusi kategori</span>
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
 
       {/* REKAP TABEL */}

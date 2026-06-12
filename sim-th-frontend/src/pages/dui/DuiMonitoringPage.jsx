@@ -1,33 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import DashboardLayout from '../../components/DuiLayout'; // Sesuaikan path import DuiLayout lu
+import DashboardLayout from '../../components/DuiLayout'; 
 import * as XLSX from "xlsx";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
-function DuiLaporanPage() {
+function DuiMonitoringPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // State Filter Banner
+  // State Filter Banner (Terpisah Bulan & Tahun)
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState('Semua Periode');
   const [selectedYear, setSelectedYear] = useState('2026');
+  const [selectedWilayahId, setSelectedWilayahId] = useState('Semua Wilayah');
+  const [isWilayahDropdownOpen, setIsWilayahDropdownOpen] = useState(false);
 
-  // State Modal Export
+  // State Modal Export (Terpisah Bulan & Tahun)
   const [isExportPeriodeOpen, setIsExportPeriodeOpen] = useState(false);
   const [exportPeriode, setExportPeriode] = useState('Semua Periode');
   const [exportYear, setExportYear] = useState('2026');
   
   // Data Asli dari Backend
   const [dataTrx, setDataTrx] = useState([]);
-  const [dataLb, setDataLb] = useState([]); // Leaderboard data untuk nyari KPI
+  const uniqueCategories = Array.from(new Set(dataTrx.map(t => t.nama_kategori).filter(Boolean)));
+  const [dataLb, setDataLb] = useState([]); 
+  const [listWilayah, setListWilayah] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Opsi Bulan tanpa Tahun
   const periodeOptions = [
-    'Jan - Feb', 'Mar - Apr', 
-    'Mei - Jun', 'Jul - Ags', 
-    'Sep - Okt', 'Nov - Des'
+    'Jan - Feb', 'Mar - Apr', 'Mei - Jun', 
+    'Jul - Ags', 'Sep - Okt', 'Nov - Des'
   ];
 
   const getBulanPeriode = (isoString) => {
@@ -59,14 +63,15 @@ function DuiLaporanPage() {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}` };
         
-        // Tarik data Transaksi Global & Leaderboard (buat KPI)
-        const [resTrx, resLb] = await Promise.all([
+        const [resTrx, resLb, wilRes] = await Promise.all([
           fetch(`${baseUrl}/transaksi`, { headers }),
-          fetch(`${baseUrl}/dashboard/leaderboard`, { headers })
+          fetch(`${baseUrl}/dashboard/leaderboard`, { headers }),
+          fetch(`${baseUrl}/wilayah/aktif`, { headers })
         ]);
 
         const trx = await resTrx.json();
         const lb = await resLb.json();
+        const wilData = await wilRes.json();
 
         if (trx.status === 'sukses' && Array.isArray(trx.data)) {
           setDataTrx(trx.data.sort((a, b) => b.id - a.id));
@@ -79,8 +84,12 @@ function DuiLaporanPage() {
         } else {
           setDataLb([]);
         }
+
+        if (wilData.status === 'sukses' && Array.isArray(wilData.data)) {
+          setListWilayah(wilData.data);
+        }
       } catch (error) {
-        console.error("Gagal mengambil data laporan DUI:", error);
+        console.error("Gagal mengambil data monitoring DUI:", error);
         setDataTrx([]);
         setDataLb([]);
       } finally {
@@ -90,26 +99,21 @@ function DuiLaporanPage() {
     fetchData();
   }, []);
 
-  // ==========================================
   // LOGIKA FILTERING & AGREGASI DATA
-  // ==========================================
-  
-  // 1. Filter Data Transaksi sesuai Search & Bulan
   const filteredData = dataTrx.filter(t => {
     const matchBulan = selectedMonth === 'Semua Periode' || getBulanPeriode(t.tanggal) === selectedMonth;
     const matchTahun = getTahun(t.tanggal) === selectedYear;
     const matchSearch = searchTerm === '' || t.nama_wilayah?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchBulan && matchTahun && matchSearch;
+    const matchWilayah = selectedWilayahId === 'Semua Wilayah' || t.wilayah_id === parseInt(selectedWilayahId);
+    return matchBulan && matchTahun && matchSearch && matchWilayah;
   });
 
-  // 2. Hitung Summary Cards
   const totalTransaksi = filteredData.length;
   const totalBerat = filteredData.reduce((sum, t) => sum + (t.berat || t.berat_gram || 0), 0) / 1000;
   const totalNilai = filteredData.reduce((sum, t) => sum + (t.total_nilai || 0), 0);
   const activeWilayahSet = new Set(filteredData.filter(t => t.nama_wilayah).map(t => t.nama_wilayah));
   const totalWilayahAktif = activeWilayahSet.size;
 
-  // 3. Agregasi untuk Tabel & Bar/Pie Chart
   const wilayahMap = {};
   filteredData.forEach(t => {
     const w = t.nama_wilayah || 'Unknown';
@@ -133,14 +137,20 @@ function DuiLaporanPage() {
       nilai: formatRp(wilayahMap[w].nilai),
       kpi: lbItem ? lbItem.poin_kpi : '-'
     };
-  }).sort((a, b) => b.beratRaw - a.beratRaw); // Urutkan dari yg paling berat
+  }).sort((a, b) => b.beratRaw - a.beratRaw);
 
-  // 4. Data untuk Charts
-  const barData = rekapTableData.slice(0, 5).map(r => ({ name: r.wilayah, nilai: r.nilaiRaw }));
-  const pieData = rekapTableData.slice(0, 5).map(r => ({ name: r.wilayah, value: r.beratRaw }));
+  const barData = rekapTableData.slice(0, 5).map(r => ({ name: r.wilayah.replace('BEM ', ''), nilai: r.nilaiRaw }));
+  const pieDataWilayah = rekapTableData.slice(0, 5).map(r => ({ name: r.wilayah.replace('BEM ', ''), value: r.beratRaw }));
   const COLORS = ['#125B2A', '#F4A300', '#8FA57A', '#517D3B', '#D1D5DB'];
 
-  // 5. Data Line Chart (Tren Kategori Bulanan)
+  const pieMap = {};
+  filteredData.forEach(t => {
+     const kat = t.nama_kategori || 'Unknown';
+     if (!pieMap[kat]) pieMap[kat] = 0;
+     pieMap[kat] += (t.berat || t.berat_gram || 0) / 1000;
+  });
+  const pieDataKategori = Object.keys(pieMap).map(k => ({ name: k, value: pieMap[k] }));
+
   const generateLineChart = () => {
     if (filteredData.length === 0) return [];
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
@@ -161,18 +171,23 @@ function DuiLaporanPage() {
     }
 
     for (let i = startMonth; i <= endMonth; i++) {
-      tempChart[monthNames[i]] = { name: monthNames[i], Plastik: 0, Kertas: 0, Logam: 0 };
+      let monthKey = monthNames[i];
+      const initObj = { name: monthNames[i] };
+      uniqueCategories.forEach(kat => {
+        initObj[kat] = 0;
+      });
+      tempChart[monthKey] = initObj;
     }
 
     filteredData.forEach(item => {
       const d = new Date(item.tanggal);
       const m = monthNames[d.getMonth()];
       if (tempChart[m]) {
-        const kat = (item.nama_kategori || '').toLowerCase();
+        const kat = item.nama_kategori;
         const beratKg = (item.berat || item.berat_gram || 0) / 1000;
-        if (kat.includes('plastik')) tempChart[m].Plastik += beratKg;
-        else if (kat.includes('kertas') || kat.includes('kardus')) tempChart[m].Kertas += beratKg;
-        else if (kat.includes('logam') || kat.includes('besi')) tempChart[m].Logam += beratKg;
+        if (kat && tempChart[m].hasOwnProperty(kat)) {
+          tempChart[m][kat] += beratKg;
+        }
       }
     });
 
@@ -180,9 +195,7 @@ function DuiLaporanPage() {
   };
   const lineData = generateLineChart();
 
-  // ==========================================
   // LOGIKA EXPORT EXCEL
-  // ==========================================
   const handleExport = () => {
     let dataToExport = dataTrx.filter(t => getTahun(t.tanggal) === exportYear);
     
@@ -206,8 +219,8 @@ function DuiLaporanPage() {
       "Status": t.status
     })));
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Data Laporan");
-    XLSX.writeFile(workbook, `Laporan_Pusat_SIMTH_${exportPeriode.replace(/ /g, '')}_${exportYear}.xlsx`);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Data Monitoring");
+    XLSX.writeFile(workbook, `Monitoring_Wilayah_SIMTH_${exportPeriode.replace(/ /g, '')}_${exportYear}.xlsx`);
     
     setIsExportOpen(false);
   };
@@ -221,42 +234,82 @@ function DuiLaporanPage() {
       {/* BANNER UTAMA */}
       <div className="bg-[#0B4D1E] rounded-[2rem] p-10 flex flex-col md:flex-row items-start md:items-center justify-between shadow-sm mt-2 mb-8">
         <div className="flex items-center gap-5 text-white mb-6 md:mb-0">
-          <div className="bg-[#F4A300] p-4 rounded-2xl"><svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div>
-          <div><h2 className="text-3xl font-extrabold mb-1">Laporan</h2><p className="text-green-100/80 font-medium">Dashboard analitik dan pelaporan komprehensif</p></div>
+          <div className="bg-[#F4A300] p-4 rounded-2xl">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-3xl font-extrabold mb-1">Monitoring Wilayah</h2>
+            <p className="text-green-100/80 font-medium">Dashboard analitik dan monitoring wilayah BEM secara real-time</p>
+          </div>
         </div>
         <button onClick={() => setIsExportOpen(true)} className="bg-[#F4A300] text-white px-8 py-3.5 rounded-2xl font-bold flex items-center gap-2 hover:bg-[#d68e00] transition-all shadow-md">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Export Laporan
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg> 
+          Export Laporan
         </button>
       </div>
 
-      {/* FILTER SEARCH & BULAN */}
+      {/* FILTER SEARCH, BULAN, & TAHUN */}
       <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 mb-8 flex flex-col md:flex-row gap-4 items-center">
         <div className="relative flex-1 w-full">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
           <input type="text" placeholder="Cari berdasarkan nama BEM/Wilayah..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#F5EFE6] px-14 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E]" />
         </div>
         
-        {/* TAHUN FILTER */}
-        <div className="w-full md:w-32 bg-[#F5EFE6] border-none px-4 py-2.5 rounded-2xl flex justify-between items-center h-[56px]">
-          <span className="font-extrabold text-[#0B4D1E] text-lg">{selectedYear}</span>
-          <div className="flex flex-col">
-            <button onClick={() => setSelectedYear((parseInt(selectedYear) + 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" /></svg></button>
-            <button onClick={() => setSelectedYear((parseInt(selectedYear) - 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg></button>
-          </div>
+        {/* DROPDOWN WILAYAH */}
+        <div className="relative w-full md:w-64">
+          <button 
+            onClick={() => setIsWilayahDropdownOpen(!isWilayahDropdownOpen)}
+            className="w-full bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl flex items-center justify-between shadow-sm hover:bg-[#EAE5DA] transition-all h-[56px]"
+          >
+            <span className="truncate pr-2">
+              {selectedWilayahId === 'Semua Wilayah' ? 'Semua Wilayah' : (listWilayah.find(w => w.id === parseInt(selectedWilayahId))?.nama || 'Semua Wilayah')}
+            </span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0B4D1E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          
+          {isWilayahDropdownOpen && (
+            <div className="absolute top-full mt-3 right-0 w-72 bg-white p-4 rounded-[2rem] shadow-2xl border border-gray-100 z-50 flex flex-col gap-2 max-h-60 overflow-y-auto">
+              <button 
+                onClick={() => { setSelectedWilayahId('Semua Wilayah'); setIsWilayahDropdownOpen(false); }} 
+                className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all text-center ${selectedWilayahId === 'Semua Wilayah' ? 'bg-[#0B4D1E] text-white shadow-md' : 'bg-[#F3F4F6] text-[#4B5563] hover:bg-[#E5E7EB]'}`}
+              >
+                Semua Wilayah
+              </button>
+              {listWilayah.map(wil => (
+                <button 
+                  key={wil.id} 
+                  onClick={() => { setSelectedWilayahId(wil.id.toString()); setIsWilayahDropdownOpen(false); }} 
+                  className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all text-center ${selectedWilayahId === wil.id.toString() ? 'bg-[#0B4D1E] text-white shadow-md' : 'bg-[#F5EFE6] text-[#0B4D1E] hover:bg-[#EAE5DA]'}`}
+                >
+                  {wil.nama}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* DROPDOWN BULAN SIMETRIS */}
-        <div className="relative w-full md:w-64">
+        {/* DROPDOWN BULAN */}
+        <div className="relative w-full md:w-56">
           <button 
             onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
             className="w-full bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl flex items-center justify-between shadow-sm hover:bg-[#EAE5DA] transition-all h-[56px]"
           >
             {selectedMonth}
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0B4D1E]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0B4D1E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
           </button>
           
           {isMonthPickerOpen && (
-            <div className="absolute top-full mt-3 right-0 w-80 bg-white p-4 rounded-[2rem] shadow-2xl border border-gray-100 z-50 flex flex-col gap-2">
+            <div className="absolute top-full mt-3 right-0 w-72 bg-white p-4 rounded-[2rem] shadow-2xl border border-gray-100 z-50 flex flex-col gap-2">
               <div className="grid grid-cols-2 gap-2">
                 {periodeOptions.map(opt => (
                   <button 
@@ -277,6 +330,26 @@ function DuiLaporanPage() {
             </div>
           )}
         </div>
+
+        {/* TAHUN (Custom Arrow Naik Turun) */}
+        <div className="relative w-full md:w-32">
+          <div className="w-full bg-[#F5EFE6] border-none px-5 py-2.5 rounded-2xl flex justify-between items-center h-[56px]">
+            <span className="font-extrabold text-[#0B4D1E] text-lg">{selectedYear}</span>
+            <div className="flex flex-col">
+              <button onClick={() => setSelectedYear((parseInt(selectedYear) + 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" />
+                </svg>
+              </button>
+              <button onClick={() => setSelectedYear((parseInt(selectedYear) - 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* SUMMARY INFO CARDS */}
@@ -287,7 +360,11 @@ function DuiLaporanPage() {
           { t: 'Nilai Ekonomi', v: formatRp(totalNilai), b: 'Berdasarkan Filter', c: 'text-green-600' },
           { t: 'Wilayah Aktif', v: totalWilayahAktif, b: 'Punya Transaksi' }
         ].map((c,i) => (
-          <div key={i} className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100"><p className="text-gray-400 text-sm font-medium mb-1">{c.t}</p><h3 className={`text-3xl font-extrabold ${c.c || 'text-[#0B4D1E]'}`}>{c.v}</h3><p className="text-[10px] text-green-500 font-bold mt-1">{c.b}</p></div>
+          <div key={i} className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+            <p className="text-gray-400 text-sm font-medium mb-1">{c.t}</p>
+            <h3 className={`text-3xl font-extrabold ${c.c || 'text-[#0B4D1E]'}`}>{c.v}</h3>
+            <p className="text-[10px] text-green-500 font-bold mt-1">{c.b}</p>
+          </div>
         ))}
       </div>
 
@@ -298,16 +375,16 @@ function DuiLaporanPage() {
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
           <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Tren Sampah per Kategori</h3>
           <div className="h-48">
-            {lineData.length > 0 && lineData.some(d => d.Plastik > 0 || d.Kertas > 0 || d.Logam > 0) ? (
+            {lineData.length > 0 && lineData.some(d => uniqueCategories.some(kat => d[kat] > 0)) ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={lineData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} />
                   <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={40} />
                   <Tooltip cursor={{stroke: '#E5E7EB', strokeWidth: 2}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `${val.toFixed(1)} kg`} />
-                  <Line type="monotone" name="Plastik" dataKey="Plastik" stroke="#125B2A" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
-                  <Line type="monotone" name="Kertas" dataKey="Kertas" stroke="#F4A300" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
-                  <Line type="monotone" name="Logam" dataKey="Logam" stroke="#8FA57A" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
+                  {uniqueCategories.map((kat, index) => (
+                    <Line key={kat} type="monotone" name={kat} dataKey={kat} stroke={COLORS[index % COLORS.length]} strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
+                  ))}
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -327,7 +404,7 @@ function DuiLaporanPage() {
                 <BarChart data={barData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={50} tickFormatter={(v) => `${v/1000}k`} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} width={55} tickFormatter={(v) => `${v/1000}k`} />
                   <Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => formatRp(val)} />
                   <Bar dataKey="nilai" fill="#125B2A" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -341,25 +418,49 @@ function DuiLaporanPage() {
         </div>
       </div>
 
-      {/* Pie Chart */}
-      <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-8 h-80 flex flex-col">
-        <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-6">Kontribusi Wilayah (kg) (Top 5)</h3>
-        <div className="flex-1 relative">
-          {pieData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `${val.toFixed(1)} kg`} />
-                <Legend iconType="square" wrapperStyle={{ fontSize: '12px' }} />
-                <Pie data={pieData} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" nameKey="name">
-                  {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="w-full h-full bg-gray-50 rounded-2xl flex items-center justify-center border border-dashed border-gray-200">
-              <span className="text-gray-400 font-medium text-sm">Belum ada data kontribusi wilayah</span>
-            </div>
-          )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {/* Pie Chart Wilayah */}
+        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 h-80 flex flex-col justify-between">
+          <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-2">Kontribusi Wilayah (kg) (Top 5)</h3>
+          <div className="flex-1 relative">
+            {pieDataWilayah.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `${val.toFixed(1)} kg`} />
+                  <Legend iconType="square" wrapperStyle={{ fontSize: '12px' }} />
+                  <Pie data={pieDataWilayah} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" nameKey="name" label={({name}) => name} labelLine={false} style={{fontSize: '11px', fontWeight: 'bold'}}>
+                    {pieDataWilayah.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full bg-gray-50 rounded-2xl flex items-center justify-center border border-dashed border-gray-200">
+                <span className="text-gray-400 font-medium text-sm">Belum ada data kontribusi wilayah</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Pie Chart Kategori */}
+        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 h-80 flex flex-col justify-between">
+          <h3 className="font-extrabold text-lg text-[#0B4D1E] mb-2">Kontribusi per Kategori (kg)</h3>
+          <div className="flex-1 relative">
+            {pieDataKategori.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} formatter={(val) => `${val.toFixed(1)} kg`} />
+                  <Legend iconType="square" wrapperStyle={{ fontSize: '12px' }} />
+                  <Pie data={pieDataKategori} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" nameKey="name" label={({name}) => name} labelLine={false} style={{fontSize: '11px', fontWeight: 'bold'}}>
+                    {pieDataKategori.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full bg-gray-50 rounded-2xl flex items-center justify-center border border-dashed border-gray-200">
+                <span className="text-gray-400 font-medium text-sm">Belum ada data kontribusi kategori</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -403,53 +504,68 @@ function DuiLaporanPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl relative animate-fade-in-up border border-gray-100">
             
-            {/* Header */}
             <div className="flex justify-between items-center mb-8">
               <div className="flex items-center gap-4">
                 <div className="bg-[#FFF8E1] p-3 rounded-full text-[#F4A300]">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
                 </div>
                 <h3 className="text-xl font-extrabold text-[#0B4D1E]">Export Laporan</h3>
               </div>
               <button onClick={() => setIsExportOpen(false)} className="text-gray-500 hover:text-[#0B4D1E] transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
             
             <div className="space-y-6">
-              {/* Tahun Laporan */}
-              <div>
-                <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Tahun Laporan</label>
-                <div className="w-full bg-[#F5EFE6] border-none px-5 py-2.5 rounded-2xl flex justify-between items-center h-[56px]">
-                  <span className="font-extrabold text-[#0B4D1E] text-lg">{exportYear}</span>
-                  <div className="flex flex-col">
-                    <button type="button" onClick={() => setExportYear((parseInt(exportYear) + 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" /></svg></button>
-                    <button type="button" onClick={() => setExportYear((parseInt(exportYear) - 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg></button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dropdown Periode (2 Bulanan) */}
-              <div>
-                <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Pilih Periode</label>
-                <div className="relative">
-                  <div onClick={() => setIsExportPeriodeOpen(!isExportPeriodeOpen)} className="w-full bg-[#F5EFE6] px-5 py-4 rounded-2xl font-bold text-[#0B4D1E] cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors">
-                    {exportPeriode}
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0B4D1E]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                  </div>
-                  {isExportPeriodeOpen && (
-                    <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 shadow-xl rounded-xl z-50 overflow-hidden py-1">
-                      {['Semua Periode', ...periodeOptions].map(opt => (
-                        <div key={opt} onClick={() => { setExportPeriode(opt); setIsExportPeriodeOpen(false); }} className={`px-5 py-2.5 cursor-pointer text-sm font-bold transition-colors ${exportPeriode === opt ? 'bg-[#0B4D1E] text-white' : 'text-[#0B4D1E] hover:bg-gray-100'}`}>
-                          {opt}
-                        </div>
-                      ))}
+              
+              <div className="flex gap-4">
+                {/* Dropdown Periode Export */}
+                <div className="w-3/5">
+                  <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Pilih Periode</label>
+                  <div className="relative">
+                    <div onClick={() => setIsExportPeriodeOpen(!isExportPeriodeOpen)} className="w-full bg-[#F5EFE6] px-5 py-4 rounded-2xl font-bold text-[#0B4D1E] cursor-pointer flex justify-between items-center hover:bg-[#EAE5DA] transition-colors">
+                      <span className="truncate pr-2">{exportPeriode}</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0B4D1E] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
                     </div>
-                  )}
+                    {isExportPeriodeOpen && (
+                      <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 shadow-xl rounded-xl z-50 overflow-hidden py-1">
+                        {['Semua Periode', ...periodeOptions].map(opt => (
+                          <div key={opt} onClick={() => { setExportPeriode(opt); setIsExportPeriodeOpen(false); }} className={`px-5 py-2.5 cursor-pointer text-sm font-bold transition-colors ${exportPeriode === opt ? 'bg-[#0B4D1E] text-white' : 'text-[#0B4D1E] hover:bg-gray-100'}`}>
+                            {opt}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Dropdown Tahun Export */}
+                <div className="w-2/5">
+                  <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Tahun</label>
+                  <div className="w-full bg-[#F5EFE6] border-none px-4 py-2.5 rounded-2xl flex justify-between items-center h-[56px]">
+                    <span className="font-extrabold text-[#0B4D1E] text-base">{exportYear}</span>
+                    <div className="flex flex-col">
+                      <button onClick={() => setExportYear((parseInt(exportYear) + 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" />
+                        </svg>
+                      </button>
+                      <button onClick={() => setExportYear((parseInt(exportYear) - 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Data Export Checkboxes */}
               <div>
                 <label className="block text-sm font-bold text-[#0B4D1E] mb-3">Data yang Diexport</label>
                 <div className="bg-[#F5EFE6] p-5 rounded-2xl space-y-4">
@@ -462,7 +578,6 @@ function DuiLaporanPage() {
                 </div>
               </div>
 
-              {/* Format File */}
               <div>
                 <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Format File</label>
                 <div className="w-full bg-[#F4A300] text-white py-4 rounded-2xl font-extrabold text-center shadow-sm">
@@ -470,10 +585,12 @@ function DuiLaporanPage() {
                 </div>
               </div>
 
-              {/* Action Button */}
               <div className="pt-2">
                 <button onClick={handleExport} className="w-full bg-[#125B2A] text-white py-4 rounded-2xl font-extrabold hover:bg-[#0B4D1E] shadow-md flex items-center justify-center gap-2 transition-all">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Export EXCEL
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg> 
+                  Export EXCEL
                 </button>
               </div>
             </div>
@@ -481,11 +598,15 @@ function DuiLaporanPage() {
         </div>
       )}
 
-      {/* MODAL DETAIL REKAP (KLIK BARIS) */}
+      {/* MODAL DETAIL REKAP */}
       {isDetailOpen && selectedRow && (
          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
            <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-10 shadow-2xl relative animate-fade-in-up border border-gray-100">
-             <button onClick={() => setIsDetailOpen(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+             <button onClick={() => setIsDetailOpen(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600">
+               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+               </svg>
+             </button>
              <h3 className="text-2xl font-extrabold text-[#0B4D1E] mb-6 border-b border-gray-100 pb-4">{selectedRow.wilayah}</h3>
              <div className="space-y-4">
                <div className="flex justify-between"><span className="text-gray-500 text-sm">Total Transaksi:</span><strong className="text-[#0B4D1E]">{selectedRow.totalTx}x</strong></div>
@@ -501,4 +622,4 @@ function DuiLaporanPage() {
   );
 }
 
-export default DuiLaporanPage;
+export default DuiMonitoringPage;
