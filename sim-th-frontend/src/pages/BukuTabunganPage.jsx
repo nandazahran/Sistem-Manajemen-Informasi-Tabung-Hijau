@@ -27,24 +27,44 @@ function BukuTabunganPage() {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}` };
 
-        // Ambil Data Tabungan dan Transaksi
-        const [resTabungan, resTrx] = await Promise.all([
+        // Ambil Data Tabungan, Transaksi, dan Wilayah Aktif secara paralel
+        const [resTabungan, resTrx, resWil] = await Promise.all([
           fetch(`${import.meta.env.VITE_API_URL}/tabungan`, { headers }),
-          fetch(`${import.meta.env.VITE_API_URL}/transaksi`, { headers })
+          fetch(`${import.meta.env.VITE_API_URL}/transaksi`, { headers }),
+          fetch(`${import.meta.env.VITE_API_URL}/wilayah/aktif`, { headers })
         ]);
 
         const dataTabungan = await resTabungan.json();
         const dataTrx = await resTrx.json();
+        const dataWil = await resWil.json();
 
+        // Extract activeWilayahId dari JWT token
+        let activeWilayahId = null;
+        if (token) {
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            activeWilayahId = payload.wilayah_id;
+          } catch (e) {
+            console.error("Gagal parse token:", e);
+          }
+        }
+
+        // Set nama default berdasarkan activeWilayahId fallback dari API aktif
         let myWilayah = 'BEM KM / Pusat';
+        if (activeWilayahId && dataWil.status === 'sukses' && Array.isArray(dataWil.data)) {
+          const matchedWil = dataWil.data.find(w => w.id === activeWilayahId);
+          if (matchedWil) {
+            myWilayah = matchedWil.nama;
+            setNamaWilayah(myWilayah);
+          }
+        }
+
         if (dataTrx.status === 'sukses' && Array.isArray(dataTrx.data) && dataTrx.data.length > 0) {
           const allTrx = dataTrx.data;
           // Sortir transaksi dari yang terbaru ke terlama
           const sortedTrx = [...allTrx].sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
           
           setRiwayatPemasukan(sortedTrx.slice(0, 5)); // Ambil 5 terbaru untuk list riwayat
-          myWilayah = sortedTrx[0].nama_wilayah;
-          setNamaWilayah(myWilayah);
           
           const now = new Date();
           const currentMonth = now.getMonth();
@@ -84,9 +104,11 @@ function BukuTabunganPage() {
         }
 
         if (dataTabungan.status === 'sukses' && Array.isArray(dataTabungan.data)) {
-          const myDompet = dataTabungan.data.find(t => t.nama_wilayah === myWilayah);
+          // Cari dompet tabungan berdasarkan wilayah_id yang akurat
+          const myDompet = dataTabungan.data.find(t => t.wilayah_id === activeWilayahId);
           if (myDompet) {
              setSaldo(myDompet.saldo);
+             setNamaWilayah(myDompet.nama_wilayah);
              
              // Ambil riwayat grafik histori asli dari API Rust
              try {
@@ -208,7 +230,7 @@ function BukuTabunganPage() {
       <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 mb-6 hover:-translate-y-1 transition-all duration-300">
         <div className="flex justify-between items-center mb-6">
           <h3 className="font-extrabold text-xl text-[#0B4D1E]">Riwayat Pemasukan Terakhir</h3>
-          <button onClick={() => navigate('/riwayat-transaksi')} className="text-sm font-bold text-[#0B4D1E] hover:text-[#F4A300] transition-colors">Lihat Semua →</button>
+          <button onClick={() => navigate('/riwayat')} className="text-sm font-bold text-[#0B4D1E] hover:text-[#F4A300] transition-colors">Lihat Semua →</button>
         </div>
         <div className="space-y-4">
           {riwayatPemasukan.map((item, idx) => (

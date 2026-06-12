@@ -30,23 +30,33 @@ function RiwayatTransaksiPage() {
   // Helper fungsi untuk konversi ISO Date ke format "Bulan - Bulan Tahun"
   const getPeriode = (isoString) => {
     if (!isoString) return '-';
-    const d = new Date(isoString);
-    const m = d.getMonth();
-    const y = d.getFullYear();
-    if (m <= 1) return `Jan - Feb ${y}`;
-    if (m <= 3) return `Mar - Apr ${y}`;
-    if (m <= 5) return `Mei - Jun ${y}`;
-    if (m <= 7) return `Jul - Ags ${y}`;
-    if (m <= 9) return `Sep - Okt ${y}`;
-    return `Nov - Des ${y}`;
+    try {
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return '-';
+      const m = d.getMonth();
+      const y = d.getFullYear();
+      if (m <= 1) return `Jan - Feb ${y}`;
+      if (m <= 3) return `Mar - Apr ${y}`;
+      if (m <= 5) return `Mei - Jun ${y}`;
+      if (m <= 7) return `Jul - Ags ${y}`;
+      if (m <= 9) return `Sep - Okt ${y}`;
+      return `Nov - Des ${y}`;
+    } catch (e) {
+      return '-';
+    }
   };
 
   const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
 
   const formatTanggal = (isoString) => {
     if (!isoString) return '-';
-    const date = new Date(isoString);
-    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    try {
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return '-';
+      return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch (e) {
+      return '-';
+    }
   };
 
   // FETCH DATA MURNI DARI BACKEND
@@ -107,7 +117,7 @@ function RiwayatTransaksiPage() {
     
     // 3. Filter Waktu (Tahun dan 2-Bulanan)
     const itemPeriode = getPeriode(item.tanggal);
-    const itemTahun = new Date(item.tanggal).getFullYear();
+    const itemTahun = item.tanggal ? new Date(item.tanggal).getFullYear() : NaN;
     
     // Jika user belum milih bulan (masih "-------- ----"), filter cuma berdasarkan tahun
     const matchWaktu = filterBulan === '-------- ----' ? (itemTahun === filterTahun) : (itemPeriode === filterBulan);

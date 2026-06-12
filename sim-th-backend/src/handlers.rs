@@ -191,6 +191,7 @@ pub struct TabunganLengkap {
     pub id: i32,
     pub saldo: i32,
     pub status: String,
+    pub wilayah_id: i32,
     pub nama_wilayah: String, // Diambil dari tabel wilayah
 }
 
