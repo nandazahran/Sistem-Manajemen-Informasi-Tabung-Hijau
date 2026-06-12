@@ -100,12 +100,58 @@ function DashboardLayout({ children }) {
     fetchProfil();
   }, [navigate]);
 
+  const formatWaktuNotif = React.useCallback((dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }, []);
+
+  const fetchNavbarNotifications = React.useCallback(async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token || !baseUrl) return;
+
+      const response = await fetch(`${baseUrl}/notifikasi`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const resData = await response.json();
+
+      if (resData.status === 'sukses' && Array.isArray(resData.data)) {
+        const readIds = JSON.parse(localStorage.getItem('read_notification_ids') || '[]');
+        const mappedData = resData.data.map(n => ({
+          ...n,
+          isRead: readIds.includes(n.id)
+        }));
+        setDataNotif(mappedData.slice(0, 5));
+        const hitungBelumDibaca = mappedData.filter(n => !n.isRead).length;
+        setUnreadCount(hitungBelumDibaca);
+      }
+    } catch (error) {
+      console.error("Gagal sinkronisasi notifikasi navbar:", error);
+    }
+  }, []);
+
+  // Polling data notifikasi dari database history
+  useEffect(() => {
+    fetchNavbarNotifications();
+    const interval = setInterval(fetchNavbarNotifications, 15000);
+
+    const syncUnreadCount = () => {
+      fetchNavbarNotifications();
+    };
+    window.addEventListener('notifikasi_read', syncUnreadCount);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('notifikasi_read', syncUnreadCount);
+    };
+  }, [fetchNavbarNotifications]);
+
   // MENDENGARKAN WEBSOCKET NOTIFIKASI
   useEffect(() => {
     if (!rawRole) return; 
-
-    const savedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
-    setUnreadCount(savedNotifs.filter(n => !n.isRead).length);
 
     try {
       const baseUrl = import.meta.env.VITE_API_URL;
@@ -115,49 +161,36 @@ function DashboardLayout({ children }) {
       const ws = new WebSocket(wsUrl);
 
       ws.onmessage = (event) => {
-        const notifBaru = JSON.parse(event.data);
-        let shouldShow = false;
+        try {
+          const notifBaru = JSON.parse(event.data);
+          let shouldShow = false;
 
-        if (notifBaru.target_role && notifBaru.target_role.includes('all')) shouldShow = true;
-        if (notifBaru.target_role && notifBaru.target_role.includes(rawRole)) shouldShow = true;
-        if (notifBaru.target_wilayah_id && notifBaru.target_wilayah_id === wilayahId) shouldShow = true;
+          if (notifBaru.target_role && notifBaru.target_role.includes('all')) shouldShow = true;
+          if (notifBaru.target_role && notifBaru.target_role.includes(rawRole)) shouldShow = true;
+          if (notifBaru.target_wilayah_id && notifBaru.target_wilayah_id === wilayahId) shouldShow = true;
 
-        if (shouldShow) {
-          const notifFormat = {
-            id: Date.now(),
-            waktu: new Date().toLocaleString(),
-            isRead: false,
-            ...notifBaru
-          };
-          const updateNotifs = [notifFormat, ...JSON.parse(localStorage.getItem('notifikasi_th') || '[]')];
-          localStorage.setItem('notifikasi_th', JSON.stringify(updateNotifs));
-          setUnreadCount(prev => prev + 1);
-
-          window.dispatchEvent(new Event('notifikasi_baru'));
+          if (shouldShow) {
+            fetchNavbarNotifications();
+            window.dispatchEvent(new Event('notifikasi_baru'));
+          }
+        } catch (e) {
+          console.error("Gagal memproses pesan WS:", e);
         }
       };
 
-      const syncUnreadCount = () => {
-        const updatedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
-        setUnreadCount(updatedNotifs.filter(n => !n.isRead).length);
-      };
-      window.addEventListener('notifikasi_read', syncUnreadCount);
-
       return () => {
         ws.close(); 
-        window.removeEventListener('notifikasi_read', syncUnreadCount);
       };
     } catch (err) {
       console.error("WebSocket not configured/running");
     }
-  }, [rawRole, wilayahId]);
+  }, [rawRole, wilayahId, fetchNavbarNotifications]);
 
   useEffect(() => {
     if (showNotifPopup) {
-      const savedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
-      setDataNotif(savedNotifs.slice(0, 5));
+      fetchNavbarNotifications();
     }
-  }, [showNotifPopup, unreadCount]);
+  }, [showNotifPopup, fetchNavbarNotifications]);
 
   const menuItems = [
     { name: 'Dashboard', path: '/dashboard', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
@@ -250,7 +283,7 @@ function DashboardLayout({ children }) {
                           <div>
                             <p className="text-sm font-extrabold text-[#0B4D1E]">{n.judul || 'Pemberitahuan Baru'}</p>
                             <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed">{n.pesan || n.deskripsi}</p>
-                            <p className="text-[10px] text-gray-400 mt-2 font-bold">{n.waktu}</p>
+                            <p className="text-[10px] text-gray-400 mt-2 font-bold">{formatWaktuNotif(n.waktu || n.created_at)}</p>
                           </div>
                         </div>
                       ))

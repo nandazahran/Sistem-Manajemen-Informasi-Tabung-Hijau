@@ -25,6 +25,7 @@ function NotifikasiPage() {
         const resData = await response.json();
         
         if (resData.status === 'sukses' && Array.isArray(resData.data)) {
+          const readIds = JSON.parse(localStorage.getItem('read_notification_ids') || '[]');
           // Mapping data riil dari API
           const mappedNotif = resData.data.map(n => ({
             id: n.id,
@@ -32,7 +33,7 @@ function NotifikasiPage() {
             title: n.judul,
             desc: n.deskripsi || n.pesan || '',
             time: formatWaktuDB(n.waktu),
-            read: n.isRead || false
+            read: readIds.includes(n.id)
           }));
 
           // Tetap tambahkan notif sistem 
@@ -56,14 +57,25 @@ function NotifikasiPage() {
   const unreadCount = notifikasi.filter(n => !n.read).length;
 
   const markAllAsRead = () => {
+    const idsToMark = notifikasi.map(n => n.id).filter(id => id !== 'sys-1');
+    const readIds = JSON.parse(localStorage.getItem('read_notification_ids') || '[]');
+    const newReadIds = Array.from(new Set([...readIds, ...idsToMark]));
+    localStorage.setItem('read_notification_ids', JSON.stringify(newReadIds));
+
     setNotifikasi(notifikasi.map(n => ({ ...n, read: true })));
     
-    // Update LocalStorage agar tersimpan sebagai "Sudah Dibaca"
-    const savedNotifs = JSON.parse(localStorage.getItem('notifikasi_th') || '[]');
-    const updatedSaved = savedNotifs.map(n => ({ ...n, isRead: true }));
-    localStorage.setItem('notifikasi_th', JSON.stringify(updatedSaved));
-    
     // Panggil event agar angka lonceng di layout ikut di-reset jadi 0
+    window.dispatchEvent(new Event('notifikasi_read'));
+  };
+
+  const handleMarkAsRead = (id) => {
+    if (id === 'sys-1') return;
+    const readIds = JSON.parse(localStorage.getItem('read_notification_ids') || '[]');
+    if (!readIds.includes(id)) {
+      readIds.push(id);
+      localStorage.setItem('read_notification_ids', JSON.stringify(readIds));
+    }
+    setNotifikasi(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
     window.dispatchEvent(new Event('notifikasi_read'));
   };
 
@@ -112,7 +124,7 @@ function NotifikasiPage() {
       {/* LIST NOTIFIKASI */}
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 space-y-4">
         {displayedNotif.length > 0 ? displayedNotif.map((notif) => (
-          <div key={notif.id} className={`flex items-start justify-between p-6 rounded-2xl border transition-all hover:-translate-y-1 ${!notif.read ? 'bg-[#FDF9F0] border-[#F4A300]/30' : 'bg-white border-gray-100'}`}>
+          <div key={notif.id} onClick={() => handleMarkAsRead(notif.id)} className={`flex items-start justify-between p-6 rounded-2xl border transition-all hover:-translate-y-1 cursor-pointer ${!notif.read ? 'bg-[#FDF9F0] border-[#F4A300]/30' : 'bg-white border-gray-100'}`}>
             <div className="flex gap-4">
               <div className={`p-3 rounded-full flex-shrink-0 ${!notif.read ? 'bg-green-100 text-[#0B4D1E]' : 'bg-gray-100 text-gray-400'}`}>
                 {renderIcon(notif.type)}
