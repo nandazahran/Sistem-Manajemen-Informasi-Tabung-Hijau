@@ -70,7 +70,8 @@ function ProfilPage() {
       } catch (error) {
         console.error('Gagal memuat profil, beralih ke local storage state', error);
         // Fallback data lokal biar halaman ga kosong melong pas backend mati
-        const savedUser = JSON.parse(localStorage.getItem('user'));
+        const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+        const savedUser = userStr ? JSON.parse(userStr) : null;
         if (savedUser) {
           setFormData(prev => ({
             ...prev,

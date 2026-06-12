@@ -15,7 +15,16 @@ function ProtectedRoute({ children, allowedRoles }) {
   if (allowedRoles && allowedRoles.length > 0 && userStr) {
     try {
       const user = JSON.parse(userStr);
-      if (!allowedRoles.includes(user.role)) {
+      let hasAccess = allowedRoles.includes(user.role);
+      
+      // Jika allowedRoles mencakup 'bem_wilayah', izinkan semua role yang diawali 'bem_' atau 'ormawa_' kecuali 'bem_km'
+      if (!hasAccess && allowedRoles.includes('bem_wilayah')) {
+        if (user.role && (user.role.startsWith('bem_') || user.role.startsWith('ormawa_')) && user.role !== 'bem_km') {
+          hasAccess = true;
+        }
+      }
+
+      if (!hasAccess) {
         // Jika role tidak sesuai, arahkan ke dashboard masing-masing sesuai role
         if (['admin', 'superadmin', 'bem_km'].includes(user.role)) {
           return <Navigate to="/admin/dashboard" replace />;

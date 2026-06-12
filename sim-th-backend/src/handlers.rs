@@ -83,6 +83,8 @@ pub struct InputWilayah {
 #[derive(Serialize, Deserialize)]
 pub struct KlaimToken {
     pub sub: String, // sub = subject (siapa pemilik KTP ini)
+    pub role: String,
+    pub wilayah_id: Option<i32>,
     pub exp: usize,  // exp = expiration (kapan KTP ini hangus)
 }
 
@@ -778,6 +780,8 @@ pub async fn login(
                     .timestamp() as usize;
                 let klaim = KlaimToken {
                     sub: data_user.username.clone(),
+                    role: data_user.role.clone(),
+                    wilayah_id: data_user.wilayah_id,
                     exp: waktu_hangus,
                 };
 
@@ -912,6 +916,8 @@ pub async fn verify_2fa(
                 .timestamp() as usize;
             let klaim = KlaimToken {
                 sub: data_user.username.clone(),
+                role: data_user.role.clone(),
+                wilayah_id: data_user.wilayah_id,
                 exp: waktu_hangus,
             };
 
@@ -2670,12 +2676,20 @@ pub async fn lihat_dashboard_wilayah(
     Extension(username_jwt): Extension<String>,
 ) -> Json<serde_json::Value> {
     // CEK HAK AKSES: Kunci agar BEM tidak bisa mengintip ringkasan dashboard BEM saingannya
-    let user_login = user::Entity::find()
+    let user_login_result = user::Entity::find()
         .filter(user::Column::Username.eq(username_jwt))
         .one(&db)
-        .await
-        .unwrap()
-        .unwrap();
+        .await;
+
+    let user_login = match user_login_result {
+        Ok(Some(u)) => u,
+        _ => {
+            return Json(serde_json::json!({
+                "status": "error",
+                "pesan": "Sesi tidak valid atau pengguna sudah dihapus. Silakan login kembali."
+            }));
+        }
+    };
     if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui"
         && user_login.wilayah_id != Some(wilayah_id) {
             return Json(serde_json::json!({
@@ -2783,20 +2797,23 @@ pub async fn lihat_dashboard_wilayah(
         serde_json::json!({"bulan": "Des", "berat": 0, "rupiah": 0}),
     ];
 
+    let tahun = Utc::now().year();
     for trx in semua_trx_wilayah {
-        let bulan_idx = trx.tanggal.month() as usize - 1;
-        if let Some(obj) = data_bulanan[bulan_idx].as_object_mut() {
-            let berat_lama = obj.get("berat").unwrap().as_i64().unwrap();
-            let rupiah_lama = obj.get("rupiah").unwrap().as_i64().unwrap();
+        if trx.tanggal.year() == tahun {
+            let bulan_idx = trx.tanggal.month() as usize - 1;
+            if let Some(obj) = data_bulanan[bulan_idx].as_object_mut() {
+                let berat_lama = obj.get("berat").unwrap().as_i64().unwrap();
+                let rupiah_lama = obj.get("rupiah").unwrap().as_i64().unwrap();
 
-            obj.insert(
-                "berat".to_string(),
-                serde_json::json!(berat_lama + trx.berat as i64),
-            );
-            obj.insert(
-                "rupiah".to_string(),
-                serde_json::json!(rupiah_lama + trx.total_nilai as i64),
-            );
+                obj.insert(
+                    "berat".to_string(),
+                    serde_json::json!(berat_lama + trx.berat as i64),
+                );
+                obj.insert(
+                    "rupiah".to_string(),
+                    serde_json::json!(rupiah_lama + trx.total_nilai as i64),
+                );
+            }
         }
     }
 

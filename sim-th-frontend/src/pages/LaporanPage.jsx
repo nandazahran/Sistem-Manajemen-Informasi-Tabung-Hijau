@@ -7,9 +7,11 @@ function LaporanPage() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState('Semua Periode');
+  const [selectedYear, setSelectedYear] = useState('2026');
   
   // State untuk Modal Export
-  const [exportPeriode, setExportPeriode] = useState('Mei - Jun 2026');
+  const [exportPeriode, setExportPeriode] = useState('Semua Periode');
+  const [exportYear, setExportYear] = useState('2026');
   const [isExportPeriodeOpen, setIsExportPeriodeOpen] = useState(false);
   
   const [exportData, setExportData] = useState({
@@ -25,23 +27,24 @@ function LaporanPage() {
 
   // Opsi Filter 2 Bulanan
   const periodeOptions = [
-    'Jan - Feb 2026', 'Mar - Apr 2026', 
-    'Mei - Jun 2026', 'Jul - Ags 2026', 
-    'Sep - Okt 2026', 'Nov - Des 2026'
+    'Jan - Feb', 'Mar - Apr', 'Mei - Jun', 
+    'Jul - Ags', 'Sep - Okt', 'Nov - Des'
   ];
 
-  // Helper function buat konversi tanggal ke format 2 bulanan
-  const getPeriode = (isoString) => {
+  const getBulanPeriode = (isoString) => {
     if (!isoString) return '-';
-    const d = new Date(isoString);
-    const m = d.getMonth();
-    const y = d.getFullYear();
-    if (m <= 1) return `Jan - Feb ${y}`;
-    if (m <= 3) return `Mar - Apr ${y}`;
-    if (m <= 5) return `Mei - Jun ${y}`;
-    if (m <= 7) return `Jul - Ags ${y}`;
-    if (m <= 9) return `Sep - Okt ${y}`;
-    return `Nov - Des ${y}`;
+    const m = new Date(isoString).getMonth();
+    if (m <= 1) return `Jan - Feb`;
+    if (m <= 3) return `Mar - Apr`;
+    if (m <= 5) return `Mei - Jun`;
+    if (m <= 7) return `Jul - Ags`;
+    if (m <= 9) return `Sep - Okt`;
+    return `Nov - Des`;
+  };
+
+  const getTahun = (isoString) => {
+    if (!isoString) return '-';
+    return new Date(isoString).getFullYear().toString();
   };
 
   // Ambil Data dari Backend (Sekali Aja Pas Load)
@@ -85,8 +88,9 @@ function LaporanPage() {
 
   // Filter data sesuai periode 2 bulan yang dipilih
   const filteredData = dataTrx.filter(t => {
-    if (selectedMonth === 'Semua Periode') return true;
-    return getPeriode(t.tanggal) === selectedMonth;
+    const matchBulan = selectedMonth === 'Semua Periode' || getBulanPeriode(t.tanggal) === selectedMonth;
+    const matchTahun = getTahun(t.tanggal) === selectedYear;
+    return matchBulan && matchTahun;
   });
 
   const totalBerat = filteredData.reduce((sum, t) => sum + (t.berat || t.berat_gram || 0), 0) / 1000;
@@ -152,12 +156,16 @@ function LaporanPage() {
   const chartDataBulanan = generateChartData();
 
   const handleExport = () => {
-    let dataToExport = dataTrx;
+    let dataToExport = dataTrx.filter(t => getTahun(t.tanggal) === exportYear);
+    
     if (exportPeriode !== 'Semua Periode') {
-      dataToExport = dataTrx.filter(t => getPeriode(t.tanggal) === exportPeriode);
+      dataToExport = dataToExport.filter(t => getBulanPeriode(t.tanggal) === exportPeriode);
     }
 
-    // Blokir alert udah gua buang, jadi bakal tetep tembus nge-download!
+    if (dataToExport.length === 0) {
+      alert("Tidak ada data untuk diexport pada periode ini.");
+      return;
+    }
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport.map(t => ({
       "ID Transaksi": t.id,
@@ -172,7 +180,7 @@ function LaporanPage() {
     
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Data Laporan");
-    XLSX.writeFile(workbook, `Laporan_SIMTH_${exportPeriode.replace(/ /g, '')}.xlsx`);
+    XLSX.writeFile(workbook, `Laporan_SIMTH_${exportPeriode.replace(/ /g, '')}_${exportYear}.xlsx`);
     
     setIsExportModalOpen(false);
   };
@@ -193,10 +201,19 @@ function LaporanPage() {
         </div>
         
         <div className="flex items-center gap-4">
+          {/* TAHUN FILTER */}
+          <div className="bg-white text-gray-700 px-4 py-2.5 rounded-2xl flex items-center justify-between gap-3 font-bold shadow-sm border border-gray-100 h-[52px]">
+            <span className="text-lg text-[#0B4D1E]">{selectedYear}</span>
+            <div className="flex flex-col">
+              <button onClick={() => setSelectedYear((parseInt(selectedYear) + 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" /></svg></button>
+              <button onClick={() => setSelectedYear((parseInt(selectedYear) - 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg></button>
+            </div>
+          </div>
+
           <div className="relative">
             <button 
               onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
-              className="bg-white text-gray-700 px-6 py-3.5 rounded-2xl flex items-center gap-3 font-bold shadow-sm hover:bg-gray-50 transition-all border border-gray-100"
+              className="bg-white text-gray-700 px-6 py-3.5 rounded-2xl flex items-center gap-3 font-bold shadow-sm hover:bg-gray-50 transition-all border border-gray-100 h-[52px]"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
               {selectedMonth}
@@ -318,6 +335,17 @@ function LaporanPage() {
             </div>
 
             <div className="space-y-8">
+              <div>
+                <label className="block text-sm font-bold text-[#0B4D1E] mb-3">Tahun Laporan</label>
+                <div className="w-full bg-[#F5EFE6] border-none px-5 py-2.5 rounded-2xl flex justify-between items-center h-[56px]">
+                  <span className="font-extrabold text-[#0B4D1E] text-lg">{exportYear}</span>
+                  <div className="flex flex-col">
+                    <button type="button" onClick={() => setExportYear((parseInt(exportYear) + 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" /></svg></button>
+                    <button type="button" onClick={() => setExportYear((parseInt(exportYear) - 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg></button>
+                  </div>
+                </div>
+              </div>
+              
               <div>
                 <label className="block text-sm font-bold text-[#0B4D1E] mb-3">Pilih Periode</label>
                 <div className="relative">

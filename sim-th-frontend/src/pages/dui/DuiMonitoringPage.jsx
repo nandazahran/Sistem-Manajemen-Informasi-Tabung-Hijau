@@ -12,10 +12,12 @@ function DuiLaporanPage() {
   // State Filter Banner
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState('Semua Periode');
+  const [selectedYear, setSelectedYear] = useState('2026');
 
   // State Modal Export
   const [isExportPeriodeOpen, setIsExportPeriodeOpen] = useState(false);
   const [exportPeriode, setExportPeriode] = useState('Semua Periode');
+  const [exportYear, setExportYear] = useState('2026');
   
   // Data Asli dari Backend
   const [dataTrx, setDataTrx] = useState([]);
@@ -23,22 +25,25 @@ function DuiLaporanPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const periodeOptions = [
-    'Jan - Feb 2026', 'Mar - Apr 2026', 
-    'Mei - Jun 2026', 'Jul - Ags 2026', 
-    'Sep - Okt 2026', 'Nov - Des 2026'
+    'Jan - Feb', 'Mar - Apr', 
+    'Mei - Jun', 'Jul - Ags', 
+    'Sep - Okt', 'Nov - Des'
   ];
 
-  const getPeriode = (isoString) => {
+  const getBulanPeriode = (isoString) => {
     if (!isoString) return '-';
-    const d = new Date(isoString);
-    const m = d.getMonth();
-    const y = d.getFullYear();
-    if (m <= 1) return `Jan - Feb ${y}`;
-    if (m <= 3) return `Mar - Apr ${y}`;
-    if (m <= 5) return `Mei - Jun ${y}`;
-    if (m <= 7) return `Jul - Ags ${y}`;
-    if (m <= 9) return `Sep - Okt ${y}`;
-    return `Nov - Des ${y}`;
+    const m = new Date(isoString).getMonth();
+    if (m <= 1) return `Jan - Feb`;
+    if (m <= 3) return `Mar - Apr`;
+    if (m <= 5) return `Mei - Jun`;
+    if (m <= 7) return `Jul - Ags`;
+    if (m <= 9) return `Sep - Okt`;
+    return `Nov - Des`;
+  };
+
+  const getTahun = (isoString) => {
+    if (!isoString) return '-';
+    return new Date(isoString).getFullYear().toString();
   };
 
   const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
@@ -91,9 +96,10 @@ function DuiLaporanPage() {
   
   // 1. Filter Data Transaksi sesuai Search & Bulan
   const filteredData = dataTrx.filter(t => {
-    const matchBulan = selectedMonth === 'Semua Periode' || getPeriode(t.tanggal) === selectedMonth;
+    const matchBulan = selectedMonth === 'Semua Periode' || getBulanPeriode(t.tanggal) === selectedMonth;
+    const matchTahun = getTahun(t.tanggal) === selectedYear;
     const matchSearch = searchTerm === '' || t.nama_wilayah?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchBulan && matchSearch;
+    return matchBulan && matchTahun && matchSearch;
   });
 
   // 2. Hitung Summary Cards
@@ -178,9 +184,10 @@ function DuiLaporanPage() {
   // LOGIKA EXPORT EXCEL
   // ==========================================
   const handleExport = () => {
-    let dataToExport = dataTrx;
+    let dataToExport = dataTrx.filter(t => getTahun(t.tanggal) === exportYear);
+    
     if (exportPeriode !== 'Semua Periode') {
-      dataToExport = dataTrx.filter(t => getPeriode(t.tanggal) === exportPeriode);
+      dataToExport = dataToExport.filter(t => getBulanPeriode(t.tanggal) === exportPeriode);
     }
 
     if (dataToExport.length === 0) {
@@ -200,7 +207,7 @@ function DuiLaporanPage() {
     })));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Data Laporan");
-    XLSX.writeFile(workbook, `Laporan_Pusat_SIMTH_${exportPeriode.replace(/ /g, '')}.xlsx`);
+    XLSX.writeFile(workbook, `Laporan_Pusat_SIMTH_${exportPeriode.replace(/ /g, '')}_${exportYear}.xlsx`);
     
     setIsExportOpen(false);
   };
@@ -229,6 +236,15 @@ function DuiLaporanPage() {
           <input type="text" placeholder="Cari berdasarkan nama BEM/Wilayah..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#F5EFE6] px-14 py-4 rounded-2xl font-medium text-[#0B4D1E] outline-none focus:ring-2 focus:ring-[#0B4D1E]" />
         </div>
         
+        {/* TAHUN FILTER */}
+        <div className="w-full md:w-32 bg-[#F5EFE6] border-none px-4 py-2.5 rounded-2xl flex justify-between items-center h-[56px]">
+          <span className="font-extrabold text-[#0B4D1E] text-lg">{selectedYear}</span>
+          <div className="flex flex-col">
+            <button onClick={() => setSelectedYear((parseInt(selectedYear) + 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" /></svg></button>
+            <button onClick={() => setSelectedYear((parseInt(selectedYear) - 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg></button>
+          </div>
+        </div>
+
         {/* DROPDOWN BULAN SIMETRIS */}
         <div className="relative w-full md:w-64">
           <button 
@@ -401,6 +417,18 @@ function DuiLaporanPage() {
             </div>
             
             <div className="space-y-6">
+              {/* Tahun Laporan */}
+              <div>
+                <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Tahun Laporan</label>
+                <div className="w-full bg-[#F5EFE6] border-none px-5 py-2.5 rounded-2xl flex justify-between items-center h-[56px]">
+                  <span className="font-extrabold text-[#0B4D1E] text-lg">{exportYear}</span>
+                  <div className="flex flex-col">
+                    <button type="button" onClick={() => setExportYear((parseInt(exportYear) + 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" /></svg></button>
+                    <button type="button" onClick={() => setExportYear((parseInt(exportYear) - 1).toString())} className="text-gray-400 hover:text-[#0B4D1E] p-0.5"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg></button>
+                  </div>
+                </div>
+              </div>
+
               {/* Dropdown Periode (2 Bulanan) */}
               <div>
                 <label className="block text-sm font-bold text-[#0B4D1E] mb-2">Pilih Periode</label>

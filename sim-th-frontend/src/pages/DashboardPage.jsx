@@ -28,104 +28,126 @@ function DashboardPage() {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (!token) return;
 
-        // Extract username from token
+        // Extract username and wilayah_id from token payload directly
         const payload = JSON.parse(atob(token.split('.')[1]));
         const usernameJwt = payload.sub;
+        let activeWilayahId = payload.wilayah_id;
 
-        // Fetch users to find current user's wilayah_id
-        const userRes = await fetch(`${import.meta.env.VITE_API_URL}/users`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const userDataRes = await userRes.json();
-        
-        if (userDataRes.status !== 'sukses') return;
-        
-        const myUser = userDataRes.data.find(u => u.username === usernameJwt);
-        if (!myUser || !myUser.wilayah_id) return;
-
-        const wilayahId = myUser.wilayah_id;
-        
-        // Set nama wilayah
-        const userData = JSON.parse(localStorage.getItem('user'));
+        const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+        const userData = userStr ? JSON.parse(userStr) : null;
+        let targetNama = 'BEM Wilayah';
         if (userData && userData.nama_wilayah) {
-          setNamaWilayah(userData.nama_wilayah);
+          targetNama = userData.nama_wilayah;
         } else if (userData && userData.nama) {
-          setNamaWilayah(userData.nama);
-        } else {
-          setNamaWilayah(myUser.nama_wilayah || 'BEM Wilayah');
+          targetNama = userData.nama;
         }
+
+        // Fallback yang lebih tangguh: gunakan ROLE untuk mencari nama wilayah
+        if (!activeWilayahId) {
+           try {
+             let computedTarget = userData?.nama_wilayah || userData?.nama || '';
+             
+             // Jika ada role (misal: "bem_faperta" -> "BEM FAPERTA" atau "ormawa_ppku" -> "Ormawa Eksekutif PPKU")
+             if (userData?.role && userData.role !== 'bem_km' && userData.role !== 'bem_wilayah') {
+                if (userData.role.startsWith('bem_')) {
+                   computedTarget = userData.role.replace('bem_', 'BEM ').toUpperCase();
+                } else if (userData.role.startsWith('ormawa_')) {
+                   if (userData.role === 'ormawa_ppku') {
+                      computedTarget = 'Ormawa Eksekutif PPKU';
+                   } else {
+                      computedTarget = userData.role.replace('ormawa_', 'ORMAWA ').toUpperCase();
+                   }
+                }
+             }
+             targetNama = computedTarget;
+             
+             const wilRes = await fetch(`${import.meta.env.VITE_API_URL}/wilayah/aktif`, {
+               headers: { 'Authorization': `Bearer ${token}` }
+             });
+             const wilData = await wilRes.json();
+             
+             if (wilData.status === 'sukses' && wilData.data) {
+                const match = wilData.data.find(w => w.nama === targetNama || w.nama.toUpperCase() === targetNama);
+                if (match) activeWilayahId = match.id;
+             }
+           } catch (e) { console.error("Fallback wilayah ID gagal:", e); }
+        }
+
+        if (!activeWilayahId) {
+           console.warn("Wilayah ID tidak ditemukan pada token dan fallback gagal. Data akan kosong.");
+        }
+        
+        setNamaWilayah(targetNama);
 
         // 1. Fetch Data Statistik Dashboard dari Backend
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/${wilayahId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const resData = await response.json();
-
-        // 2. Fetch Leaderboard (Top 3)
-        const lbRes = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/leaderboard`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const lbData = await lbRes.json();
-
-        // 3. Fetch Aktivitas Terbaru
-        const actRes = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/${wilayahId}/aktivitas`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const actData = await actRes.json();
-
-        // 4. Fetch Transaksi Terbaru
-        const trxRes = await fetch(`${import.meta.env.VITE_API_URL}/transaksi`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const trxData = await trxRes.json();
-        
-        let myWilayahId = null;
-
-        if (resData.status === 'sukses') {
-          // Cari rank wilayah ini di leaderboard
-          let myRank = '-';
-          if (lbData.status === 'sukses' && lbData.data) {
-            const rankObj = lbData.data.find(w => w.nama_wilayah === resData.nama_wilayah);
-            if (rankObj) {
-               myRank = `#${rankObj.peringkat} Wilayah`;
-               myWilayahId = rankObj.wilayah_id;
+        try {
+          if (activeWilayahId) {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/${activeWilayahId}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const resData = await response.json();
+            if (resData.status === 'sukses') {
+              
+              // JIKA BERHASIL, KITA TIMPA NAMA WILAYAH DENGAN NAMA DARI DATABASE (Akurat!)
+              if (resData.nama_wilayah) {
+                targetNama = resData.nama_wilayah;
+                setNamaWilayah(resData.nama_wilayah);
+              }
+              
+              setStats(prev => ({
+                ...prev,
+                totalSampah: `${resData.rekap_wilayah?.total_berat_gram ? resData.rekap_wilayah.total_berat_gram / 1000 : 0} kg`,
+                nilaiEkonomi: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(resData.rekap_wilayah?.total_rupiah || 0),
+                totalTransaksi: resData.rekap_wilayah?.jumlah_transaksi || 0,
+              }));
+              if (resData.grafik_bulanan && Array.isArray(resData.grafik_bulanan)) {
+                setGrafikBulanan(resData.grafik_bulanan);
+              }
             }
           }
+        } catch (e) { console.error("Gagal ambil statistik:", e); }
 
-          setStats({
-            totalSampah: `${resData.rekap_wilayah?.total_berat_gram ? resData.rekap_wilayah.total_berat_gram / 1000 : 0} kg`,
-            nilaiEkonomi: formatRp(resData.rekap_wilayah?.total_rupiah || 0),
-            totalTransaksi: resData.rekap_wilayah?.jumlah_transaksi || 0,
-            rank: myRank
+        // 2. Fetch Leaderboard (Top 3)
+        try {
+          const lbRes = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/leaderboard`, {
+            headers: { 'Authorization': `Bearer ${token}` }
           });
-          
-          if (lbData.status === 'sukses') {
-            setTop3(lbData.data.slice(0, 3) || []);
+          const lbData = await lbRes.json();
+          if (lbData.status === 'sukses' && lbData.data) {
+             setTop3(lbData.data.slice(0, 3) || []);
+             const rankObj = lbData.data.find(w => w.nama_wilayah === targetNama);
+             if (rankObj) {
+               setStats(prev => ({ ...prev, rank: `#${rankObj.peringkat} Wilayah` }));
+             }
           }
-          
+        } catch (e) { console.error("Gagal fetch leaderboard:", e); }
+
+        // 3. Fetch Aktivitas Terbaru
+        try {
+          if (activeWilayahId) {
+            const actRes = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/${activeWilayahId}/aktivitas`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const actData = await actRes.json();
+            if (actData.status === 'sukses') {
+              setAktivitas(actData.data || []);
+            }
+          }
+        } catch (e) { console.error("Gagal fetch aktivitas:", e); }
+
+        // 4. Fetch Transaksi Terbaru
+        try {
+          const trxRes = await fetch(`${import.meta.env.VITE_API_URL}/transaksi`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const trxData = await trxRes.json();
           if (trxData.status === 'sukses') {
-             // filter transaksi for this wilayah, limit to 5
-             const myTrx = trxData.data.filter(t => t.nama_wilayah === resData.nama_wilayah);
+             const myTrx = trxData.data.filter(t => t.nama_wilayah === targetNama);
              setTransaksiTerbaru(myTrx.slice(0, 5) || []);
           }
-
-          if (actData.status === 'sukses') {
-            setAktivitas(actData.data || []);
-          }
-
-          // 6. Fetch Grafik Bulanan dengan parameter spesifik
-          try {
-             const resGrafik = await fetch(`${import.meta.env.VITE_API_URL}/dashboard/${resData.nama_wilayah_id || myWilayahId}?grafik_bulanan=true`, { headers });
-             const dataGrafik = await resGrafik.json();
-             if (dataGrafik.status === 'sukses') {
-               setGrafikBulanan(dataGrafik.data || []);
-             }
-          } catch (e) {
-             console.error("Gagal mengambil grafik:", e);
-          }
-        }
+        } catch (e) { console.error("Gagal fetch transaksi:", e); }
       } catch (error) {
-        console.error("Gagal mengambil data dashboard:", error);
+        console.error("Gagal menginisialisasi dashboard:", error);
       }
     };
 
