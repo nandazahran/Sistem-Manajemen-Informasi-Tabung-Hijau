@@ -119,13 +119,8 @@ function DashboardLayout({ children }) {
       const resData = await response.json();
 
       if (resData.status === 'sukses' && Array.isArray(resData.data)) {
-        const readIds = JSON.parse(localStorage.getItem('read_notification_ids') || '[]');
-        const mappedData = resData.data.map(n => ({
-          ...n,
-          isRead: readIds.includes(n.id)
-        }));
-        setDataNotif(mappedData.slice(0, 5));
-        const hitungBelumDibaca = mappedData.filter(n => !n.isRead).length;
+        setDataNotif(resData.data.slice(0, 5));
+        const hitungBelumDibaca = resData.data.filter(n => !n.isRead).length;
         setUnreadCount(hitungBelumDibaca);
       }
     } catch (error) {

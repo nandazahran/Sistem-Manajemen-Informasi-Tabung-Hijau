@@ -16,6 +16,8 @@ pub struct Model {
     pub target_role: Option<String>,
     pub target_wilayah_id: Option<i32>,
     pub waktu: DateTime,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub read_by_users: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

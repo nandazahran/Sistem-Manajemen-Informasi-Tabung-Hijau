@@ -64,6 +64,8 @@ mod handlers;
         handlers::lihat_aktivitas_terbaru,
         handlers::broadcast_notifikasi,
         handlers::lihat_notifikasi,
+        handlers::baca_satu_notifikasi,
+        handlers::baca_semua_notifikasi,
         // Modul Dev
         handlers::seed_data
     ),
@@ -304,6 +306,14 @@ async fn main() {
         .route(
             "/",
             get(handlers::lihat_notifikasi).route_layer(middleware::from_fn(handlers::token_jwt)),
+        )
+        .route(
+            "/baca-semua",
+            put(handlers::baca_semua_notifikasi).route_layer(middleware::from_fn(handlers::token_jwt)),
+        )
+        .route(
+            "/{id}/baca",
+            put(handlers::baca_satu_notifikasi).route_layer(middleware::from_fn(handlers::token_jwt)),
         )
         .route(
             "/broadcast",

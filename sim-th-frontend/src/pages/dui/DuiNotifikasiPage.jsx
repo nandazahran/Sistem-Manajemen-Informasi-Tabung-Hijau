@@ -90,8 +90,40 @@ function DuiNotifikasiPage() {
     }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, isRead: true })));
+  const markAllAsRead = async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`${baseUrl}/notifikasi/baca-semua`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        setNotifications(notifications.map(n => ({ ...n, isRead: true })));
+      }
+    } catch (error) {
+      console.error("Gagal menandai semua notifikasi dibaca:", error);
+    }
+  };
+
+  const handleMarkAsRead = async (id) => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`${baseUrl}/notifikasi/${id}/baca`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+      }
+    } catch (error) {
+      console.error("Gagal menandai notifikasi dibaca:", error);
+    }
   };
 
   // LOGIKA FILTERING (SEARCH & DROPDOWN)
@@ -168,7 +200,7 @@ function DuiNotifikasiPage() {
             <div className="py-8 text-center text-gray-500 font-bold animate-pulse">Sinkronisasi dengan brankas sistem...</div>
           ) : filteredNotifications.length > 0 ? (
             filteredNotifications.map((notif) => (
-              <div key={notif.id} className={`flex justify-between items-center p-6 rounded-3xl transition-all cursor-pointer ${notif.isRead ? 'bg-white border border-gray-100 hover:shadow-sm' : 'bg-[#FDF6EA] border border-[#F4A300]/20'}`}>
+              <div key={notif.id} onClick={() => handleMarkAsRead(notif.id)} className={`flex justify-between items-center p-6 rounded-3xl transition-all cursor-pointer ${notif.isRead ? 'bg-white border border-gray-100 hover:shadow-sm' : 'bg-[#FDF6EA] border border-[#F4A300]/20'}`}>
                 <div className="flex items-center gap-5">
                   <div className="bg-[#E8F5E9] p-4 rounded-full text-[#2E7D32]">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>

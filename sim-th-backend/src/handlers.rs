@@ -3299,14 +3299,150 @@ pub async fn lihat_notifikasi(
             should_show
         })
         .map(|n| {
+            let read_ids: Vec<i32> = n.read_by_users.as_ref()
+                .and_then(|val| serde_json::from_str::<Vec<i32>>(val).ok())
+                .unwrap_or_default();
+            let is_read = read_ids.contains(&user_login.id);
+
             serde_json::json!({
                 "id": n.id, "tipe": n.tipe, "judul": n.judul, "deskripsi": n.deskripsi,
-                "waktu": n.waktu, "isRead": false
+                "waktu": n.waktu, "isRead": is_read
             })
         })
         .collect();
 
     Json(serde_json::json!({ "status": "sukses", "data": notif_tersaring }))
+}
+
+// Endpoint untuk menandai satu notifikasi sebagai dibaca
+#[utoipa::path(
+    put,
+    path = "/api/notifikasi/{id}/baca",
+    params(("id" = i32, Path, description = "ID Notifikasi")),
+    responses(
+        (status = 200, description = "Notifikasi berhasil ditandai sebagai dibaca"),
+        (status = 404, description = "Notifikasi tidak ditemukan")
+    ),
+    tag = "Notifikasi",
+    security(("jwt_auth" = []))
+)]
+pub async fn baca_satu_notifikasi(
+    State(db): State<DatabaseConnection>,
+    Path(notif_id): Path<i32>,
+    Extension(username_jwt): Extension<String>,
+) -> (StatusCode, Json<ResponPesan>) {
+    let user_login = match user::Entity::find()
+        .filter(user::Column::Username.eq(username_jwt))
+        .one(&db)
+        .await
+        .unwrap_or(None)
+    {
+        Some(u) => u,
+        None => return (StatusCode::UNAUTHORIZED, Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string() })),
+    };
+
+    let notif_opt = match notifikasi::Entity::find_by_id(notif_id).one(&db).await {
+        Ok(Some(n)) => Some(n),
+        _ => None,
+    };
+
+    let Some(notif) = notif_opt else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(ResponPesan {
+                status: "gagal".to_string(),
+                pesan: "Notifikasi tidak ditemukan.".to_string(),
+            }),
+        );
+    };
+
+    let mut read_ids: Vec<i32> = notif.read_by_users.as_ref()
+        .and_then(|val| serde_json::from_str::<Vec<i32>>(val).ok())
+        .unwrap_or_default();
+
+    if !read_ids.contains(&user_login.id) {
+        read_ids.push(user_login.id);
+        let mut active_model: notifikasi::ActiveModel = notif.into();
+        active_model.read_by_users = Set(Some(serde_json::to_string(&read_ids).unwrap()));
+        let _ = active_model.update(&db).await;
+    }
+
+    (
+        StatusCode::OK,
+        Json(ResponPesan {
+            status: "sukses".to_string(),
+            pesan: "Notifikasi ditandai sebagai dibaca.".to_string(),
+        }),
+    )
+}
+
+// Endpoint untuk menandai semua notifikasi pengguna sebagai dibaca
+#[utoipa::path(
+    put,
+    path = "/api/notifikasi/baca-semua",
+    responses(
+        (status = 200, description = "Semua notifikasi berhasil ditandai sebagai dibaca")
+    ),
+    tag = "Notifikasi",
+    security(("jwt_auth" = []))
+)]
+pub async fn baca_semua_notifikasi(
+    State(db): State<DatabaseConnection>,
+    Extension(username_jwt): Extension<String>,
+) -> (StatusCode, Json<ResponPesan>) {
+    let user_login = match user::Entity::find()
+        .filter(user::Column::Username.eq(username_jwt))
+        .one(&db)
+        .await
+        .unwrap_or(None)
+    {
+        Some(u) => u,
+        None => return (StatusCode::UNAUTHORIZED, Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string() })),
+    };
+
+    let role = user_login.role;
+    let wilayah_id = user_login.wilayah_id;
+
+    // Ambil 50 notifikasi terbaru yang bisa dibaca oleh user
+    let semua_notif = notifikasi::Entity::find()
+        .order_by_desc(notifikasi::Column::Id)
+        .limit(50)
+        .all(&db)
+        .await
+        .unwrap_or_default();
+
+    for notif in semua_notif {
+        let mut should_show = false;
+        if let Some(target_role) = &notif.target_role
+            && (target_role.contains("all") || target_role.contains(&role)) {
+                should_show = true;
+            }
+        if let Some(target_wilayah) = notif.target_wilayah_id
+            && Some(target_wilayah) == wilayah_id {
+                should_show = true;
+            }
+
+        if should_show {
+            let mut read_ids: Vec<i32> = notif.read_by_users.as_ref()
+                .and_then(|val| serde_json::from_str::<Vec<i32>>(val).ok())
+                .unwrap_or_default();
+
+            if !read_ids.contains(&user_login.id) {
+                read_ids.push(user_login.id);
+                let mut active_model: notifikasi::ActiveModel = notif.into();
+                active_model.read_by_users = Set(Some(serde_json::to_string(&read_ids).unwrap()));
+                let _ = active_model.update(&db).await;
+            }
+        }
+    }
+
+    (
+        StatusCode::OK,
+        Json(ResponPesan {
+            status: "sukses".to_string(),
+            pesan: "Semua notifikasi ditandai sebagai dibaca.".to_string(),
+        }),
+    )
 }
 
 // Fungsi Ubah Password dari menu Profil

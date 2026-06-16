@@ -19,6 +19,7 @@ impl MigrationTrait for Migration {
                     .col(text_null(Notifikasi::TargetRole))
                     .col(integer_null(Notifikasi::TargetWilayahId))
                     .col(timestamp(Notifikasi::Waktu).default(Expr::current_timestamp()))
+                    .col(text_null(Notifikasi::ReadByUsers))
                     // Relasi ke wilayah jika notifikasi ini spesifik untuk 1 wilayah
                     .foreign_key(
                         ForeignKey::create()
@@ -50,6 +51,7 @@ pub enum Notifikasi {
     TargetRole,
     TargetWilayahId,
     Waktu,
+    ReadByUsers,
 }
 
 #[derive(DeriveIden)]

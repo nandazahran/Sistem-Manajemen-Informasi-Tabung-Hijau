@@ -25,7 +25,6 @@ function NotifikasiPage() {
         const resData = await response.json();
         
         if (resData.status === 'sukses' && Array.isArray(resData.data)) {
-          const readIds = JSON.parse(localStorage.getItem('read_notification_ids') || '[]');
           // Mapping data riil dari API
           const mappedNotif = resData.data.map(n => ({
             id: n.id,
@@ -33,7 +32,7 @@ function NotifikasiPage() {
             title: n.judul,
             desc: n.deskripsi || n.pesan || '',
             time: formatWaktuDB(n.waktu),
-            read: readIds.includes(n.id)
+            read: n.isRead || false
           }));
 
           // Tetap tambahkan notif sistem 
@@ -56,27 +55,43 @@ function NotifikasiPage() {
 
   const unreadCount = notifikasi.filter(n => !n.read).length;
 
-  const markAllAsRead = () => {
-    const idsToMark = notifikasi.map(n => n.id).filter(id => id !== 'sys-1');
-    const readIds = JSON.parse(localStorage.getItem('read_notification_ids') || '[]');
-    const newReadIds = Array.from(new Set([...readIds, ...idsToMark]));
-    localStorage.setItem('read_notification_ids', JSON.stringify(newReadIds));
+  const markAllAsRead = async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) return;
 
-    setNotifikasi(notifikasi.map(n => ({ ...n, read: true })));
-    
-    // Panggil event agar angka lonceng di layout ikut di-reset jadi 0
-    window.dispatchEvent(new Event('notifikasi_read'));
+      const response = await fetch(`${baseUrl}/notifikasi/baca-semua`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        setNotifikasi(notifikasi.map(n => ({ ...n, read: true })));
+        window.dispatchEvent(new Event('notifikasi_read'));
+      }
+    } catch (error) {
+      console.error("Gagal menandai semua notifikasi dibaca:", error);
+    }
   };
 
-  const handleMarkAsRead = (id) => {
+  const handleMarkAsRead = async (id) => {
     if (id === 'sys-1') return;
-    const readIds = JSON.parse(localStorage.getItem('read_notification_ids') || '[]');
-    if (!readIds.includes(id)) {
-      readIds.push(id);
-      localStorage.setItem('read_notification_ids', JSON.stringify(readIds));
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`${baseUrl}/notifikasi/${id}/baca`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        setNotifikasi(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+        window.dispatchEvent(new Event('notifikasi_read'));
+      }
+    } catch (error) {
+      console.error("Gagal menandai notifikasi dibaca:", error);
     }
-    setNotifikasi(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-    window.dispatchEvent(new Event('notifikasi_read'));
   };
 
   const displayedNotif = activeTab === 'semua' ? notifikasi : notifikasi.filter(n => !n.read);
