@@ -37,7 +37,7 @@ jobs:
 
     steps:
       - name: Checkout kode sumber
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -63,7 +63,7 @@ jobs:
 
     steps:
       - name: Checkout kode sumber
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Rust toolchain dengan Clippy
         uses: dtolnay/rust-toolchain@stable
@@ -91,7 +91,7 @@ jobs:
 
     steps:
       - name: Checkout kode sumber
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
