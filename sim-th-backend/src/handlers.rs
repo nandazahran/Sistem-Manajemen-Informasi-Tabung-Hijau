@@ -1504,7 +1504,6 @@ pub async fn lihat_kategori(State(db): State<DatabaseConnection>) -> Json<serde_
     security(("jwt_auth" = []))
 )]
 pub async fn lihat_riwayat_harga(State(db): State<DatabaseConnection>) -> Json<serde_json::Value> {
-    use sea_orm::{QueryOrder, QuerySelect};
     
     let daftar_riwayat = riwayat_harga::Entity::find()
         .find_also_related(kategori_sampah::Entity)
@@ -3658,7 +3657,7 @@ pub async fn seed_data(
         .one(&db)
         .await;
 
-    let admin_user = match pemanggil {
+    let _admin_user = match pemanggil {
         Ok(Some(u)) => {
             if u.role != "superadmin" {
                 return (
@@ -3846,7 +3845,7 @@ pub async fn seed_data(
         for &w_id in &wilayah_ids {
             // 3-5 transaksi per wilayah per bulan
             let num_trx = 3 + rand::rng().random_range(0..3_i64);
-            for t in 0..num_trx {
+            for _ in 0..num_trx {
                 let k_idx = rand::rng().random_range(0..kategori_ids.len());
                 let k_id = kategori_ids[k_idx];
                 let harga_per_kg = kategori_list[k_idx].1;
@@ -3971,7 +3970,7 @@ pub async fn seed_data(
         ("broadcast", "Harga Sampah Update", "Harga sampah plastik naik menjadi Rp 4.500/kg efektif hari ini."),
     ];
     for (i, (tipe, judul, deskripsi)) in notif_data.iter().enumerate() {
-        let waktu = now - Duration::days((notif_data.len() - i) as i64 * 3);
+        let _waktu = now - Duration::days((notif_data.len() - i) as i64 * 3);
         let target_role = if *tipe == "broadcast" { Some(serde_json::json!(["all"]).to_string()) } else { Some(serde_json::json!(["admin", "bem_km"]).to_string()) };
         let model = notifikasi::ActiveModel {
             tipe: Set(tipe.to_string()),
@@ -3986,7 +3985,7 @@ pub async fn seed_data(
 
     let total_wilayah = wilayah_ids.len();
     let total_kategori = kategori_ids.len();
-    let total_trx: i32 = total_saldo_wilayah.values().count() as i32;
+    let _total_trx: i32 = total_saldo_wilayah.values().count() as i32;
 
     (StatusCode::CREATED, Json(ResponPesan {
         status: "sukses".to_string(),
