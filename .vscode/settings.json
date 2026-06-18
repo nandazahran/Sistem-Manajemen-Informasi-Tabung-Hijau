@@ -1,5 +1,10 @@
 {
     "files.watcherExclude": {
         "**/target": true
+    },
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "biomejs.biome",
+    "[rust]": {
+        "editor.defaultFormatter": "rust-lang.rust-analyzer"
     }
 }
