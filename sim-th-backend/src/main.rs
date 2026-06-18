@@ -156,7 +156,7 @@ async fn main() {
 
     // Auto-seed Admin Pertama jika belum ada user admin di database
     {
-        use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
         let ada_admin = crate::entities::user::Entity::find()
             .filter(crate::entities::user::Column::Role.eq("admin"))
             .one(&db)
@@ -164,11 +164,11 @@ async fn main() {
             .unwrap_or(None);
 
         if ada_admin.is_none() {
-            use bcrypt::{hash, DEFAULT_COST};
+            use bcrypt::{DEFAULT_COST, hash};
             use sea_orm::{ActiveModelTrait, Set};
 
-            let password_hash = hash("admin123", DEFAULT_COST)
-                .expect("Gagal hashing password admin default");
+            let password_hash =
+                hash("admin123", DEFAULT_COST).expect("Gagal hashing password admin default");
 
             let admin_seed = crate::entities::user::ActiveModel {
                 username: Set("admin".to_string()),
@@ -182,7 +182,9 @@ async fn main() {
             };
 
             match admin_seed.insert(&db).await {
-                Ok(_) => println!("🌱 Admin pertama berhasil dibuat! Username: admin, Password: admin123"),
+                Ok(_) => println!(
+                    "🌱 Admin pertama berhasil dibuat! Username: admin, Password: admin123"
+                ),
                 Err(e) => println!("⚠️  Gagal membuat admin seed: {}", e),
             }
         } else {
@@ -197,7 +199,7 @@ async fn main() {
             .unwrap_or(None);
 
         if ada_superadmin.is_none() {
-            use bcrypt::{hash, DEFAULT_COST};
+            use bcrypt::{DEFAULT_COST, hash};
             use sea_orm::{ActiveModelTrait, Set};
 
             let password_hash = hash("superadmin123", DEFAULT_COST)
@@ -215,7 +217,9 @@ async fn main() {
             };
 
             match superadmin_seed.insert(&db).await {
-                Ok(_) => println!("🌱 Superadmin berhasil dibuat! Username: superadmin, Password: superadmin123"),
+                Ok(_) => println!(
+                    "🌱 Superadmin berhasil dibuat! Username: superadmin, Password: superadmin123"
+                ),
                 Err(e) => println!("⚠️  Gagal membuat superadmin seed: {}", e),
             }
         } else {
@@ -288,10 +292,7 @@ async fn main() {
 
     // Rute Manajemen User (BARU)
     let rute_user = Router::new()
-        .route(
-            "/",
-            get(handlers::lihat_user).post(handlers::buat_user),
-        )
+        .route("/", get(handlers::lihat_user).post(handlers::buat_user))
         .route(
             "/{id}",
             put(handlers::update_user).delete(handlers::hapus_user),
@@ -309,11 +310,13 @@ async fn main() {
         )
         .route(
             "/baca-semua",
-            put(handlers::baca_semua_notifikasi).route_layer(middleware::from_fn(handlers::token_jwt)),
+            put(handlers::baca_semua_notifikasi)
+                .route_layer(middleware::from_fn(handlers::token_jwt)),
         )
         .route(
             "/{id}/baca",
-            put(handlers::baca_satu_notifikasi).route_layer(middleware::from_fn(handlers::token_jwt)),
+            put(handlers::baca_satu_notifikasi)
+                .route_layer(middleware::from_fn(handlers::token_jwt)),
         )
         .route(
             "/broadcast",
@@ -339,7 +342,11 @@ async fn main() {
         .route("/api/lupa-password", post(handlers::minta_otp_email))
         .route("/api/reset-password", post(handlers::reset_password_email))
         .route("/api/verify-2fa", post(handlers::verify_2fa))
-        .route("/api/riwayat-harga", get(handlers::lihat_riwayat_harga).route_layer(middleware::from_fn(handlers::token_jwt)))
+        .route(
+            "/api/riwayat-harga",
+            get(handlers::lihat_riwayat_harga)
+                .route_layer(middleware::from_fn(handlers::token_jwt)),
+        )
         .nest("/api/wilayah", rute_wilayah)
         .nest("/api/kategori", rute_kategori)
         .nest("/api/transaksi", rute_transaksi)

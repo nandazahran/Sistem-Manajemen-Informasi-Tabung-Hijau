@@ -23,7 +23,8 @@ use totp_rs::{Algorithm, Secret, TOTP};
 use utoipa::ToSchema;
 
 use crate::entities::{
-    kategori_sampah, kontak, notifikasi, rekening_wilayah, riwayat_harga, riwayat_penarikan, tabungan_sampah, transaksi_sampah, user, wilayah,
+    kategori_sampah, kontak, notifikasi, rekening_wilayah, riwayat_harga, riwayat_penarikan,
+    tabungan_sampah, transaksi_sampah, user, wilayah,
 };
 
 // Struct khusus untuk menerima data Register
@@ -33,7 +34,7 @@ pub struct InputRegister {
     pub password: String,
     pub email: String,
     pub nama: String,
-    pub role: String,            // Nanti diisi: "Admin", "BEMWilayah", atau "DUI"
+    pub role: String, // Nanti diisi: "Admin", "BEMWilayah", atau "DUI"
 }
 
 // Struct khusus untuk menerima data Login
@@ -85,7 +86,7 @@ pub struct KlaimToken {
     pub sub: String, // sub = subject (siapa pemilik KTP ini)
     pub role: String,
     pub wilayah_id: Option<i32>,
-    pub exp: usize,  // exp = expiration (kapan KTP ini hangus)
+    pub exp: usize, // exp = expiration (kapan KTP ini hangus)
 }
 
 // Balasan khusus untuk fitur Login
@@ -116,8 +117,8 @@ pub struct InputUpdateUser {
     pub nama: String,
     pub status: String,
     pub telepon: Option<String>,
-    pub email: Option<String>,     // Admin bisa ubah email user
-    pub role: Option<String>,      // Admin bisa ubah role user
+    pub email: Option<String>, // Admin bisa ubah email user
+    pub role: Option<String>,  // Admin bisa ubah role user
 }
 
 // Struct khusus untuk Admin membuat user baru (POST /api/users)
@@ -127,7 +128,7 @@ pub struct InputBuatUser {
     pub password: String,
     pub email: String,
     pub nama: String,
-    pub role: String,  // Kode role: "admin", "dui", "bem_fateta", dll.
+    pub role: String, // Kode role: "admin", "dui", "bem_fateta", dll.
 }
 
 // Struct untuk Ubah Password dari Halaman Profil
@@ -382,16 +383,15 @@ pub async fn lihat_user(
         Ok(daftar_user) => {
             // Siapkan HashMap wilayah agar tidak query berulang-ulang
             let semua_wilayah = wilayah::Entity::find().all(&db).await.unwrap_or_default();
-            let peta_wilayah: HashMap<i32, String> = semua_wilayah
-                .into_iter()
-                .map(|w| (w.id, w.nama))
-                .collect();
+            let peta_wilayah: HashMap<i32, String> =
+                semua_wilayah.into_iter().map(|w| (w.id, w.nama)).collect();
 
             // Kita saring datanya agar kolom 'password' TIDAK ikut terkirim ke frontend!
             let data_aman: Vec<_> = daftar_user
                 .into_iter()
                 .map(|u| {
-                    let nama_wilayah = u.wilayah_id
+                    let nama_wilayah = u
+                        .wilayah_id
                         .and_then(|wid| peta_wilayah.get(&wid).cloned())
                         .unwrap_or_else(|| "-".to_string());
                     serde_json::json!({
@@ -462,7 +462,8 @@ pub async fn buat_user(
                     StatusCode::FORBIDDEN,
                     Json(ResponPesan {
                         status: "gagal".to_string(),
-                        pesan: "Akses ditolak! Hanya Admin yang bisa membuat user baru.".to_string(),
+                        pesan: "Akses ditolak! Hanya Admin yang bisa membuat user baru."
+                            .to_string(),
                     }),
                 );
             }
@@ -536,10 +537,7 @@ pub async fn buat_user(
             StatusCode::CREATED,
             Json(ResponPesan {
                 status: "sukses".to_string(),
-                pesan: format!(
-                    "User '{}' berhasil dibuat oleh Admin.",
-                    payload.nama
-                ),
+                pesan: format!("User '{}' berhasil dibuat oleh Admin.", payload.nama),
             }),
         ),
         Err(_) => (
@@ -730,7 +728,9 @@ pub async fn login(
                     Json(ResponLogin {
                         status: "gagal".to_string(),
                         pesan: "Akun nonaktif.".to_string(),
-                        token: None, role: None, nama: None,
+                        token: None,
+                        role: None,
+                        nama: None,
                     }),
                 );
             }
@@ -798,7 +798,9 @@ pub async fn login(
                     Json(ResponLogin {
                         status: "sukses".to_string(),
                         pesan: format!("Selamat datang, {}!", data_user.nama),
-                        token: Some(token_jwt), role: Some(data_user.role.clone()), nama: Some(data_user.nama.clone()),
+                        token: Some(token_jwt),
+                        role: Some(data_user.role.clone()),
+                        nama: Some(data_user.nama.clone()),
                     }),
                 )
             } else {
@@ -807,7 +809,9 @@ pub async fn login(
                     Json(ResponLogin {
                         status: "gagal".to_string(),
                         pesan: "Password salah.".to_string(),
-                        token: None, role: None, nama: None,
+                        token: None,
+                        role: None,
+                        nama: None,
                     }),
                 )
             }
@@ -817,7 +821,9 @@ pub async fn login(
             Json(ResponLogin {
                 status: "gagal".to_string(),
                 pesan: "Akun tidak ditemukan.".to_string(),
-                token: None, role: None, nama: None,
+                token: None,
+                role: None,
+                nama: None,
             }),
         ),
     }
@@ -858,7 +864,9 @@ pub async fn verify_2fa(
                     status: "gagal".to_string(),
                     pesan: "Sesi login kadaluarsa (lewat 5 menit). Silakan login ulang."
                         .to_string(),
-                    token: None, role: None, nama: None,
+                    token: None,
+                    role: None,
+                    nama: None,
                 }),
             );
         }
@@ -871,7 +879,9 @@ pub async fn verify_2fa(
             Json(ResponLogin {
                 status: "gagal".to_string(),
                 pesan: "Token tidak valid.".to_string(),
-                token: None, role: None, nama: None,
+                token: None,
+                role: None,
+                nama: None,
             }),
         );
     }
@@ -905,7 +915,9 @@ pub async fn verify_2fa(
                     Json(ResponLogin {
                         status: "gagal".to_string(),
                         pesan: "Kode OTP salah!".to_string(),
-                        token: None, role: None, nama: None,
+                        token: None,
+                        role: None,
+                        nama: None,
                     }),
                 );
             }
@@ -934,7 +946,9 @@ pub async fn verify_2fa(
                 Json(ResponLogin {
                     status: "sukses".to_string(),
                     pesan: "Autentikasi 2FA Berhasil!".to_string(),
-                    token: Some(token_jwt), role: Some(data_user.role.clone()), nama: Some(data_user.nama.clone()),
+                    token: Some(token_jwt),
+                    role: Some(data_user.role.clone()),
+                    nama: Some(data_user.nama.clone()),
                 }),
             )
         }
@@ -943,7 +957,9 @@ pub async fn verify_2fa(
             Json(ResponLogin {
                 status: "gagal".to_string(),
                 pesan: "User tidak ditemukan.".to_string(),
-                token: None, role: None, nama: None,
+                token: None,
+                role: None,
+                nama: None,
             }),
         ),
     }
@@ -1247,7 +1263,12 @@ pub async fn lihat_wilayah(
 
     let (role_user, id_wilayah_user) = match pencarian_user {
         Some(u) => (u.role, u.wilayah_id),
-        None => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "status": "gagal", "pesan": "User tidak valid" }))),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({ "status": "gagal", "pesan": "User tidak valid" })),
+            );
+        }
     };
 
     // LOGIKA FILTER:
@@ -1255,7 +1276,11 @@ pub async fn lihat_wilayah(
     // 2. Jika bukan -> Ambil yang ID-nya cocok dengan wilayah si user
 
     let role_lower = role_user.to_lowercase();
-    let query = if role_lower == "bem_km" || role_lower == "admin" || role_lower == "superadmin" || role_lower == "dui" {
+    let query = if role_lower == "bem_km"
+        || role_lower == "admin"
+        || role_lower == "superadmin"
+        || role_lower == "dui"
+    {
         wilayah::Entity::find()
     } else {
         wilayah::Entity::find().filter(wilayah::Column::Id.eq(id_wilayah_user))
@@ -1504,7 +1529,6 @@ pub async fn lihat_kategori(State(db): State<DatabaseConnection>) -> Json<serde_
     security(("jwt_auth" = []))
 )]
 pub async fn lihat_riwayat_harga(State(db): State<DatabaseConnection>) -> Json<serde_json::Value> {
-    
     let daftar_riwayat = riwayat_harga::Entity::find()
         .find_also_related(kategori_sampah::Entity)
         .order_by_desc(riwayat_harga::Column::Id)
@@ -1529,7 +1553,7 @@ pub async fn lihat_riwayat_harga(State(db): State<DatabaseConnection>) -> Json<s
                 "status": "sukses",
                 "data": mapped_data
             }))
-        },
+        }
         Err(_) => Json(serde_json::json!({
             "status": "error",
             "pesan": "Gagal mengambil data riwayat harga"
@@ -1598,7 +1622,7 @@ pub async fn update_kategori(
                             kategori_id, payload.nama_kategori, payload.harga_per_kg
                         ),
                     })
-                },
+                }
                 Err(e) => Json(ResponPesan {
                     status: "gagal".to_string(),
                     pesan: format!("Gagal mengupdate kategori: {}", e),
@@ -1918,10 +1942,13 @@ pub async fn lihat_transaksi(
         .join(JoinType::InnerJoin, transaksi_sampah::Relation::User.def());
 
     // FILTER: Jika dia BEM Wilayah, HANYA BISA LIHAT transaksinya sendiri
-    if role != "bem_km" && role != "admin" && role != "dui"
-        && let Some(id_wil) = wilayah_id {
-            query = query.filter(transaksi_sampah::Column::WilayahId.eq(id_wil));
-        }
+    if role != "bem_km"
+        && role != "admin"
+        && role != "dui"
+        && let Some(id_wil) = wilayah_id
+    {
+        query = query.filter(transaksi_sampah::Column::WilayahId.eq(id_wil));
+    }
 
     let hasil_eksekusi = query
         // Tuangkan hasilnya ke dalam cetakan JSON yang kita buat tadi
@@ -2250,13 +2277,15 @@ pub async fn hapus_transaksi(
                 });
             }
 
-            if user_login.role != "bem_km" && user_login.role != "admin"
-                && user_login.wilayah_id != Some(data_trx.wilayah_id) {
-                    return Json(ResponPesan {
+            if user_login.role != "bem_km"
+                && user_login.role != "admin"
+                && user_login.wilayah_id != Some(data_trx.wilayah_id)
+            {
+                return Json(ResponPesan {
                         status: "gagal".to_string(),
                         pesan: "Akses ditolak! Anda tidak boleh memanipulasi/menghapus transaksi milik wilayah lain.".to_string(),
                     });
-                }
+            }
 
             // Ambil informasi nilai dan wilayah sebelum transaksinya dimusnahkan
             let nilai_yang_dihapus = data_trx.total_nilai;
@@ -2341,15 +2370,17 @@ pub async fn tarik_saldo(
         .await
         .unwrap()
         .unwrap();
-    if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui"
-        && user_login.wilayah_id != Some(payload.wilayah_id) {
-            return Json(ResponPesan {
-                status: "gagal".to_string(),
-                pesan:
-                    "Akses ditolak! Anda tidak berhak mencairkan dana tabungan milik wilayah lain."
-                        .to_string(),
-            });
-        }
+    if user_login.role != "bem_km"
+        && user_login.role != "admin"
+        && user_login.role != "dui"
+        && user_login.wilayah_id != Some(payload.wilayah_id)
+    {
+        return Json(ResponPesan {
+            status: "gagal".to_string(),
+            pesan: "Akses ditolak! Anda tidak berhak mencairkan dana tabungan milik wilayah lain."
+                .to_string(),
+        });
+    }
 
     // 1. Cari dompet tabungan wilayah tersebut
     let pencarian_dompet = tabungan_sampah::Entity::find()
@@ -2386,7 +2417,9 @@ pub async fn tarik_saldo(
                         ditarik_oleh: Set(username_jwt.clone()),
                         ..Default::default()
                     };
-                    let _ = riwayat_penarikan::Entity::insert(log_penarikan).exec(&db).await;
+                    let _ = riwayat_penarikan::Entity::insert(log_penarikan)
+                        .exec(&db)
+                        .await;
 
                     Json(ResponPesan {
                         status: "sukses".to_string(),
@@ -2395,7 +2428,7 @@ pub async fn tarik_saldo(
                             payload.nominal, saldo_baru
                         ),
                     })
-                },
+                }
                 Err(e) => Json(ResponPesan {
                     status: "gagal".to_string(),
                     pesan: format!("Gagal memproses penarikan di database: {}", e),
@@ -2439,10 +2472,11 @@ pub async fn lihat_histori_tabungan(
         }));
     }
     let wilayah_id = wilayah_id_str.unwrap().parse::<i32>().unwrap_or(0);
-    
+
     // Ambil tahun dari query, default tahun sekarang
     let tahun_sekarang = chrono::Utc::now().year();
-    let tahun = params.get("tahun")
+    let tahun = params
+        .get("tahun")
         .and_then(|t| t.parse::<i32>().ok())
         .unwrap_or(tahun_sekarang);
 
@@ -2460,7 +2494,9 @@ pub async fn lihat_histori_tabungan(
         .await
         .unwrap_or_default();
 
-    let month_names = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
+    let month_names = [
+        "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des",
+    ];
     let mut histori_bulanan = vec![];
 
     for (i, nama_bulan) in month_names.iter().enumerate() {
@@ -2474,7 +2510,9 @@ pub async fn lihat_histori_tabungan(
         }
 
         for pen in &penarikan {
-            if pen.tanggal_penarikan.year() == tahun && pen.tanggal_penarikan.month() as usize - 1 == i {
+            if pen.tanggal_penarikan.year() == tahun
+                && pen.tanggal_penarikan.month() as usize - 1 == i
+            {
                 total_penarikan += pen.nominal;
             }
         }
@@ -2690,20 +2728,26 @@ pub async fn lihat_dashboard_wilayah(
             }));
         }
     };
-    if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui"
-        && user_login.wilayah_id != Some(wilayah_id) {
-            return Json(serde_json::json!({
-                "status": "gagal",
-                "pesan": "Akses ditolak! Anda hanya boleh melihat detail dashboard wilayah Anda sendiri."
-            }));
-        }
+    if user_login.role != "bem_km"
+        && user_login.role != "admin"
+        && user_login.role != "dui"
+        && user_login.wilayah_id != Some(wilayah_id)
+    {
+        return Json(serde_json::json!({
+            "status": "gagal",
+            "pesan": "Akses ditolak! Anda hanya boleh melihat detail dashboard wilayah Anda sendiri."
+        }));
+    }
 
     // Kalau butuh grafik bulanan via endpoint spesifik
     if let Some(grafik_req) = params.get("grafik_bulanan")
         && grafik_req == "true"
     {
         let tahun_sekarang = chrono::Utc::now().year();
-        let tahun = params.get("tahun").and_then(|t| t.parse::<i32>().ok()).unwrap_or(tahun_sekarang);
+        let tahun = params
+            .get("tahun")
+            .and_then(|t| t.parse::<i32>().ok())
+            .unwrap_or(tahun_sekarang);
 
         let semua_trx = transaksi_sampah::Entity::find()
             .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id))
@@ -2711,7 +2755,9 @@ pub async fn lihat_dashboard_wilayah(
             .await
             .unwrap_or_default();
 
-        let month_names = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
+        let month_names = [
+            "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des",
+        ];
         let mut data_bulanan = vec![];
         for (i, nama_bulan) in month_names.iter().enumerate() {
             let mut berat = 0;
@@ -2913,8 +2959,6 @@ pub async fn lihat_leaderboard(
         .await
         .unwrap_or_default();
 
-
-
     // Menyimpan agregasi data: (total_berat, total_nilai, total_poin_kualitas, jumlah_transaksi)
     let mut rekap_wilayah: HashMap<String, (i64, i64, i64, i64)> = HashMap::new();
 
@@ -3009,10 +3053,13 @@ pub async fn lihat_aktivitas_terbaru(
         .await
         .unwrap()
         .unwrap();
-    if user_login.role != "bem_km" && user_login.role != "admin" && user_login.role != "dui"
-        && user_login.wilayah_id != Some(wilayah_id) {
-            return Json(serde_json::json!({ "status": "gagal", "pesan": "Akses ditolak!" }));
-        }
+    if user_login.role != "bem_km"
+        && user_login.role != "admin"
+        && user_login.role != "dui"
+        && user_login.wilayah_id != Some(wilayah_id)
+    {
+        return Json(serde_json::json!({ "status": "gagal", "pesan": "Akses ditolak!" }));
+    }
 
     let transaksi = transaksi_sampah::Entity::find()
         .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id))
@@ -3211,7 +3258,15 @@ pub async fn broadcast_notifikasi(
 
     let user_login = match pencarian_user {
         Ok(Some(u)) => u,
-        _ => return (StatusCode::UNAUTHORIZED, Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string() })),
+        _ => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: "User tidak ditemukan.".to_string(),
+                }),
+            );
+        }
     };
 
     // 2. Satpam Pengecek Role: Pastikan hanya BEM KM, Admin, atau DUI yang bisa menembus blok ini
@@ -3250,7 +3305,7 @@ pub async fn broadcast_notifikasi(
         Json(ResponPesan {
             status: "sukses".to_string(),
             pesan: "Broadcast notifikasi berhasil dikirim!".to_string(),
-        })
+        }),
     )
 }
 
@@ -3288,17 +3343,21 @@ pub async fn lihat_notifikasi(
         .filter(|n| {
             let mut should_show = false;
             if let Some(target_role) = &n.target_role
-                && (target_role.contains("all") || target_role.contains(&role)) {
-                    should_show = true;
-                }
+                && (target_role.contains("all") || target_role.contains(&role))
+            {
+                should_show = true;
+            }
             if let Some(target_wilayah) = n.target_wilayah_id
-                && Some(target_wilayah) == wilayah_id {
-                    should_show = true;
-                }
+                && Some(target_wilayah) == wilayah_id
+            {
+                should_show = true;
+            }
             should_show
         })
         .map(|n| {
-            let read_ids: Vec<i32> = n.read_by_users.as_ref()
+            let read_ids: Vec<i32> = n
+                .read_by_users
+                .as_ref()
                 .and_then(|val| serde_json::from_str::<Vec<i32>>(val).ok())
                 .unwrap_or_default();
             let is_read = read_ids.contains(&user_login.id);
@@ -3337,7 +3396,15 @@ pub async fn baca_satu_notifikasi(
         .unwrap_or(None)
     {
         Some(u) => u,
-        None => return (StatusCode::UNAUTHORIZED, Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string() })),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: "User tidak ditemukan.".to_string(),
+                }),
+            );
+        }
     };
 
     let notif_opt = match notifikasi::Entity::find_by_id(notif_id).one(&db).await {
@@ -3355,7 +3422,9 @@ pub async fn baca_satu_notifikasi(
         );
     };
 
-    let mut read_ids: Vec<i32> = notif.read_by_users.as_ref()
+    let mut read_ids: Vec<i32> = notif
+        .read_by_users
+        .as_ref()
         .and_then(|val| serde_json::from_str::<Vec<i32>>(val).ok())
         .unwrap_or_default();
 
@@ -3396,7 +3465,15 @@ pub async fn baca_semua_notifikasi(
         .unwrap_or(None)
     {
         Some(u) => u,
-        None => return (StatusCode::UNAUTHORIZED, Json(ResponPesan { status: "gagal".to_string(), pesan: "User tidak ditemukan.".to_string() })),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(ResponPesan {
+                    status: "gagal".to_string(),
+                    pesan: "User tidak ditemukan.".to_string(),
+                }),
+            );
+        }
     };
 
     let role = user_login.role;
@@ -3413,16 +3490,20 @@ pub async fn baca_semua_notifikasi(
     for notif in semua_notif {
         let mut should_show = false;
         if let Some(target_role) = &notif.target_role
-            && (target_role.contains("all") || target_role.contains(&role)) {
-                should_show = true;
-            }
+            && (target_role.contains("all") || target_role.contains(&role))
+        {
+            should_show = true;
+        }
         if let Some(target_wilayah) = notif.target_wilayah_id
-            && Some(target_wilayah) == wilayah_id {
-                should_show = true;
-            }
+            && Some(target_wilayah) == wilayah_id
+        {
+            should_show = true;
+        }
 
         if should_show {
-            let mut read_ids: Vec<i32> = notif.read_by_users.as_ref()
+            let mut read_ids: Vec<i32> = notif
+                .read_by_users
+                .as_ref()
                 .and_then(|val| serde_json::from_str::<Vec<i32>>(val).ok())
                 .unwrap_or_default();
 
@@ -3664,7 +3745,8 @@ pub async fn seed_data(
                     StatusCode::FORBIDDEN,
                     Json(ResponPesan {
                         status: "gagal".to_string(),
-                        pesan: "Akses ditolak! Hanya Superadmin yang bisa menggenerate data dummy.".to_string(),
+                        pesan: "Akses ditolak! Hanya Superadmin yang bisa menggenerate data dummy."
+                            .to_string(),
                     }),
                 );
             }
@@ -3692,7 +3774,8 @@ pub async fn seed_data(
     // Hapus user dummy (semua kecuali admin, superadmin, dui)
     let _ = user::Entity::delete_many()
         .filter(user::Column::Role.is_not_in(["admin", "superadmin", "dui"]))
-        .exec(&db).await;
+        .exec(&db)
+        .await;
     let _ = kategori_sampah::Entity::delete_many().exec(&db).await;
     let _ = wilayah::Entity::delete_many().exec(&db).await;
 
@@ -3700,11 +3783,20 @@ pub async fn seed_data(
 
     // ===== FASE 1: Buat Wilayah Sesuai Daftar Sebenarnya =====
     let wilayah_data = vec![
-        ("BEM FAPERTA", "bem_faperta"), ("BEM SKHB", "bem_skhb"), ("BEM FPIK", "bem_fpik"),
-        ("BEM FAPET", "bem_fapet"), ("BEM FAHUTAN", "bem_fahutan"), ("BEM FATETA", "bem_fateta"),
-        ("BEM FMIPA", "bem_fmipa"), ("BEM FEM", "bem_fem"), ("BEM FEMA", "bem_fema"),
-        ("BEM VOKASI", "bem_vokasi"), ("BEM SB", "bem_sb"), ("BEM FK", "bem_fk"),
-        ("BEM SSMI", "bem_ssmi"), ("Ormawa Eksekutif PPKU", "ormawa_ppku")
+        ("BEM FAPERTA", "bem_faperta"),
+        ("BEM SKHB", "bem_skhb"),
+        ("BEM FPIK", "bem_fpik"),
+        ("BEM FAPET", "bem_fapet"),
+        ("BEM FAHUTAN", "bem_fahutan"),
+        ("BEM FATETA", "bem_fateta"),
+        ("BEM FMIPA", "bem_fmipa"),
+        ("BEM FEM", "bem_fem"),
+        ("BEM FEMA", "bem_fema"),
+        ("BEM VOKASI", "bem_vokasi"),
+        ("BEM SB", "bem_sb"),
+        ("BEM FK", "bem_fk"),
+        ("BEM SSMI", "bem_ssmi"),
+        ("Ormawa Eksekutif PPKU", "ormawa_ppku"),
     ];
     let mut wilayah_ids = Vec::new();
     for (nama, _) in &wilayah_data {
@@ -3758,13 +3850,16 @@ pub async fn seed_data(
     for (idx, &w_id) in wilayah_ids.iter().enumerate() {
         let (nama_wilayah, role_wilayah) = wilayah_data[idx];
 
-        let random_suffix: String = (0..5).map(|_| {
-            let i = rand::rng().random_range(0..charset.len());
-            charset[i] as char
-        }).collect();
+        let random_suffix: String = (0..5)
+            .map(|_| {
+                let i = rand::rng().random_range(0..charset.len());
+                charset[i] as char
+            })
+            .collect();
         let username = format!("{}_{}", role_wilayah, random_suffix.to_lowercase());
         let email = format!("{}@dummy.com", username);
-        let password_hash = hash("password123", DEFAULT_COST).unwrap_or_else(|_| "dummyhash".to_string());
+        let password_hash =
+            hash("password123", DEFAULT_COST).unwrap_or_else(|_| "dummyhash".to_string());
 
         let model = user::ActiveModel {
             username: Set(username.clone()),
@@ -3795,7 +3890,8 @@ pub async fn seed_data(
         bem_km_admin_id = u.id;
         bem_km_admin_username = u.username;
     } else {
-        let password_hash = hash("bemkm123", DEFAULT_COST).unwrap_or_else(|_| "dummyhash".to_string());
+        let password_hash =
+            hash("bemkm123", DEFAULT_COST).unwrap_or_else(|_| "dummyhash".to_string());
         let model = user::ActiveModel {
             username: Set("admin_bem_km".to_string()),
             email: Set("admin_bemkm@simth.ipb.ac.id".to_string()),
@@ -3818,7 +3914,8 @@ pub async fn seed_data(
         .await
         .unwrap_or(None);
     if dui_user.is_none() {
-        let password_hash = hash("dui123", DEFAULT_COST).unwrap_or_else(|_| "dummyhash".to_string());
+        let password_hash =
+            hash("dui123", DEFAULT_COST).unwrap_or_else(|_| "dummyhash".to_string());
         let model = user::ActiveModel {
             username: Set("admin_dui".to_string()),
             email: Set("dui@simth.ipb.ac.id".to_string()),
@@ -3834,7 +3931,8 @@ pub async fn seed_data(
 
     // ===== FASE 5: Buat Transaksi Dummy (6 bulan terakhir, trend positif) =====
     let now = Utc::now().naive_utc();
-    let mut total_saldo_wilayah: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
+    let mut total_saldo_wilayah: std::collections::HashMap<i32, i32> =
+        std::collections::HashMap::new();
 
     // 6 sesi: bulan -6, -5, -4, -3, -2, -1 (trend naik)
     for bulan_lalu in (1..=6).rev() {
@@ -3854,7 +3952,8 @@ pub async fn seed_data(
                 let berat = (2000 + rand::rng().random_range(500..3000)) * multiplier;
                 let total_nilai = (berat / 1000) * harga_per_kg;
 
-                let poin_kualitas = std::cmp::min(100, 70 + rand::rng().random_range(0..15) * multiplier / 2);
+                let poin_kualitas =
+                    std::cmp::min(100, 70 + rand::rng().random_range(0..15) * multiplier / 2);
 
                 // Variasi tanggal di dalam bulan
                 let offset_hari = rand::rng().random_range(0..15_i64);
@@ -3926,7 +4025,9 @@ pub async fn seed_data(
             status: Set("Aktif".to_string()),
             ..Default::default()
         };
-        let _ = tabungan_sampah::Entity::insert(tabungan_model).exec(&db).await;
+        let _ = tabungan_sampah::Entity::insert(tabungan_model)
+            .exec(&db)
+            .await;
     }
 
     // ===== FASE 7: Riwayat Harga (2 perubahan per kategori) =====
@@ -3960,18 +4061,54 @@ pub async fn seed_data(
 
     // ===== FASE 8: Notifikasi Dummy =====
     let notif_data = [
-        ("broadcast", "Pengumuman Sistem", "Selamat datang di SIM Tabung Hijau! Sistem telah diperbarui."),
-        ("broadcast", "Jadwal Setoran", "Setoran sampah bulan ini dibuka mulai tanggal 1-15."),
-        ("transaksi", "Transaksi Baru Dicatat", "Transaksi sampah plastik 25kg telah berhasil dicatat ke sistem."),
-        ("broadcast", "Pemenang Leaderboard", "Selamat kepada BEM FATETA sebagai juara KPI bulan lalu!"),
-        ("sistem", "Pemeliharaan Sistem", "Sistem akan maintenance pada hari Sabtu pukul 23:00-01:00."),
-        ("broadcast", "Target Bulanan", "Mari capai target 500kg sampah terkelola bulan ini!"),
-        ("transaksi", "Penarikan Saldo", "Penarikan saldo Rp 500.000 telah diproses untuk BEM FAPET."),
-        ("broadcast", "Harga Sampah Update", "Harga sampah plastik naik menjadi Rp 4.500/kg efektif hari ini."),
+        (
+            "broadcast",
+            "Pengumuman Sistem",
+            "Selamat datang di SIM Tabung Hijau! Sistem telah diperbarui.",
+        ),
+        (
+            "broadcast",
+            "Jadwal Setoran",
+            "Setoran sampah bulan ini dibuka mulai tanggal 1-15.",
+        ),
+        (
+            "transaksi",
+            "Transaksi Baru Dicatat",
+            "Transaksi sampah plastik 25kg telah berhasil dicatat ke sistem.",
+        ),
+        (
+            "broadcast",
+            "Pemenang Leaderboard",
+            "Selamat kepada BEM FATETA sebagai juara KPI bulan lalu!",
+        ),
+        (
+            "sistem",
+            "Pemeliharaan Sistem",
+            "Sistem akan maintenance pada hari Sabtu pukul 23:00-01:00.",
+        ),
+        (
+            "broadcast",
+            "Target Bulanan",
+            "Mari capai target 500kg sampah terkelola bulan ini!",
+        ),
+        (
+            "transaksi",
+            "Penarikan Saldo",
+            "Penarikan saldo Rp 500.000 telah diproses untuk BEM FAPET.",
+        ),
+        (
+            "broadcast",
+            "Harga Sampah Update",
+            "Harga sampah plastik naik menjadi Rp 4.500/kg efektif hari ini.",
+        ),
     ];
     for (i, (tipe, judul, deskripsi)) in notif_data.iter().enumerate() {
         let _waktu = now - Duration::days((notif_data.len() - i) as i64 * 3);
-        let target_role = if *tipe == "broadcast" { Some(serde_json::json!(["all"]).to_string()) } else { Some(serde_json::json!(["admin", "bem_km"]).to_string()) };
+        let target_role = if *tipe == "broadcast" {
+            Some(serde_json::json!(["all"]).to_string())
+        } else {
+            Some(serde_json::json!(["admin", "bem_km"]).to_string())
+        };
         let model = notifikasi::ActiveModel {
             tipe: Set(tipe.to_string()),
             judul: Set(judul.to_string()),
@@ -3987,11 +4124,14 @@ pub async fn seed_data(
     let total_kategori = kategori_ids.len();
     let _total_trx: i32 = total_saldo_wilayah.values().count() as i32;
 
-    (StatusCode::CREATED, Json(ResponPesan {
-        status: "sukses".to_string(),
-        pesan: format!(
-            "Data dummy komprehensif berhasil di-generate! {} wilayah, {} kategori, 6 bulan transaksi, tabungan, riwayat penarikan, riwayat harga, rekening, dan notifikasi.",
-            total_wilayah, total_kategori
-        )
-    }))
+    (
+        StatusCode::CREATED,
+        Json(ResponPesan {
+            status: "sukses".to_string(),
+            pesan: format!(
+                "Data dummy komprehensif berhasil di-generate! {} wilayah, {} kategori, 6 bulan transaksi, tabungan, riwayat penarikan, riwayat harga, rekening, dan notifikasi.",
+                total_wilayah, total_kategori
+            ),
+        }),
+    )
 }

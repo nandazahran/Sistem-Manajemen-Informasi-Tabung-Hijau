@@ -14,7 +14,10 @@ impl MigrationTrait for Migration {
                     .col(pk_auto(RiwayatPenarikan::Id))
                     .col(integer(RiwayatPenarikan::WilayahId))
                     .col(integer(RiwayatPenarikan::Nominal))
-                    .col(timestamp(RiwayatPenarikan::TanggalPenarikan).default(Expr::current_timestamp()))
+                    .col(
+                        timestamp(RiwayatPenarikan::TanggalPenarikan)
+                            .default(Expr::current_timestamp()),
+                    )
                     .col(string(RiwayatPenarikan::DitarikOleh))
                     .foreign_key(
                         ForeignKey::create()

@@ -15,7 +15,10 @@ impl MigrationTrait for Migration {
                     .col(integer(RiwayatHarga::KategoriId))
                     .col(integer(RiwayatHarga::HargaLama))
                     .col(integer(RiwayatHarga::HargaBaru))
-                    .col(timestamp(RiwayatHarga::TanggalPerubahan).default(Expr::current_timestamp()))
+                    .col(
+                        timestamp(RiwayatHarga::TanggalPerubahan)
+                            .default(Expr::current_timestamp()),
+                    )
                     .col(string(RiwayatHarga::DiubahOleh))
                     .foreign_key(
                         ForeignKey::create()
