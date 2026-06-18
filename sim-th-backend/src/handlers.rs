@@ -4103,7 +4103,7 @@ pub async fn seed_data(
         ),
     ];
     for (i, (tipe, judul, deskripsi)) in notif_data.iter().enumerate() {
-        let _waktu = now - Duration::days((notif_data.len() - i) as i64 * 3);
+        let waktu = now - Duration::days((notif_data.len() - i) as i64 * 3);
         let target_role = if *tipe == "broadcast" {
             Some(serde_json::json!(["all"]).to_string())
         } else {
@@ -4115,6 +4115,7 @@ pub async fn seed_data(
             deskripsi: Set(deskripsi.to_string()),
             target_role: Set(target_role),
             target_wilayah_id: Set(None),
+            waktu: Set(waktu),
             ..Default::default()
         };
         let _ = model.insert(&db).await;
@@ -4122,15 +4123,15 @@ pub async fn seed_data(
 
     let total_wilayah = wilayah_ids.len();
     let total_kategori = kategori_ids.len();
-    let _total_trx: i32 = total_saldo_wilayah.values().count() as i32;
+    let total_trx: i32 = total_saldo_wilayah.values().count() as i32;
 
     (
         StatusCode::CREATED,
         Json(ResponPesan {
             status: "sukses".to_string(),
             pesan: format!(
-                "Data dummy komprehensif berhasil di-generate! {} wilayah, {} kategori, 6 bulan transaksi, tabungan, riwayat penarikan, riwayat harga, rekening, dan notifikasi.",
-                total_wilayah, total_kategori
+                "Data dummy komprehensif berhasil di-generate! {} wilayah, {} kategori, {} total transaksi, tabungan, riwayat penarikan, riwayat harga, rekening, dan notifikasi.",
+                total_wilayah, total_kategori, total_trx
             ),
         }),
     )
