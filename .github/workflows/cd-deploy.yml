@@ -1,0 +1,134 @@
+# =============================================================
+# CD Deploy to Production — Build, Push, dan Deploy via SSH
+# =============================================================
+# Workflow ini mem-build Docker image backend & frontend,
+# push ke GitHub Container Registry (ghcr.io), lalu deploy
+# ke server production melalui SSH.
+#
+# ⚠️ STATUS: DISABLED (Home server belum siap)
+# Untuk mengaktifkan, ganti branch trigger ke [main]:
+#   on:
+#     push:
+#       branches: [main]
+
+name: CD Deploy to Production
+
+on:
+  push:
+    branches: [ignore-this-for-now] # Biar gak jalan otomatis dulu
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/sim-th-backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/sim-th-frontend
+
+jobs:
+  # -------------------------------------------------------
+  # Job 1: Build & Push Docker Images ke ghcr.io
+  # -------------------------------------------------------
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout kode sumber
+        uses: actions/checkout@v4
+
+      # ------- Setup Docker Buildx untuk fitur caching -------
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ------- Login ke GitHub Container Registry -------
+      - name: Login ke ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ------- Build & Push Backend Image -------
+      - name: Build & Push Backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./sim-th-backend
+          file: ./sim-th-backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:latest
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ------- Build & Push Frontend Image -------
+      - name: Build & Push Frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./sim-th-frontend
+          file: ./sim-th-frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:latest
+            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # -------------------------------------------------------
+  # Job 2: Deploy ke Server Production via SSH
+  # -------------------------------------------------------
+  deploy:
+    name: Deploy ke Server
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: production
+
+    steps:
+      - name: Checkout kode sumber
+        uses: actions/checkout@v4
+
+      # ------- Deploy via SSH -------
+      - name: Deploy ke server production
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+
+            echo "🚀 Memulai deployment SIM-TH..."
+
+            # Masuk ke direktori project
+            cd ~/Sistem-Manajemen-Informasi-Tabung-Hijau
+
+            # Pull perubahan terbaru dari GitHub
+            git pull origin main
+
+            # Login ke GitHub Container Registry
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Buat file .env production dari secrets
+            cat > .env << 'ENVEOF'
+            DB_USER=${{ secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_NAME=${{ secrets.DB_NAME }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            SMTP_HOST=${{ secrets.SMTP_HOST }}
+            SMTP_EMAIL=${{ secrets.SMTP_EMAIL }}
+            SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+            CLOUDFLARE_TOKEN=${{ secrets.CLOUDFLARE_TOKEN }}
+            ENVEOF
+
+            # Pull image terbaru dan deploy
+            docker compose -f compose.yml -f compose.prod.yml --profile production pull
+            docker compose -f compose.yml -f compose.prod.yml --profile production up -d
+
+            # Bersihkan image lama yang tidak terpakai
+            docker image prune -f
+
+            echo "✅ Deployment selesai!"

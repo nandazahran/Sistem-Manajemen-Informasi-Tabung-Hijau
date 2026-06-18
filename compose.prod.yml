@@ -1,0 +1,20 @@
+# =============================================================
+# compose.prod.yml — Override untuk Production Deployment
+# =============================================================
+# File ini digunakan BERSAMA compose.yml utama untuk mengganti
+# 'build' directive dengan 'image' dari GitHub Container Registry.
+#
+# Cara pakai:
+#   docker compose -f compose.yml -f compose.prod.yml --profile production up -d
+#
+# Dengan ini, server production tidak perlu build dari source code,
+# cukup pull image yang sudah di-build oleh GitHub Actions CI/CD.
+# Docker Compose akan menggunakan 'image' jika tersedia, dan
+# mengabaikan 'build' jika image sudah ada secara lokal.
+
+services:
+  backend:
+    image: ghcr.io/nandazahran/sim-th-backend:latest
+
+  frontend-prod:
+    image: ghcr.io/nandazahran/sim-th-frontend:latest

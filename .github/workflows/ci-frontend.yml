@@ -1,0 +1,81 @@
+# =============================================================
+# CI Frontend (React/Vite) — Linting dan Build Verification
+# =============================================================
+# Workflow ini berjalan otomatis setiap ada Push atau Pull Request
+# ke branch 'main' yang mengubah file di folder sim-th-frontend/.
+
+name: CI Frontend (React/Vite)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sim-th-frontend/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sim-th-frontend/**'
+
+# Jika ada push baru saat CI sedang jalan, batalkan yang lama
+concurrency:
+  group: ci-frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # -------------------------------------------------------
+  # Job 1: ESLint — Tangkap error & code quality issues
+  # -------------------------------------------------------
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sim-th-frontend
+
+    steps:
+      - name: Checkout kode sumber
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: sim-th-frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Jalankan ESLint
+        run: npm run lint
+
+  # -------------------------------------------------------
+  # Job 2: Build — Pastikan frontend bisa di-build tanpa error
+  # -------------------------------------------------------
+  build:
+    name: Vite Build
+    runs-on: ubuntu-latest
+    needs: lint
+    defaults:
+      run:
+        working-directory: sim-th-frontend
+
+    steps:
+      - name: Checkout kode sumber
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: sim-th-frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          # URL dummy agar Vite tidak error saat build di CI
+          VITE_API_URL: http://localhost:3000/api
