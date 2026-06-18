@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 
 function AdminNotifikasiPage() {
@@ -51,12 +51,12 @@ function AdminNotifikasiPage() {
 
 	useEffect(() => {
 		fetchNotifications();
-	}, []);
+	}, [fetchNotifications]);
 
 	const formatWaktuDB = (dateString) => {
 		if (!dateString) return "-";
 		const date = new Date(dateString);
-		if (isNaN(date.getTime())) return dateString;
+		if (Number.isNaN(date.getTime())) return dateString;
 		return date.toLocaleDateString("id-ID", {
 			day: "numeric",
 			month: "short",

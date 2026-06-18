@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 function DuiLayout({ children }) {
@@ -53,7 +53,7 @@ function DuiLayout({ children }) {
 			}
 		};
 		fetchProfil();
-	}, [navigate]);
+	}, []);
 
 	// FETCH DATA NOTIFIKASI DARI BACKEND
 	const fetchNavbarNotifications = async () => {
@@ -85,12 +85,12 @@ function DuiLayout({ children }) {
 		// Sinkronisasi otomatis tiap 15 detik biar angkanya update kalau ada pesan baru
 		const interval = setInterval(fetchNavbarNotifications, 15000);
 		return () => clearInterval(interval);
-	}, []);
+	}, [fetchNavbarNotifications]);
 
 	const formatWaktuNotif = (dateString) => {
 		if (!dateString) return "-";
 		const date = new Date(dateString);
-		if (isNaN(date.getTime())) return dateString;
+		if (Number.isNaN(date.getTime())) return dateString;
 		return date.toLocaleDateString("id-ID", {
 			day: "numeric",
 			month: "short",

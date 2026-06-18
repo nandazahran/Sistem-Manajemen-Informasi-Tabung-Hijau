@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import DashboardLayout from "../components/DashboardLayout";
 
 function NotifikasiPage() {
@@ -9,7 +9,7 @@ function NotifikasiPage() {
 	const formatWaktuDB = (dateString) => {
 		if (!dateString) return "-";
 		const date = new Date(dateString);
-		if (isNaN(date.getTime())) return dateString;
+		if (Number.isNaN(date.getTime())) return dateString;
 		return date.toLocaleDateString("id-ID", {
 			day: "numeric",
 			month: "short",
@@ -73,7 +73,7 @@ function NotifikasiPage() {
 		// Dengarkan event 'notifikasi_baru' dari DashboardLayout agar langsung ter-refresh otomatis
 		window.addEventListener("notifikasi_baru", fetchNotifikasi);
 		return () => window.removeEventListener("notifikasi_baru", fetchNotifikasi);
-	}, []);
+	}, [formatWaktuDB]);
 
 	const unreadCount = notifikasi.filter((n) => !n.read).length;
 

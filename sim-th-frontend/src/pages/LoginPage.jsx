@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/AuthLayout";
 
@@ -94,7 +94,7 @@ function LoginPage() {
 			} else {
 				setErrorMsg(data.pesan || "Username atau password salah.");
 			}
-		} catch (error) {
+		} catch (_error) {
 			setErrorMsg("Koneksi gagal. Cek apakah backend sudah nyala.");
 		} finally {
 			setIsLoading(false);

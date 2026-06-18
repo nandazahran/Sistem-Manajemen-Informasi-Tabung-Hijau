@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import DashboardLayout from "../components/DashboardLayout";
 
 function InputTransaksiPage() {
@@ -49,8 +49,8 @@ function InputTransaksiPage() {
 			const token =
 				localStorage.getItem("token") || sessionStorage.getItem("token");
 			const payload = {
-				kategori_id: parseInt(kategori),
-				wilayah_id: parseInt(wilayahId),
+				kategori_id: parseInt(kategori, 10),
+				wilayah_id: parseInt(wilayahId, 10),
 				berat_gram: parseFloat(berat) * 1000,
 				poin_kualitas: 30, // Default maksimal: Sampah Bersih
 				catatan: catatan || "Pencatatan standar",
@@ -77,7 +77,7 @@ function InputTransaksiPage() {
 			} else {
 				alert(`Gagal: ${data.pesan}`);
 			}
-		} catch (err) {
+		} catch (_err) {
 			alert("Koneksi gagal saat menyimpan transaksi.");
 		} finally {
 			setIsLoading(false);

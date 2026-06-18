@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
 	Bar,
 	BarChart,
@@ -136,7 +136,7 @@ function DuiMonitoringPage() {
 			t.nama_wilayah?.toLowerCase().includes(searchTerm.toLowerCase());
 		const matchWilayah =
 			selectedWilayahId === "Semua Wilayah" ||
-			t.wilayah_id === parseInt(selectedWilayahId);
+			t.wilayah_id === parseInt(selectedWilayahId, 10);
 		return matchBulan && matchTahun && matchSearch && matchWilayah;
 	});
 
@@ -401,8 +401,9 @@ function DuiMonitoringPage() {
 						<span className="truncate pr-2">
 							{selectedWilayahId === "Semua Wilayah"
 								? "Semua Wilayah"
-								: listWilayah.find((w) => w.id === parseInt(selectedWilayahId))
-										?.nama || "Semua Wilayah"}
+								: listWilayah.find(
+										(w) => w.id === parseInt(selectedWilayahId, 10),
+									)?.nama || "Semua Wilayah"}
 						</span>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -508,7 +509,7 @@ function DuiMonitoringPage() {
 						<div className="flex flex-col">
 							<button
 								onClick={() =>
-									setSelectedYear((parseInt(selectedYear) + 1).toString())
+									setSelectedYear((parseInt(selectedYear, 10) + 1).toString())
 								}
 								className="text-gray-400 hover:text-[#0B4D1E] p-0.5"
 							>
@@ -529,7 +530,7 @@ function DuiMonitoringPage() {
 							</button>
 							<button
 								onClick={() =>
-									setSelectedYear((parseInt(selectedYear) - 1).toString())
+									setSelectedYear((parseInt(selectedYear, 10) - 1).toString())
 								}
 								className="text-gray-400 hover:text-[#0B4D1E] p-0.5"
 							>
@@ -722,7 +723,7 @@ function DuiMonitoringPage() {
 										labelLine={false}
 										style={{ fontSize: "11px", fontWeight: "bold" }}
 									>
-										{pieDataWilayah.map((entry, index) => (
+										{pieDataWilayah.map((_entry, index) => (
 											<Cell
 												key={`cell-${index}`}
 												fill={COLORS[index % COLORS.length]}
@@ -773,7 +774,7 @@ function DuiMonitoringPage() {
 										labelLine={false}
 										style={{ fontSize: "11px", fontWeight: "bold" }}
 									>
-										{pieDataKategori.map((entry, index) => (
+										{pieDataKategori.map((_entry, index) => (
 											<Cell
 												key={`cell-${index}`}
 												fill={COLORS[index % COLORS.length]}
@@ -966,7 +967,9 @@ function DuiMonitoringPage() {
 										<div className="flex flex-col">
 											<button
 												onClick={() =>
-													setExportYear((parseInt(exportYear) + 1).toString())
+													setExportYear(
+														(parseInt(exportYear, 10) + 1).toString(),
+													)
 												}
 												className="text-gray-400 hover:text-[#0B4D1E] p-0.5"
 											>
@@ -987,7 +990,9 @@ function DuiMonitoringPage() {
 											</button>
 											<button
 												onClick={() =>
-													setExportYear((parseInt(exportYear) - 1).toString())
+													setExportYear(
+														(parseInt(exportYear, 10) - 1).toString(),
+													)
 												}
 												className="text-gray-400 hover:text-[#0B4D1E] p-0.5"
 											>

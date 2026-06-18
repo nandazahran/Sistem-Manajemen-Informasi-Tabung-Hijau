@@ -1,10 +1,10 @@
 import AOS from "aos";
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import "aos/dist/aos.css";
 
 function AuthLayout({ children, title, subtitle }) {
-	const location = useLocation(); // Buat deteksi perpindahan URL
+	const _location = useLocation(); // Buat deteksi perpindahan URL
 
 	useEffect(() => {
 		AOS.init({ duration: 600, once: true });
@@ -13,7 +13,7 @@ function AuthLayout({ children, title, subtitle }) {
 	// Refresh animasi setiap kali pindah halaman (misal: login -> register)
 	useEffect(() => {
 		AOS.refresh();
-	}, [location.pathname]);
+	}, []);
 
 	return (
 		// Tambahin data-aos="fade-in" biar layarnya transisi mulus

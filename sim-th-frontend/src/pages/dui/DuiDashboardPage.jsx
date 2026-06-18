@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
 	Bar,
@@ -189,7 +189,7 @@ function DuiDashboardPage() {
 			}
 		};
 		fetchDuiDashboard();
-	}, []);
+	}, [stats]);
 
 	const COLORS_KATEGORI = ["#125B2A", "#F4A300", "#8FA57A", "#EAE5DA"];
 	const COLORS_WILAYAH = [
@@ -405,7 +405,7 @@ function DuiDashboardPage() {
 										labelLine={false}
 										style={{ fontSize: "11px", fontWeight: "bold" }}
 									>
-										{pieKategori.map((entry, index) => (
+										{pieKategori.map((_entry, index) => (
 											<Cell
 												key={`cell-${index}`}
 												fill={COLORS_KATEGORI[index % COLORS_KATEGORI.length]}
@@ -450,7 +450,7 @@ function DuiDashboardPage() {
 										labelLine={false}
 										style={{ fontSize: "11px", fontWeight: "bold" }}
 									>
-										{pieWilayah.map((entry, index) => (
+										{pieWilayah.map((_entry, index) => (
 											<Cell
 												key={`cell-${index}`}
 												fill={COLORS_WILAYAH[index % COLORS_WILAYAH.length]}

@@ -103,12 +103,12 @@ function DashboardLayout({ children }) {
 			}
 		};
 		fetchProfil();
-	}, [navigate]);
+	}, []);
 
 	const formatWaktuNotif = React.useCallback((dateString) => {
 		if (!dateString) return "-";
 		const date = new Date(dateString);
-		if (isNaN(date.getTime())) return dateString;
+		if (Number.isNaN(date.getTime())) return dateString;
 		return date.toLocaleDateString("id-ID", {
 			day: "numeric",
 			month: "short",
@@ -163,7 +163,7 @@ function DashboardLayout({ children }) {
 			const baseUrl = import.meta.env.VITE_API_URL;
 			if (!baseUrl) return;
 
-			const wsUrl = baseUrl.replace(/^http/, "ws") + "/notifikasi/ws";
+			const wsUrl = `${baseUrl.replace(/^http/, "ws")}/notifikasi/ws`;
 			const ws = new WebSocket(wsUrl);
 
 			ws.onmessage = (event) => {
@@ -171,10 +171,8 @@ function DashboardLayout({ children }) {
 					const notifBaru = JSON.parse(event.data);
 					let shouldShow = false;
 
-					if (notifBaru.target_role && notifBaru.target_role.includes("all"))
-						shouldShow = true;
-					if (notifBaru.target_role && notifBaru.target_role.includes(rawRole))
-						shouldShow = true;
+					if (notifBaru.target_role?.includes("all")) shouldShow = true;
+					if (notifBaru.target_role?.includes(rawRole)) shouldShow = true;
 					if (
 						notifBaru.target_wilayah_id &&
 						notifBaru.target_wilayah_id === wilayahId
@@ -193,7 +191,7 @@ function DashboardLayout({ children }) {
 			return () => {
 				ws.close();
 			};
-		} catch (err) {
+		} catch (_err) {
 			console.error("WebSocket not configured/running");
 		}
 	}, [rawRole, wilayahId, fetchNavbarNotifications]);

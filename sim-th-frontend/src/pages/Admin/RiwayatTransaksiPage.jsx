@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 
 function RiwayatTransaksiPage() {
@@ -38,7 +38,7 @@ function RiwayatTransaksiPage() {
 				const result = await response.json();
 
 				if (result.status === "sukses" && result.data) {
-					const mapped = result.data.map((item, idx) => ({
+					const mapped = result.data.map((item, _idx) => ({
 						id: item.id,
 						id_trx: `#${String(item.id).padStart(4, "0")}`,
 						tanggal: new Date(item.tanggal).toLocaleDateString("id-ID", {
@@ -65,7 +65,7 @@ function RiwayatTransaksiPage() {
 			}
 		};
 		fetchRiwayat();
-	}, []);
+	}, [formatRp]);
 
 	const filteredData = historyData.filter((item) => {
 		const term = searchTerm.toLowerCase();

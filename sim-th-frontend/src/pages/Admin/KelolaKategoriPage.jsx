@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/AdminLayout";
 
@@ -57,7 +57,7 @@ function KelolaKategoriPage() {
 
 	useEffect(() => {
 		fetchCategories();
-	}, []);
+	}, [fetchCategories]);
 
 	// Logic Filter
 	const filteredCategories = categories.filter((c) => {
@@ -103,7 +103,7 @@ function KelolaKategoriPage() {
 					headers,
 					body: JSON.stringify({
 						nama_kategori: formName,
-						harga_per_kg: parseInt(formHarga),
+						harga_per_kg: parseInt(formHarga, 10),
 					}),
 				});
 				const result = await res.json();
@@ -120,7 +120,7 @@ function KelolaKategoriPage() {
 					headers,
 					body: JSON.stringify({
 						nama_kategori: formName,
-						harga_per_kg: parseInt(formHarga),
+						harga_per_kg: parseInt(formHarga, 10),
 					}),
 				});
 				const result = await res.json();

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
 	Bar,
 	BarChart,
@@ -320,7 +320,7 @@ function LaporanPage() {
 						<div className="flex flex-col">
 							<button
 								onClick={() =>
-									setSelectedYear((parseInt(selectedYear) + 1).toString())
+									setSelectedYear((parseInt(selectedYear, 10) + 1).toString())
 								}
 								className="text-gray-400 hover:text-[#0B4D1E] p-0.5"
 							>
@@ -341,7 +341,7 @@ function LaporanPage() {
 							</button>
 							<button
 								onClick={() =>
-									setSelectedYear((parseInt(selectedYear) - 1).toString())
+									setSelectedYear((parseInt(selectedYear, 10) - 1).toString())
 								}
 								className="text-gray-400 hover:text-[#0B4D1E] p-0.5"
 							>
@@ -658,7 +658,7 @@ function LaporanPage() {
 											labelLine={false}
 											style={{ fontSize: "12px", fontWeight: "bold" }}
 										>
-											{pieDataKategori.map((entry, index) => (
+											{pieDataKategori.map((_entry, index) => (
 												<Cell
 													key={`cell-${index}`}
 													fill={COLORS[index % COLORS.length]}
@@ -739,7 +739,7 @@ function LaporanPage() {
 										<button
 											type="button"
 											onClick={() =>
-												setExportYear((parseInt(exportYear) + 1).toString())
+												setExportYear((parseInt(exportYear, 10) + 1).toString())
 											}
 											className="text-gray-400 hover:text-[#0B4D1E] p-0.5"
 										>
@@ -761,7 +761,7 @@ function LaporanPage() {
 										<button
 											type="button"
 											onClick={() =>
-												setExportYear((parseInt(exportYear) - 1).toString())
+												setExportYear((parseInt(exportYear, 10) - 1).toString())
 											}
 											className="text-gray-400 hover:text-[#0B4D1E] p-0.5"
 										>

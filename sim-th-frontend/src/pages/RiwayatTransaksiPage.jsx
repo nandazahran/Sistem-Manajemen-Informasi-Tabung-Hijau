@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import DashboardLayout from "../components/DashboardLayout";
 
 function RiwayatTransaksiPage() {
@@ -35,7 +35,7 @@ function RiwayatTransaksiPage() {
 		if (!isoString) return "-";
 		try {
 			const d = new Date(isoString);
-			if (isNaN(d.getTime())) return "-";
+			if (Number.isNaN(d.getTime())) return "-";
 			const m = d.getMonth();
 			const y = d.getFullYear();
 			if (m <= 1) return `Jan - Feb ${y}`;
@@ -44,7 +44,7 @@ function RiwayatTransaksiPage() {
 			if (m <= 7) return `Jul - Ags ${y}`;
 			if (m <= 9) return `Sep - Okt ${y}`;
 			return `Nov - Des ${y}`;
-		} catch (e) {
+		} catch (_e) {
 			return "-";
 		}
 	};
@@ -60,13 +60,13 @@ function RiwayatTransaksiPage() {
 		if (!isoString) return "-";
 		try {
 			const date = new Date(isoString);
-			if (isNaN(date.getTime())) return "-";
+			if (Number.isNaN(date.getTime())) return "-";
 			return date.toLocaleDateString("id-ID", {
 				day: "numeric",
 				month: "long",
 				year: "numeric",
 			});
-		} catch (e) {
+		} catch (_e) {
 			return "-";
 		}
 	};
@@ -317,7 +317,7 @@ function RiwayatTransaksiPage() {
 											onClick={() => {
 												setFilterBulan(opt);
 												setIsMonthPickerOpen(false);
-												setFilterTahun(parseInt(opt.slice(-4)));
+												setFilterTahun(parseInt(opt.slice(-4), 10));
 											}}
 											className={`py-3 rounded-xl text-xs font-bold transition-colors ${filterBulan === opt ? "bg-[#0B4D1E] text-white" : "bg-[#F5EFE6] text-[#0B4D1E] hover:bg-[#F4A300] hover:text-white"}`}
 										>

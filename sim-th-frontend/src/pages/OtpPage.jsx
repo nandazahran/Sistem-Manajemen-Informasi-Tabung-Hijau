@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/AuthLayout";
 
@@ -14,7 +14,7 @@ function OtpPage() {
 
 	const handleChange = (index, value) => {
 		// Cuma bolehin ngetik angka
-		if (isNaN(value)) return;
+		if (Number.isNaN(value)) return;
 
 		const newOtp = [...otp];
 		// Ambil karakter terakhir aja biar nggak numpuk kalau ngetik cepet
@@ -92,7 +92,7 @@ function OtpPage() {
 			} else {
 				setErrorMsg(data.pesan || "Kode OTP salah. Silakan coba lagi.");
 			}
-		} catch (error) {
+		} catch (_error) {
 			setErrorMsg("Gagal terhubung ke server.");
 		} finally {
 			setIsLoading(false);

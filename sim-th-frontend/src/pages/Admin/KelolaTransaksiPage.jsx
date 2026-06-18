@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 
 function KelolaTransaksiPage() {
@@ -34,16 +34,16 @@ function KelolaTransaksiPage() {
 	const [filterBulan, setFilterBulan] = useState("");
 	const [filterStatus, setFilterStatus] = useState("");
 
-	const [isWilayahOpen, setIsWilayahOpen] = useState(false);
-	const [isKategoriOpen, setIsKategoriOpen] = useState(false);
-	const [isBulanOpen, setIsBulanOpen] = useState(false);
-	const [isStatusOpen, setIsStatusOpen] = useState(false);
+	const [_isWilayahOpen, _setIsWilayahOpen] = useState(false);
+	const [_isKategoriOpen, _setIsKategoriOpen] = useState(false);
+	const [_isBulanOpen, _setIsBulanOpen] = useState(false);
+	const [_isStatusOpen, _setIsStatusOpen] = useState(false);
 
 	// Data from Backend
 	const [transactions, setTransactions] = useState([]);
 	const [wilayahs, setWilayahs] = useState([]);
 	const [categories, setCategories] = useState([]);
-	const [loading, setLoading] = useState(true);
+	const [_loading, setLoading] = useState(true);
 
 	const opsiPenilaian = [
 		"Sangat Baik",
@@ -146,7 +146,7 @@ function KelolaTransaksiPage() {
 
 	useEffect(() => {
 		fetchData();
-	}, []);
+	}, [fetchData]);
 
 	// Derived unique months from transactions for filter
 	const uniqueMonths = [
@@ -178,7 +178,7 @@ function KelolaTransaksiPage() {
 		setToastMessage({ msg, type });
 		setTimeout(() => setToastMessage(""), 3000);
 	};
-	const closeAllDropdowns = () => {}; // No longer needed with datalist
+	const _closeAllDropdowns = () => {}; // No longer needed with datalist
 
 	const handleView = (tx) => {
 		setSelectedTx(tx);
@@ -189,7 +189,7 @@ function KelolaTransaksiPage() {
 	const handleEdit = (tx) => {
 		setSelectedTx(tx);
 		const d = new Date(tx.tanggal_raw);
-		const tgl = isNaN(d) ? "" : d.toISOString().split("T")[0];
+		const tgl = Number.isNaN(d) ? "" : d.toISOString().split("T")[0];
 		setEditForm({
 			tanggal: tgl,
 			wilayah: tx.wilayah,
@@ -237,7 +237,7 @@ function KelolaTransaksiPage() {
 				(nilaiMap[editForm.penilaian.pemilahan] || 0) +
 				(nilaiMap[editForm.penilaian.kondisi] || 0);
 			const payload = {
-				kategori_id: parseInt(editForm.kategori_id),
+				kategori_id: parseInt(editForm.kategori_id, 10),
 				berat_gram: Math.round(parseFloat(editForm.berat) * 1000),
 				poin_kualitas: totalPoin || selectedTx.poin_kualitas, // default to previous if untouched
 				catatan: editForm.catatan,

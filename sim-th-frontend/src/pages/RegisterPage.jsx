@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/AuthLayout";
 
@@ -82,7 +82,7 @@ function RegisterPage() {
 					data.pesan || "Pendaftaran gagal. Periksa kembali data Anda.",
 				);
 			}
-		} catch (error) {
+		} catch (_error) {
 			setErrorMsg("Koneksi gagal. Pastikan backend server sudah berjalan.");
 		} finally {
 			setIsLoading(false);

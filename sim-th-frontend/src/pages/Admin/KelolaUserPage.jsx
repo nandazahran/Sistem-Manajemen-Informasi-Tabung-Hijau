@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 
 // Helper: Mapping kode role backend → label tampilan
@@ -10,8 +10,8 @@ const ROLE_DISPLAY = {
 
 function getRoleLabel(role) {
 	if (ROLE_DISPLAY[role]) return ROLE_DISPLAY[role];
-	if (role && role.startsWith("bem_")) return "BEM Wilayah";
-	if (role && role.startsWith("ormawa_")) return "Ormawa";
+	if (role?.startsWith("bem_")) return "BEM Wilayah";
+	if (role?.startsWith("ormawa_")) return "Ormawa";
 	return role || "-";
 }
 
@@ -115,7 +115,7 @@ function KelolaUserPage() {
 	useEffect(() => {
 		fetchUsers();
 		fetchWilayah();
-	}, []);
+	}, [fetchWilayah, fetchUsers]);
 
 	// ========== FILTER LOGIC ==========
 	const filteredUsers = users.filter((u) => {
@@ -136,7 +136,7 @@ function KelolaUserPage() {
 		(u) => u.role === "admin" || u.role === "bem_km",
 	).length;
 	const totalBEM = users.filter(
-		(u) => u.role && u.role.startsWith("bem_") && u.role !== "bem_km",
+		(u) => u.role?.startsWith("bem_") && u.role !== "bem_km",
 	).length;
 	const totalAktif = users.filter((u) => u.status === "Aktif").length;
 
@@ -154,7 +154,7 @@ function KelolaUserPage() {
 		try {
 			const payload = JSON.parse(atob(token.split(".")[1]));
 			return payload.sub;
-		} catch (e) {
+		} catch (_e) {
 			return null;
 		}
 	};
@@ -201,7 +201,7 @@ function KelolaUserPage() {
 			} else {
 				showToast(data.pesan || "Gagal menambahkan user.", "error");
 			}
-		} catch (err) {
+		} catch (_err) {
 			showToast("Gagal koneksi ke server.", "error");
 		} finally {
 			setSubmitting(false);
@@ -235,7 +235,7 @@ function KelolaUserPage() {
 			} else {
 				showToast(data.pesan || "Gagal mengupdate user.", "error");
 			}
-		} catch (err) {
+		} catch (_err) {
 			showToast("Gagal koneksi ke server.", "error");
 		} finally {
 			setSubmitting(false);
@@ -257,7 +257,7 @@ function KelolaUserPage() {
 			} else {
 				showToast(data.pesan || "Gagal menghapus user.", "error");
 			}
-		} catch (err) {
+		} catch (_err) {
 			showToast("Gagal koneksi ke server.", "error");
 		} finally {
 			setSubmitting(false);
@@ -288,7 +288,7 @@ function KelolaUserPage() {
 			} else {
 				showToast(data.pesan || "Gagal men-generate data.", "error");
 			}
-		} catch (err) {
+		} catch (_err) {
 			showToast("Gagal koneksi ke server.", "error");
 		} finally {
 			setSubmitting(false);
@@ -299,8 +299,8 @@ function KelolaUserPage() {
 	const detectRoleType = (roleCode) => {
 		if (["admin", "dui", "bem_km", "ormawa_ppku"].includes(roleCode))
 			return roleCode;
-		if (roleCode && roleCode.startsWith("bem_")) return "bem_wilayah";
-		if (roleCode && roleCode.startsWith("ormawa_")) return "ormawa_ppku";
+		if (roleCode?.startsWith("bem_")) return "bem_wilayah";
+		if (roleCode?.startsWith("ormawa_")) return "ormawa_ppku";
 		return "bem_wilayah";
 	};
 

@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/AuthLayout";
 
 function ResetPasswordPage() {
@@ -25,7 +25,7 @@ function ResetPasswordPage() {
 	}, [emailTerdeteksi, navigate]);
 
 	const handleOtpChange = (element, index) => {
-		if (isNaN(element.value)) return false;
+		if (Number.isNaN(element.value)) return false;
 
 		const newOtp = [...otp];
 		newOtp[index] = element.value;
@@ -98,7 +98,7 @@ function ResetPasswordPage() {
 				});
 				setStep(1);
 			}
-		} catch (error) {
+		} catch (_error) {
 			setPesan({ tipe: "error", teks: "Koneksi gagal. Cek backend Nanda." });
 			setStep(1);
 		} finally {

@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
 	Bar,
 	BarChart,
 	CartesianGrid,
 	Cell,
-	Legend,
 	Line,
 	LineChart,
 	Pie,
@@ -19,7 +18,7 @@ import bannerImg from "../assets/DB-gambar-banner.png";
 import DashboardLayout from "../components/DashboardLayout";
 
 function DashboardPage() {
-	const navigate = useNavigate();
+	const _navigate = useNavigate();
 
 	// STATE UNTUK DATA API (KOSONGAN/LOADING STATE)
 	const [stats, setStats] = useState({
@@ -47,16 +46,16 @@ function DashboardPage() {
 
 				// Extract username and wilayah_id from token payload directly
 				const payload = JSON.parse(atob(token.split(".")[1]));
-				const usernameJwt = payload.sub;
+				const _usernameJwt = payload.sub;
 				let activeWilayahId = payload.wilayah_id;
 
 				const userStr =
 					localStorage.getItem("user") || sessionStorage.getItem("user");
 				const userData = userStr ? JSON.parse(userStr) : null;
 				let targetNama = "BEM Wilayah";
-				if (userData && userData.nama_wilayah) {
+				if (userData?.nama_wilayah) {
 					targetNama = userData.nama_wilayah;
-				} else if (userData && userData.nama) {
+				} else if (userData?.nama) {
 					targetNama = userData.nama;
 				}
 
@@ -232,7 +231,7 @@ function DashboardPage() {
 		};
 
 		fetchDashboardData();
-	}, [navigate]);
+	}, []);
 
 	const formatRp = (angka) =>
 		new Intl.NumberFormat("id-ID", {
@@ -514,7 +513,7 @@ function DashboardPage() {
 										labelLine={false}
 										style={{ fontSize: "11px", fontWeight: "bold" }}
 									>
-										{breakdownKategori.map((entry, index) => (
+										{breakdownKategori.map((_entry, index) => (
 											<Cell
 												key={`cell-${index}`}
 												fill={

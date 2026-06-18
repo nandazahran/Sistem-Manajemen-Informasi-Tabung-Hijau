@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import DuiLayout from "../../components/DuiLayout";
 
 function DuiNotifikasiPage() {
@@ -46,7 +46,7 @@ function DuiNotifikasiPage() {
 
 	useEffect(() => {
 		fetchNotifications();
-	}, []);
+	}, [fetchNotifications]);
 
 	// Hitung jumlah pesan belum dibaca secara dinamis
 	const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -151,7 +151,7 @@ function DuiNotifikasiPage() {
 		if (!dateString) return "-";
 		// Menghandle format timestamp dari database postgres/sea_orm
 		const date = new Date(dateString);
-		if (isNaN(date.getTime())) return dateString; // Fallback text aslinya jika parsing gagal
+		if (Number.isNaN(date.getTime())) return dateString; // Fallback text aslinya jika parsing gagal
 		return date.toLocaleDateString("id-ID", {
 			day: "numeric",
 			month: "short",

@@ -1,5 +1,5 @@
 import AOS from "aos";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "aos/dist/aos.css";
 
@@ -33,7 +33,7 @@ function LandingPage() {
 				} else {
 					navigate("/dashboard");
 				}
-			} catch (err) {
+			} catch (_err) {
 				// Abaikan jika error parsing
 			}
 		}
@@ -72,7 +72,7 @@ function LandingPage() {
 					teks: data.pesan || "Gagal mengirim pesan.",
 				});
 			}
-		} catch (error) {
+		} catch (_error) {
 			setStatusPesan({
 				tipe: "error",
 				teks: "Koneksi gagal. Pastikan backend sudah menyala.",

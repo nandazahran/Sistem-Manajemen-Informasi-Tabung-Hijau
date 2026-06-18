@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "../components/DashboardLayout";
 
@@ -23,9 +23,9 @@ function ProfilPage() {
 
 	// State untuk Modal Password
 	const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-	const [showCurrent, setShowCurrent] = useState(false);
-	const [showNew, setShowNew] = useState(false);
-	const [showConfirm, setShowConfirm] = useState(false);
+	const [showCurrent, _setShowCurrent] = useState(false);
+	const [showNew, _setShowNew] = useState(false);
+	const [showConfirm, _setShowConfirm] = useState(false);
 	const [passData, setPassData] = useState({
 		current: "",
 		new: "",
@@ -95,7 +95,7 @@ function ProfilPage() {
 			}
 		};
 		fetchProfile();
-	}, []);
+	}, [formatRole]);
 
 	const openEditModal = () => {
 		setEditData(formData);
@@ -143,7 +143,7 @@ function ProfilPage() {
 			} else {
 				alert(`Gagal menyimpan: ${data.pesan}`);
 			}
-		} catch (error) {
+		} catch (_error) {
 			alert(
 				"Terjadi kesalahan koneksi ke server, profil diperbarui secara lokal.",
 			);
@@ -198,7 +198,7 @@ function ProfilPage() {
 			} else {
 				alert(`Gagal: ${data.pesan}`);
 			}
-		} catch (error) {
+		} catch (_error) {
 			alert(
 				"Gagal menyambung ke server, simulasi pengubahan password berhasil.",
 			);

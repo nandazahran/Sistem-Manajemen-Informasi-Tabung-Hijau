@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 
 function KelolaWilayahPage() {
@@ -25,7 +25,7 @@ function KelolaWilayahPage() {
 
 	// Data dari Backend
 	const [wilayahData, setWilayahData] = useState([]);
-	const [loading, setLoading] = useState(true);
+	const [_loading, setLoading] = useState(true);
 
 	const getToken = () =>
 		localStorage.getItem("token") || sessionStorage.getItem("token");
@@ -103,7 +103,7 @@ function KelolaWilayahPage() {
 
 	useEffect(() => {
 		fetchData();
-	}, []);
+	}, [fetchData]);
 
 	// Logic Filter
 	const filteredWilayah = wilayahData.filter((w) => {
@@ -202,13 +202,13 @@ function KelolaWilayahPage() {
 	const totalWilayah = wilayahData.length;
 	const wilayahAktif = wilayahData.filter((w) => w.status === "Aktif").length;
 	const totalSampah = wilayahData.reduce(
-		(acc, w) => acc + parseInt(w.kontribusi || 0),
+		(acc, w) => acc + parseInt(w.kontribusi || 0, 10),
 		0,
 	);
 	const avgKpi =
 		wilayahData.length > 0
 			? Math.round(
-					wilayahData.reduce((acc, w) => acc + parseInt(w.kpi || 0), 0) /
+					wilayahData.reduce((acc, w) => acc + parseInt(w.kpi || 0, 10), 0) /
 						wilayahData.length,
 				)
 			: 0;

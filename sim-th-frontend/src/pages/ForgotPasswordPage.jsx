@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/AuthLayout";
 
@@ -41,7 +41,7 @@ function ForgotPasswordPage() {
 				// Kalau email gak ketemu / error
 				setPesan({ tipe: "error", teks: data.pesan || "Gagal mengirim OTP" });
 			}
-		} catch (error) {
+		} catch (_error) {
 			setPesan({
 				tipe: "error",
 				teks: "Koneksi gagal. Pastikan backend menyala.",

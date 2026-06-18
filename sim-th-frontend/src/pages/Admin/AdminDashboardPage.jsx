@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
 	Bar,
@@ -213,7 +213,7 @@ function AdminDashboardPage() {
 			}
 		};
 		fetchAdminDashboard();
-	}, []);
+	}, [stats]);
 
 	return (
 		<AdminLayout>
@@ -486,7 +486,7 @@ function AdminDashboardPage() {
 										labelLine={false}
 										style={{ fontSize: "11px", fontWeight: "bold" }}
 									>
-										{pieKategori.map((entry, index) => (
+										{pieKategori.map((_entry, index) => (
 											<Cell
 												key={`cell-${index}`}
 												fill={COLORS_KATEGORI[index % COLORS_KATEGORI.length]}
@@ -532,7 +532,7 @@ function AdminDashboardPage() {
 										labelLine={false}
 										style={{ fontSize: "11px", fontWeight: "bold" }}
 									>
-										{pieWilayah.map((entry, index) => (
+										{pieWilayah.map((_entry, index) => (
 											<Cell
 												key={`cell-${index}`}
 												fill={
