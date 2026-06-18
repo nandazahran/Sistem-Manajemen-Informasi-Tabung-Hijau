@@ -146,6 +146,7 @@ function KelolaTransaksiPage() {
 
 	useEffect(() => {
 		fetchData();
+		// biome-ignore lint/correctness/useExhaustiveDependencies: prevent infinite loops from unstable function references
 	}, [fetchData]);
 
 	// Derived unique months from transactions for filter
@@ -534,6 +535,7 @@ function KelolaTransaksiPage() {
 									</td>
 									<td className="px-8 py-5 flex items-center justify-center gap-2">
 										<button
+											type="button"
 											onClick={() => handleView(tx)}
 											className="p-2 text-gray-400 hover:text-[#0B4D1E] hover:bg-[#EAE5DA] rounded-lg transition-all"
 											title="Detail & Nilai"
@@ -553,6 +555,7 @@ function KelolaTransaksiPage() {
 											</svg>
 										</button>
 										<button
+											type="button"
 											onClick={() => handleEdit(tx)}
 											className="p-2 text-gray-400 hover:text-[#F4A300] hover:bg-[#FDF6EA] rounded-lg transition-all"
 											title="Edit Transaksi"
@@ -567,6 +570,7 @@ function KelolaTransaksiPage() {
 											</svg>
 										</button>
 										<button
+											type="button"
 											onClick={() => handleDeleteClick(tx)}
 											className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
 											title="Hapus"
@@ -619,6 +623,7 @@ function KelolaTransaksiPage() {
 								</h3>
 							</div>
 							<button
+								type="button"
 								onClick={() => setIsDetailOpen(false)}
 								className="text-gray-500 hover:text-gray-800 transition-colors"
 							>
@@ -799,12 +804,14 @@ function KelolaTransaksiPage() {
 						{selectedTx.status === "Belum Dinilai" ? (
 							<div className="flex gap-4">
 								<button
+									type="button"
 									onClick={() => setIsDetailOpen(false)}
 									className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-4 rounded-full font-bold hover:bg-[#EAE5DA] transition-all"
 								>
 									Batal
 								</button>
 								<button
+									type="button"
 									onClick={savePenilaian}
 									className="flex-1 bg-[#125B2A] text-white py-4 rounded-full font-bold hover:bg-[#0B4D1E] transition-all shadow-md"
 								>
@@ -813,6 +820,7 @@ function KelolaTransaksiPage() {
 							</div>
 						) : (
 							<button
+								type="button"
 								onClick={() => setIsDetailOpen(false)}
 								className="w-full bg-[#125B2A] text-white py-4 rounded-full font-bold hover:bg-[#0B4D1E] transition-all"
 							>
@@ -850,6 +858,7 @@ function KelolaTransaksiPage() {
 								</h3>
 							</div>
 							<button
+								type="button"
 								onClick={() => setIsEditOpen(false)}
 								className="text-[#0B4D1E] hover:text-red-500 transition-colors"
 							>
@@ -948,6 +957,7 @@ function KelolaTransaksiPage() {
 									/>
 									<div className="flex flex-col border-l border-gray-300 pl-2">
 										<button
+											type="button"
 											onClick={() =>
 												setEditForm({
 													...editForm,
@@ -974,6 +984,7 @@ function KelolaTransaksiPage() {
 											</svg>
 										</button>
 										<button
+											type="button"
 											onClick={() =>
 												setEditForm({
 													...editForm,
@@ -1116,12 +1127,14 @@ function KelolaTransaksiPage() {
 
 						<div className="flex gap-4 mt-8">
 							<button
+								type="button"
 								onClick={() => setIsEditOpen(false)}
 								className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-4 rounded-2xl font-bold hover:bg-[#EAE5DA] transition-all"
 							>
 								Batal
 							</button>
 							<button
+								type="button"
 								onClick={saveEdit}
 								className="flex-1 bg-[#125B2A] text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#0B4D1E] shadow-md transition-all"
 							>
@@ -1176,12 +1189,14 @@ function KelolaTransaksiPage() {
 						</p>
 						<div className="flex gap-4">
 							<button
+								type="button"
 								onClick={() => setIsDeleteOpen(false)}
 								className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-3.5 rounded-2xl font-bold hover:bg-[#EAE5DA] transition-all"
 							>
 								Batal
 							</button>
 							<button
+								type="button"
 								onClick={confirmDelete}
 								className="flex-1 bg-red-500 text-white py-3.5 rounded-2xl font-bold hover:bg-red-600 shadow-md transition-all"
 							>

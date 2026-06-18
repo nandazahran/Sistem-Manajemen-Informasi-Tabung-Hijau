@@ -319,6 +319,7 @@ function LaporanPage() {
 						<span className="text-lg text-[#0B4D1E]">{selectedYear}</span>
 						<div className="flex flex-col">
 							<button
+								type="button"
 								onClick={() =>
 									setSelectedYear((parseInt(selectedYear, 10) + 1).toString())
 								}
@@ -340,6 +341,7 @@ function LaporanPage() {
 								</svg>
 							</button>
 							<button
+								type="button"
 								onClick={() =>
 									setSelectedYear((parseInt(selectedYear, 10) - 1).toString())
 								}
@@ -365,6 +367,7 @@ function LaporanPage() {
 
 					<div className="relative">
 						<button
+							type="button"
 							onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
 							className="bg-white text-gray-700 px-6 py-3.5 rounded-2xl flex items-center gap-3 font-bold shadow-sm hover:bg-gray-50 transition-all border border-gray-100 h-[52px]"
 						>
@@ -392,6 +395,7 @@ function LaporanPage() {
 								<div className="grid grid-cols-2 gap-2">
 									{periodeOptions.map((opt) => (
 										<button
+											type="button"
 											key={opt}
 											onClick={() => {
 												setSelectedMonth(opt);
@@ -405,6 +409,7 @@ function LaporanPage() {
 								</div>
 								{/* Tombol Semua Periode ditaruh paling bawah terpisah dari grid */}
 								<button
+									type="button"
 									onClick={() => {
 										setSelectedMonth("Semua Periode");
 										setIsMonthPickerOpen(false);
@@ -418,6 +423,7 @@ function LaporanPage() {
 					</div>
 
 					<button
+						type="button"
 						onClick={() => setIsExportModalOpen(true)}
 						className="bg-[#F4A300] text-white px-8 py-3.5 rounded-2xl font-bold flex items-center gap-2 hover:bg-[#d68e00] transition-all shadow-md"
 					>
@@ -706,6 +712,7 @@ function LaporanPage() {
 								</h3>
 							</div>
 							<button
+								type="button"
 								onClick={() => setIsExportModalOpen(false)}
 								className="text-gray-400 hover:text-gray-600 transition-colors p-1"
 							>
@@ -869,6 +876,7 @@ function LaporanPage() {
 						</div>
 
 						<button
+							type="button"
 							onClick={handleExport}
 							className="w-full bg-[#125B2A] text-white py-5 rounded-2xl font-bold mt-10 hover:bg-[#0B4D1E] hover:shadow-lg hover:-translate-y-1 transition-all flex items-center justify-center gap-3"
 						>

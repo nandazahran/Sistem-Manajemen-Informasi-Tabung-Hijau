@@ -115,6 +115,7 @@ function KelolaUserPage() {
 	useEffect(() => {
 		fetchUsers();
 		fetchWilayah();
+		// biome-ignore lint/correctness/useExhaustiveDependencies: prevent infinite loops from unstable function references
 	}, [fetchWilayah, fetchUsers]);
 
 	// ========== FILTER LOGIC ==========
@@ -375,6 +376,7 @@ function KelolaUserPage() {
 				<div className="flex flex-col md:flex-row gap-4">
 					{isSuperAdmin && (
 						<button
+							type="button"
 							onClick={handleGenerateSeed}
 							disabled={submitting}
 							className="bg-white text-[#0B4D1E] px-8 py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-gray-100 transition-all shadow-md disabled:opacity-50"
@@ -397,6 +399,7 @@ function KelolaUserPage() {
 						</button>
 					)}
 					<button
+						type="button"
 						onClick={() => setIsAddOpen(true)}
 						className="bg-[#F4A300] text-white px-8 py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#d68e00] transition-all shadow-md"
 					>
@@ -633,6 +636,7 @@ function KelolaUserPage() {
 											<td className="px-8 py-5 flex items-center justify-center gap-3">
 												{/* BUTTON EDIT */}
 												<button
+													type="button"
 													onClick={() => openEditModal(u)}
 													className="p-2 text-gray-400 hover:text-[#F4A300] hover:bg-[#FDF6EA] rounded-lg transition-all"
 													title="Edit Data"
@@ -648,6 +652,7 @@ function KelolaUserPage() {
 												</button>
 												{/* BUTTON HAPUS */}
 												<button
+													type="button"
 													onClick={() => openDeleteConfirm(u)}
 													title="Hapus User"
 													className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
@@ -730,6 +735,7 @@ function KelolaUserPage() {
 								</h3>
 							</div>
 							<button
+								type="button"
 								onClick={closeModals}
 								className="text-[#0B4D1E] hover:text-red-500 transition-colors"
 							>
@@ -889,12 +895,14 @@ function KelolaUserPage() {
 
 						<div className="flex gap-4 mt-8">
 							<button
+								type="button"
 								onClick={closeModals}
 								className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-4 rounded-2xl font-bold hover:bg-[#EAE5DA] transition-all"
 							>
 								Batal
 							</button>
 							<button
+								type="button"
 								onClick={handleSubmitAdd}
 								disabled={submitting}
 								className="flex-1 bg-[#125B2A] text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#0B4D1E] shadow-md transition-all disabled:opacity-50"
@@ -970,6 +978,7 @@ function KelolaUserPage() {
 								</h3>
 							</div>
 							<button
+								type="button"
 								onClick={closeModals}
 								className="text-[#0B4D1E] hover:text-red-500 transition-colors"
 							>
@@ -1144,12 +1153,14 @@ function KelolaUserPage() {
 
 						<div className="flex gap-4 mt-8">
 							<button
+								type="button"
 								onClick={closeModals}
 								className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-4 rounded-2xl font-bold hover:bg-[#EAE5DA] transition-all"
 							>
 								Batal
 							</button>
 							<button
+								type="button"
 								onClick={handleSubmitEdit}
 								disabled={submitting}
 								className="flex-1 bg-[#125B2A] text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#0B4D1E] shadow-md transition-all disabled:opacity-50"
@@ -1232,12 +1243,14 @@ function KelolaUserPage() {
 						</div>
 						<div className="flex gap-4">
 							<button
+								type="button"
 								onClick={closeModals}
 								className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-4 rounded-2xl font-bold hover:bg-[#EAE5DA] transition-all"
 							>
 								Batal
 							</button>
 							<button
+								type="button"
 								onClick={handleDeleteUser}
 								disabled={submitting}
 								className="flex-1 bg-red-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-600 shadow-md transition-all disabled:opacity-50"

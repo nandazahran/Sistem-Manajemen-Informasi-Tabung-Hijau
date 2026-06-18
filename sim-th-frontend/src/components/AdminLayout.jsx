@@ -36,6 +36,7 @@ function AdminLayout({ children }) {
 		fetchNavbarNotifications();
 		const interval = setInterval(fetchNavbarNotifications, 15000);
 		return () => clearInterval(interval);
+		// biome-ignore lint/correctness/useExhaustiveDependencies: prevent infinite loops from unstable function references
 	}, [fetchNavbarNotifications]);
 
 	const formatWaktuNotif = (dateString) => {
@@ -171,6 +172,7 @@ function AdminLayout({ children }) {
 
 				<div className="p-4 mb-4 mt-4">
 					<button
+						type="button"
 						onClick={handleLogout}
 						className="w-full flex items-center gap-4 px-6 py-3.5 text-green-100 hover:bg-red-500/20 hover:text-red-400 rounded-2xl transition-all duration-300 font-medium"
 					>
@@ -199,6 +201,7 @@ function AdminLayout({ children }) {
 				<header className="h-24 bg-white flex items-center justify-between px-10 sticky top-0 z-30 shadow-sm border-b border-gray-100">
 					<div className="flex items-center gap-6 flex-1">
 						<button
+							type="button"
 							onClick={() => setIsSidebarOpen(!isSidebarOpen)}
 							className="p-2 bg-gray-50 rounded-xl shadow-sm text-gray-600 hover:text-[#0B4D1E] hover:bg-gray-100 transition-all border border-gray-200"
 						>
@@ -245,6 +248,7 @@ function AdminLayout({ children }) {
 						{/* WRAPPER NOTIFIKASI DROPDOWN */}
 						<div className="relative">
 							<button
+								type="button"
 								onClick={() => setIsNotifOpen(!isNotifOpen)}
 								className="relative p-2 rounded-full hover:bg-gray-100 transition-colors focus:outline-none"
 							>
@@ -314,6 +318,7 @@ function AdminLayout({ children }) {
 									</div>
 									<div className="p-4 text-center bg-white border-t border-gray-100 hover:bg-gray-50 transition-colors">
 										<button
+											type="button"
 											onClick={() => {
 												setIsNotifOpen(false);
 												navigate("/admin/notifikasi");

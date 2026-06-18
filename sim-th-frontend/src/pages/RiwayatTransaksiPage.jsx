@@ -222,6 +222,7 @@ function RiwayatTransaksiPage() {
 						</label>
 						<div className="relative">
 							<button
+								type="button"
 								onClick={() => {
 									setIsKategoriOpen(!isKategoriOpen);
 									setIsMonthPickerOpen(false);
@@ -277,6 +278,7 @@ function RiwayatTransaksiPage() {
 						</label>
 						<div className="relative">
 							<button
+								type="button"
 								onClick={() => {
 									setIsMonthPickerOpen(!isMonthPickerOpen);
 									setIsKategoriOpen(false);
@@ -303,6 +305,7 @@ function RiwayatTransaksiPage() {
 							{isMonthPickerOpen && (
 								<div className="absolute top-full mt-2 left-0 w-full bg-white p-4 rounded-3xl shadow-2xl border border-gray-100 z-30 grid grid-cols-2 gap-2">
 									<button
+										type="button"
 										onClick={() => {
 											setFilterBulan("-------- ----");
 											setIsMonthPickerOpen(false);
@@ -313,6 +316,7 @@ function RiwayatTransaksiPage() {
 									</button>
 									{periodeOptions.map((opt) => (
 										<button
+											type="button"
 											key={opt}
 											onClick={() => {
 												setFilterBulan(opt);
@@ -340,6 +344,7 @@ function RiwayatTransaksiPage() {
 							</span>
 							<div className="flex flex-col">
 								<button
+									type="button"
 									onClick={() => setFilterTahun(filterTahun + 1)}
 									className="text-gray-400 hover:text-[#0B4D1E] p-0.5"
 								>
@@ -359,6 +364,7 @@ function RiwayatTransaksiPage() {
 									</svg>
 								</button>
 								<button
+									type="button"
 									onClick={() => setFilterTahun(filterTahun - 1)}
 									className="text-gray-400 hover:text-[#0B4D1E] p-0.5"
 								>
@@ -479,6 +485,7 @@ function RiwayatTransaksiPage() {
 									</td>
 									<td className="px-8 py-5 text-center">
 										<button
+											type="button"
 											onClick={() => setSelectedTrx(item)}
 											className="text-[#0B4D1E] font-bold hover:text-[#F4A300] transition-colors text-sm underline"
 										>
@@ -525,6 +532,7 @@ function RiwayatTransaksiPage() {
 								</h3>
 							</div>
 							<button
+								type="button"
 								onClick={() => setSelectedTrx(null)}
 								className="text-gray-400 hover:text-gray-600 transition-colors p-1"
 							>

@@ -298,6 +298,7 @@ function DashboardLayout({ children }) {
 
 				<div className="p-4 mb-4">
 					<button
+						type="button"
 						onClick={handleLogout}
 						className="w-full flex items-center gap-4 px-6 py-3.5 text-green-100 hover:bg-red-500/20 hover:text-red-400 rounded-2xl transition-all duration-300 font-medium text-left"
 					>
@@ -325,6 +326,7 @@ function DashboardLayout({ children }) {
 				<header className="h-24 bg-white flex items-center justify-between px-10 sticky top-0 z-30 shadow-sm border-b border-gray-100">
 					<div className="flex items-center gap-6 flex-1">
 						<button
+							type="button"
 							onClick={() => setIsSidebarOpen(!isSidebarOpen)}
 							className="p-2 bg-gray-50 rounded-xl shadow-sm text-gray-600 hover:text-[#0B4D1E] hover:bg-gray-100 transition-all border border-gray-200"
 						>
@@ -372,6 +374,7 @@ function DashboardLayout({ children }) {
 					<div className="flex items-center gap-6">
 						<div className="relative">
 							<button
+								type="button"
 								onClick={() => setShowNotifPopup(!showNotifPopup)}
 								className="relative p-2 rounded-full hover:bg-gray-100 transition-colors focus:outline-none"
 							>

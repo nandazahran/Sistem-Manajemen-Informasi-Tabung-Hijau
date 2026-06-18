@@ -214,6 +214,7 @@ function DuiDashboardPage() {
 						terpusat.
 					</p>
 					<button
+						type="button"
 						onClick={() => navigate("/dui/monitoring")}
 						className="bg-[#F4A300] text-white px-8 py-4 rounded-full font-bold flex items-center gap-2 hover:-translate-y-1 hover:shadow-lg transition-all duration-300"
 					>

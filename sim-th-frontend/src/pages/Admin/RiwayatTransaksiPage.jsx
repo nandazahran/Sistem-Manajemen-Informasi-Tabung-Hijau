@@ -65,6 +65,7 @@ function RiwayatTransaksiPage() {
 			}
 		};
 		fetchRiwayat();
+		// biome-ignore lint/correctness/useExhaustiveDependencies: prevent infinite loops from unstable function references
 	}, [formatRp]);
 
 	const filteredData = historyData.filter((item) => {
@@ -254,6 +255,7 @@ function RiwayatTransaksiPage() {
 								</h3>
 							</div>
 							<button
+								type="button"
 								onClick={() => setSelectedTrx(null)}
 								className="text-gray-500 hover:text-gray-800 transition-colors"
 							>
@@ -315,6 +317,7 @@ function RiwayatTransaksiPage() {
 							))}
 						</div>
 						<button
+							type="button"
 							onClick={() => setSelectedTrx(null)}
 							className="w-full bg-[#125B2A] text-white py-4 rounded-full font-bold mt-8 hover:bg-[#0B4D1E] transition-all"
 						>

@@ -229,6 +229,7 @@ function AdminDashboardPage() {
 						terpusat.
 					</p>
 					<button
+						type="button"
 						onClick={() => navigate("/admin/kelola-wilayah")}
 						className="bg-[#F4A300] text-white px-8 py-4 rounded-full font-bold flex items-center gap-2 hover:-translate-y-1 hover:shadow-lg transition-all duration-300"
 					>
@@ -289,6 +290,7 @@ function AdminDashboardPage() {
 						},
 					].map((act, i) => (
 						<button
+							type="button"
 							key={i}
 							onClick={() => navigate(act.p)}
 							className="bg-[#125B2A] hover:bg-[#0B4D1E] p-5 rounded-2xl flex items-center gap-4 transition-all group"
@@ -569,6 +571,7 @@ function AdminDashboardPage() {
 							Aktivitas Sistem
 						</h3>
 						<button
+							type="button"
 							onClick={() => navigate("/admin/aktivitas")}
 							className="text-sm font-bold text-[#0B4D1E] hover:text-[#F4A300] flex items-center gap-1 transition-colors"
 						>
@@ -637,6 +640,7 @@ function AdminDashboardPage() {
 							Riwayat Terbaru
 						</h3>
 						<button
+							type="button"
 							onClick={() => navigate("/admin/riwayat-transaksi")}
 							className="text-sm font-bold text-[#0B4D1E] hover:text-[#F4A300] flex items-center gap-1 transition-colors"
 						>

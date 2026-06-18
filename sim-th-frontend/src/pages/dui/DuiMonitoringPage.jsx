@@ -345,6 +345,7 @@ function DuiMonitoringPage() {
 					</div>
 				</div>
 				<button
+					type="button"
 					onClick={() => setIsExportOpen(true)}
 					className="bg-[#F4A300] text-white px-8 py-3.5 rounded-2xl font-bold flex items-center gap-2 hover:bg-[#d68e00] transition-all shadow-md"
 				>
@@ -395,6 +396,7 @@ function DuiMonitoringPage() {
 				{/* DROPDOWN WILAYAH */}
 				<div className="relative w-full md:w-64">
 					<button
+						type="button"
 						onClick={() => setIsWilayahDropdownOpen(!isWilayahDropdownOpen)}
 						className="w-full bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl flex items-center justify-between shadow-sm hover:bg-[#EAE5DA] transition-all h-[56px]"
 					>
@@ -424,6 +426,7 @@ function DuiMonitoringPage() {
 					{isWilayahDropdownOpen && (
 						<div className="absolute top-full mt-3 right-0 w-72 bg-white p-4 rounded-[2rem] shadow-2xl border border-gray-100 z-50 flex flex-col gap-2 max-h-60 overflow-y-auto">
 							<button
+								type="button"
 								onClick={() => {
 									setSelectedWilayahId("Semua Wilayah");
 									setIsWilayahDropdownOpen(false);
@@ -434,6 +437,7 @@ function DuiMonitoringPage() {
 							</button>
 							{listWilayah.map((wil) => (
 								<button
+									type="button"
 									key={wil.id}
 									onClick={() => {
 										setSelectedWilayahId(wil.id.toString());
@@ -451,6 +455,7 @@ function DuiMonitoringPage() {
 				{/* DROPDOWN BULAN */}
 				<div className="relative w-full md:w-56">
 					<button
+						type="button"
 						onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
 						className="w-full bg-[#F5EFE6] text-[#0B4D1E] font-bold px-5 py-4 rounded-2xl flex items-center justify-between shadow-sm hover:bg-[#EAE5DA] transition-all h-[56px]"
 					>
@@ -476,6 +481,7 @@ function DuiMonitoringPage() {
 							<div className="grid grid-cols-2 gap-2">
 								{periodeOptions.map((opt) => (
 									<button
+										type="button"
 										key={opt}
 										onClick={() => {
 											setSelectedMonth(opt);
@@ -488,6 +494,7 @@ function DuiMonitoringPage() {
 								))}
 							</div>
 							<button
+								type="button"
 								onClick={() => {
 									setSelectedMonth("Semua Periode");
 									setIsMonthPickerOpen(false);
@@ -508,6 +515,7 @@ function DuiMonitoringPage() {
 						</span>
 						<div className="flex flex-col">
 							<button
+								type="button"
 								onClick={() =>
 									setSelectedYear((parseInt(selectedYear, 10) + 1).toString())
 								}
@@ -529,6 +537,7 @@ function DuiMonitoringPage() {
 								</svg>
 							</button>
 							<button
+								type="button"
 								onClick={() =>
 									setSelectedYear((parseInt(selectedYear, 10) - 1).toString())
 								}
@@ -886,6 +895,7 @@ function DuiMonitoringPage() {
 								</h3>
 							</div>
 							<button
+								type="button"
 								onClick={() => setIsExportOpen(false)}
 								className="text-gray-500 hover:text-[#0B4D1E] transition-colors"
 							>
@@ -966,6 +976,7 @@ function DuiMonitoringPage() {
 										</span>
 										<div className="flex flex-col">
 											<button
+												type="button"
 												onClick={() =>
 													setExportYear(
 														(parseInt(exportYear, 10) + 1).toString(),
@@ -989,6 +1000,7 @@ function DuiMonitoringPage() {
 												</svg>
 											</button>
 											<button
+												type="button"
 												onClick={() =>
 													setExportYear(
 														(parseInt(exportYear, 10) - 1).toString(),
@@ -1055,6 +1067,7 @@ function DuiMonitoringPage() {
 
 							<div className="pt-2">
 								<button
+									type="button"
 									onClick={handleExport}
 									className="w-full bg-[#125B2A] text-white py-4 rounded-2xl font-extrabold hover:bg-[#0B4D1E] shadow-md flex items-center justify-center gap-2 transition-all"
 								>
@@ -1085,6 +1098,7 @@ function DuiMonitoringPage() {
 				<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
 					<div className="bg-white w-full max-w-sm rounded-[2.5rem] p-10 shadow-2xl relative animate-fade-in-up border border-gray-100">
 						<button
+							type="button"
 							onClick={() => setIsDetailOpen(false)}
 							className="absolute top-6 right-6 text-gray-400 hover:text-gray-600"
 						>
@@ -1131,6 +1145,7 @@ function DuiMonitoringPage() {
 							</div>
 						</div>
 						<button
+							type="button"
 							onClick={() => setIsDetailOpen(false)}
 							className="w-full bg-[#0B4D1E] text-white py-3.5 rounded-2xl font-bold mt-8 hover:bg-[#083a16] transition-all"
 						>

@@ -386,6 +386,7 @@ function BukuTabunganPage() {
 						Riwayat Pemasukan Terakhir
 					</h3>
 					<button
+						type="button"
 						onClick={() => navigate("/riwayat")}
 						className="text-sm font-bold text-[#0B4D1E] hover:text-[#F4A300] transition-colors"
 					>
@@ -466,6 +467,7 @@ function BukuTabunganPage() {
 								</h3>
 							</div>
 							<button
+								type="button"
 								onClick={() => setIsDetailOpen(false)}
 								className="text-gray-400 hover:text-gray-600 transition-colors p-1"
 							>
@@ -539,6 +541,7 @@ function BukuTabunganPage() {
 
 						{/* Tombol Tutup */}
 						<button
+							type="button"
 							onClick={() => setIsDetailOpen(false)}
 							className="w-full bg-[#125B2A] text-white py-4 rounded-2xl font-bold mt-6 hover:bg-[#0B4D1E] shadow-md transition-all"
 						>

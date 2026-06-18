@@ -380,6 +380,7 @@ function LaporanPage() {
 					</div>
 				</div>
 				<button
+					type="button"
 					onClick={() => setIsExportOpen(true)}
 					className="bg-[#F4A300] text-white px-8 py-3.5 rounded-2xl font-bold flex items-center gap-2 hover:bg-[#d68e00] transition-all shadow-md"
 				>
@@ -530,6 +531,7 @@ function LaporanPage() {
 						</span>
 						<div className="flex flex-col">
 							<button
+								type="button"
 								onClick={() =>
 									setFilterTahunUtama(
 										(parseInt(filterTahunUtama, 10) + 1).toString(),
@@ -553,6 +555,7 @@ function LaporanPage() {
 								</svg>
 							</button>
 							<button
+								type="button"
 								onClick={() =>
 									setFilterTahunUtama(
 										(parseInt(filterTahunUtama, 10) - 1).toString(),
@@ -884,6 +887,7 @@ function LaporanPage() {
 								</h3>
 							</div>
 							<button
+								type="button"
 								onClick={() => setIsExportOpen(false)}
 								className="text-gray-400 hover:text-gray-600"
 							>
@@ -1042,6 +1046,7 @@ function LaporanPage() {
 				<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
 					<div className="bg-white w-full max-w-sm rounded-[2.5rem] p-10 shadow-2xl relative animate-fade-in-up border border-gray-100">
 						<button
+							type="button"
 							onClick={() => setIsDetailOpen(false)}
 							className="absolute top-6 right-6 text-gray-400 hover:text-gray-600"
 						>
@@ -1082,6 +1087,7 @@ function LaporanPage() {
 							</div>
 						</div>
 						<button
+							type="button"
 							onClick={() => setIsDetailOpen(false)}
 							className="w-full bg-[#0B4D1E] text-white py-3.5 rounded-2xl font-bold mt-8 hover:bg-[#083a16] transition-all"
 						>

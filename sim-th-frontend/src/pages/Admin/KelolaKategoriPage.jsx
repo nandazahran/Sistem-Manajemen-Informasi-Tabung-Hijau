@@ -57,6 +57,7 @@ function KelolaKategoriPage() {
 
 	useEffect(() => {
 		fetchCategories();
+		// biome-ignore lint/correctness/useExhaustiveDependencies: prevent infinite loops from unstable function references
 	}, [fetchCategories]);
 
 	// Logic Filter
@@ -200,6 +201,7 @@ function KelolaKategoriPage() {
 				</div>
 				<div className="flex gap-4">
 					<button
+						type="button"
 						onClick={() => navigate("/admin/riwayat-harga")}
 						className="bg-white/10 text-white border border-white/20 px-6 py-3.5 rounded-2xl font-bold flex items-center gap-2 hover:bg-white/20 transition-all shadow-sm"
 					>
@@ -220,6 +222,7 @@ function KelolaKategoriPage() {
 						Riwayat Harga
 					</button>
 					<button
+						type="button"
 						onClick={() => {
 							closeModals();
 							setIsAddOpen(true);
@@ -388,6 +391,7 @@ function KelolaKategoriPage() {
 										</td>
 										<td className="px-8 py-5 flex justify-center gap-3">
 											<button
+												type="button"
 												onClick={() => handleAction(c, "edit")}
 												className="p-2 text-gray-400 hover:text-[#F4A300] hover:bg-[#FDF6EA] rounded-lg transition-all"
 												title="Edit"
@@ -402,6 +406,7 @@ function KelolaKategoriPage() {
 												</svg>
 											</button>
 											<button
+												type="button"
 												onClick={() => handleAction(c, "delete")}
 												className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
 												title="Hapus"
@@ -463,6 +468,7 @@ function KelolaKategoriPage() {
 								{isEditOpen ? "Edit Kategori" : "Tambah Kategori Baru"}
 							</h3>
 							<button
+								type="button"
 								onClick={() => {
 									setIsAddOpen(false);
 									setIsEditOpen(false);
@@ -607,12 +613,14 @@ function KelolaKategoriPage() {
 						</p>
 						<div className="flex gap-4">
 							<button
+								type="button"
 								onClick={() => setIsDeleteOpen(false)}
 								className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-3.5 rounded-xl font-bold hover:bg-[#EAE5DA] transition-all"
 							>
 								Batal
 							</button>
 							<button
+								type="button"
 								onClick={() => confirmAction("delete")}
 								className="flex-1 bg-red-500 text-white py-3.5 rounded-xl font-bold hover:bg-red-600 shadow-md transition-all"
 							>

@@ -95,6 +95,7 @@ function ProfilPage() {
 			}
 		};
 		fetchProfile();
+		// biome-ignore lint/correctness/useExhaustiveDependencies: prevent infinite loops from unstable function references
 	}, [formatRole]);
 
 	const openEditModal = () => {
@@ -250,6 +251,7 @@ function ProfilPage() {
 						Informasi Profil
 					</h3>
 					<button
+						type="button"
 						onClick={openEditModal}
 						className="bg-[#125B2A] text-white px-6 py-2.5 rounded-xl font-bold hover:bg-[#0B4D1E] transition-colors flex items-center gap-2 shadow-sm"
 					>
@@ -442,6 +444,7 @@ function ProfilPage() {
 					Keamanan Akun
 				</h3>
 				<button
+					type="button"
 					onClick={() => setIsPasswordModalOpen(true)}
 					className="w-full bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between hover:-translate-y-1 hover:shadow-md transition-all group"
 				>
@@ -491,6 +494,7 @@ function ProfilPage() {
 			{/* KELUAR SISTEM */}
 			<div className="mt-8 mb-12">
 				<button
+					type="button"
 					onClick={handleLogout}
 					className="w-full bg-[#FFF5F5] p-5 rounded-3xl shadow-sm border border-red-100 flex items-center justify-between hover:-translate-y-1 hover:shadow-md transition-all group"
 				>
@@ -530,6 +534,7 @@ function ProfilPage() {
 								Edit Profil
 							</h3>
 							<button
+								type="button"
 								onClick={() => setIsEditModalOpen(false)}
 								className="text-gray-400 hover:text-gray-600"
 							>
@@ -594,12 +599,14 @@ function ProfilPage() {
 
 						<div className="flex gap-4 mt-8">
 							<button
+								type="button"
 								onClick={() => setIsEditModalOpen(false)}
 								className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-4 rounded-2xl font-bold"
 							>
 								Batal
 							</button>
 							<button
+								type="button"
 								onClick={handleSaveProfile}
 								disabled={isSavingProfile}
 								className="flex-1 bg-[#125B2A] text-white py-4 rounded-2xl font-bold shadow-md flex items-center justify-center gap-2"
@@ -620,6 +627,7 @@ function ProfilPage() {
 								Ubah Password
 							</h3>
 							<button
+								type="button"
 								onClick={() => setIsPasswordModalOpen(false)}
 								className="text-gray-400 hover:text-gray-600"
 							>
@@ -687,12 +695,14 @@ function ProfilPage() {
 
 						<div className="flex gap-4 mt-8">
 							<button
+								type="button"
 								onClick={() => setIsPasswordModalOpen(false)}
 								className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-4 rounded-2xl font-bold"
 							>
 								Batal
 							</button>
 							<button
+								type="button"
 								onClick={handleSavePassword}
 								disabled={isSavingPassword}
 								className="flex-1 bg-[#0B4D1E] text-white py-4 rounded-2xl font-bold shadow-md"

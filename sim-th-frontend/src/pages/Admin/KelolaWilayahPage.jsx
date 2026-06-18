@@ -103,6 +103,7 @@ function KelolaWilayahPage() {
 
 	useEffect(() => {
 		fetchData();
+		// biome-ignore lint/correctness/useExhaustiveDependencies: prevent infinite loops from unstable function references
 	}, [fetchData]);
 
 	// Logic Filter
@@ -244,6 +245,7 @@ function KelolaWilayahPage() {
 					</div>
 				</div>
 				<button
+					type="button"
 					onClick={() => setIsAddOpen(true)}
 					className="bg-[#F4A300] text-white px-8 py-3.5 rounded-2xl font-bold flex items-center gap-2 hover:bg-[#d68e00] transition-all shadow-md"
 				>
@@ -410,6 +412,7 @@ function KelolaWilayahPage() {
 						{/* Aksi Bawah (Hapus tombol Nonaktifkan, sisa icon saja) */}
 						<div className="flex gap-3">
 							<button
+								type="button"
 								onClick={() => handleAction(w, "view")}
 								className="p-3 text-[#0B4D1E] bg-[#EAE5DA] hover:bg-[#0B4D1E] hover:text-white rounded-xl transition-all"
 							>
@@ -428,6 +431,7 @@ function KelolaWilayahPage() {
 								</svg>
 							</button>
 							<button
+								type="button"
 								onClick={() => handleAction(w, "edit")}
 								className="p-3 text-[#F4A300] bg-[#FFF8E1] hover:bg-[#F4A300] hover:text-white rounded-xl transition-all"
 							>
@@ -441,6 +445,7 @@ function KelolaWilayahPage() {
 								</svg>
 							</button>
 							<button
+								type="button"
 								onClick={() => handleAction(w, "delete")}
 								className="p-3 text-red-500 bg-[#FFEBEE] hover:bg-red-500 hover:text-white rounded-xl transition-all"
 							>
@@ -521,6 +526,7 @@ function KelolaWilayahPage() {
 								</h3>
 							</div>
 							<button
+								type="button"
 								onClick={closeModals}
 								className="text-[#0B4D1E] hover:text-red-500 transition-colors"
 							>
@@ -605,12 +611,14 @@ function KelolaWilayahPage() {
 
 						<div className="flex gap-4 mt-8">
 							<button
+								type="button"
 								onClick={closeModals}
 								className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-4 rounded-2xl font-bold hover:bg-[#EAE5DA] transition-all"
 							>
 								Batal
 							</button>
 							<button
+								type="button"
 								onClick={() => confirmAction("add")}
 								className="flex-1 bg-[#125B2A] text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#0B4D1E] shadow-md transition-all"
 							>
@@ -662,6 +670,7 @@ function KelolaWilayahPage() {
 								</h3>
 							</div>
 							<button
+								type="button"
 								onClick={closeModals}
 								className="text-[#0B4D1E] hover:text-red-500 transition-colors"
 							>
@@ -744,12 +753,14 @@ function KelolaWilayahPage() {
 
 						<div className="flex gap-4 mt-8">
 							<button
+								type="button"
 								onClick={closeModals}
 								className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-4 rounded-2xl font-bold hover:bg-[#EAE5DA] transition-all"
 							>
 								Batal
 							</button>
 							<button
+								type="button"
 								onClick={() => confirmAction("edit")}
 								className="flex-1 bg-[#125B2A] text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#0B4D1E] shadow-md transition-all"
 							>
@@ -801,6 +812,7 @@ function KelolaWilayahPage() {
 								</h3>
 							</div>
 							<button
+								type="button"
 								onClick={closeModals}
 								className="text-gray-500 hover:text-gray-800 transition-colors"
 							>
@@ -891,6 +903,7 @@ function KelolaWilayahPage() {
 						</div>
 
 						<button
+							type="button"
 							onClick={closeModals}
 							className="w-full bg-[#125B2A] text-white py-4 rounded-full font-bold mt-8 hover:bg-[#0B4D1E] transition-all"
 						>
@@ -929,12 +942,14 @@ function KelolaWilayahPage() {
 						</p>
 						<div className="flex gap-4">
 							<button
+								type="button"
 								onClick={closeModals}
 								className="flex-1 bg-[#F5EFE6] text-[#0B4D1E] py-3.5 rounded-2xl font-bold hover:bg-[#EAE5DA] transition-all"
 							>
 								Batal
 							</button>
 							<button
+								type="button"
 								onClick={() => confirmAction("delete")}
 								className="flex-1 bg-red-500 text-white py-3.5 rounded-2xl font-bold hover:bg-red-600 shadow-md transition-all"
 							>

@@ -46,6 +46,7 @@ function DuiNotifikasiPage() {
 
 	useEffect(() => {
 		fetchNotifications();
+		// biome-ignore lint/correctness/useExhaustiveDependencies: prevent infinite loops from unstable function references
 	}, [fetchNotifications]);
 
 	// Hitung jumlah pesan belum dibaca secara dinamis
@@ -198,6 +199,7 @@ function DuiNotifikasiPage() {
 				</div>
 				<div className="flex gap-4">
 					<button
+						type="button"
 						onClick={markAllAsRead}
 						className="bg-white/10 text-white border border-white/20 px-6 py-3.5 rounded-full font-bold flex items-center gap-2 hover:bg-white/20 transition-all shadow-sm"
 					>
@@ -218,6 +220,7 @@ function DuiNotifikasiPage() {
 						Tandai Semua Dibaca
 					</button>
 					<button
+						type="button"
 						onClick={() => setIsBroadcastOpen(true)}
 						className="bg-[#F4A300] text-white px-6 py-3.5 rounded-full font-bold flex items-center gap-2 hover:bg-[#d68e00] transition-all shadow-md"
 					>
@@ -376,6 +379,7 @@ function DuiNotifikasiPage() {
 								</h3>
 							</div>
 							<button
+								type="button"
 								onClick={() => setIsBroadcastOpen(false)}
 								className="text-gray-400 hover:text-red-500 transition-colors"
 							>

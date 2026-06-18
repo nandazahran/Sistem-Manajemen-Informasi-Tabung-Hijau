@@ -105,6 +105,7 @@ function ProfilPage() {
 						Informasi Profil
 					</h3>
 					<button
+						type="button"
 						onClick={() => setIsEditOpen(true)}
 						className="bg-[#125B2A] text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-[#0B4D1E] transition-all shadow-sm text-sm"
 					>
@@ -296,6 +297,7 @@ function ProfilPage() {
 								Edit Profil
 							</h3>
 							<button
+								type="button"
 								onClick={() => setIsEditOpen(false)}
 								className="text-gray-400 hover:text-gray-600"
 							>
@@ -398,6 +400,7 @@ function ProfilPage() {
 								Ubah Password
 							</h3>
 							<button
+								type="button"
 								onClick={() => setIsPassOpen(false)}
 								className="text-gray-400 hover:text-gray-600"
 							>

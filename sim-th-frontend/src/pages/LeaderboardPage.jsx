@@ -103,6 +103,7 @@ function LeaderboardPage() {
 				{/* REVISI DROPDOWN FILTER KONSISTEN & RAPI */}
 				<div className="relative">
 					<button
+						type="button"
 						onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
 						className="bg-[#F4A300] text-white px-6 py-4 rounded-2xl flex items-center gap-3 font-bold shadow-md hover:bg-[#d68e00] transition-all"
 					>
@@ -131,6 +132,7 @@ function LeaderboardPage() {
 									.filter((p) => p.label !== "Semua Periode")
 									.map((prd) => (
 										<button
+											type="button"
 											key={prd.label}
 											onClick={() => {
 												setFilterPeriode(prd);
@@ -145,6 +147,7 @@ function LeaderboardPage() {
 
 							{/* Tombol Semua Periode dipisah di bawah */}
 							<button
+								type="button"
 								onClick={() => {
 									const semuaOpt = periodeList.find(
 										(p) => p.label === "Semua Periode",
@@ -325,7 +328,10 @@ function LeaderboardPage() {
 								className="p-4 bg-gray-50 border-t border-gray-100 transition-colors hover:bg-gray-100 cursor-pointer"
 								onClick={() => setIsExpanded(!isExpanded)}
 							>
-								<button className="text-[#0B4D1E] font-bold text-sm flex items-center justify-center gap-2 w-full outline-none">
+								<button
+									type="button"
+									className="text-[#0B4D1E] font-bold text-sm flex items-center justify-center gap-2 w-full outline-none"
+								>
 									{isExpanded ? "Tutup Peringkat" : "Tampilkan Lebih Banyak"}
 									<svg
 										xmlns="http://www.w3.org/2000/svg"

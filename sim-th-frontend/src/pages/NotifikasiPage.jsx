@@ -73,6 +73,7 @@ function NotifikasiPage() {
 		// Dengarkan event 'notifikasi_baru' dari DashboardLayout agar langsung ter-refresh otomatis
 		window.addEventListener("notifikasi_baru", fetchNotifikasi);
 		return () => window.removeEventListener("notifikasi_baru", fetchNotifikasi);
+		// biome-ignore lint/correctness/useExhaustiveDependencies: prevent infinite loops from unstable function references
 	}, [formatWaktuDB]);
 
 	const unreadCount = notifikasi.filter((n) => !n.read).length;
@@ -230,6 +231,7 @@ function NotifikasiPage() {
 					</div>
 				</div>
 				<button
+					type="button"
 					onClick={markAllAsRead}
 					className="bg-white/20 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-white/30 transition-colors border border-white/30"
 				>
@@ -254,12 +256,14 @@ function NotifikasiPage() {
 			{/* TABS SEMUA / BELUM DIBACA */}
 			<div className="flex bg-white rounded-full p-2 mb-8 shadow-sm border border-gray-100 w-max">
 				<button
+					type="button"
 					onClick={() => setActiveTab("semua")}
 					className={`px-8 py-2.5 rounded-full font-bold text-sm transition-colors ${activeTab === "semua" ? "bg-[#0B4D1E] text-white" : "text-gray-500 hover:text-[#0B4D1E]"}`}
 				>
 					Semua
 				</button>
 				<button
+					type="button"
 					onClick={() => setActiveTab("belum-dibaca")}
 					className={`px-8 py-2.5 rounded-full font-bold text-sm transition-colors flex items-center gap-2 ${activeTab === "belum-dibaca" ? "bg-[#0B4D1E] text-white" : "text-gray-500 hover:text-[#0B4D1E]"}`}
 				>

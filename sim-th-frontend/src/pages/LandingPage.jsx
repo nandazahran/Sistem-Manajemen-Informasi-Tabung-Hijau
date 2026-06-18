@@ -506,10 +506,16 @@ function LandingPage() {
 								Social Media
 							</h3>
 							<div className="flex gap-4">
-								<button className="px-6 py-2.5 bg-[#0B4D1E] text-white font-bold rounded-full text-sm hover:bg-[#083a16] transition-colors">
+								<button
+									type="button"
+									className="px-6 py-2.5 bg-[#0B4D1E] text-white font-bold rounded-full text-sm hover:bg-[#083a16] transition-colors"
+								>
 									Instagram
 								</button>
-								<button className="px-6 py-2.5 bg-[#0B4D1E] text-white font-bold rounded-full text-sm hover:bg-[#083a16] transition-colors">
+								<button
+									type="button"
+									className="px-6 py-2.5 bg-[#0B4D1E] text-white font-bold rounded-full text-sm hover:bg-[#083a16] transition-colors"
+								>
 									Twitter
 								</button>
 							</div>
