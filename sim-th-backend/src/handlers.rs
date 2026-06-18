@@ -2463,7 +2463,7 @@ pub async fn lihat_histori_tabungan(
     let month_names = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
     let mut histori_bulanan = vec![];
 
-    for i in 0..12 {
+    for (i, nama_bulan) in month_names.iter().enumerate() {
         let mut total_pemasukan = 0;
         let mut total_penarikan = 0;
 
@@ -2480,7 +2480,7 @@ pub async fn lihat_histori_tabungan(
         }
 
         histori_bulanan.push(serde_json::json!({
-            "bulan": month_names[i],
+            "bulan": nama_bulan,
             "pemasukan": total_pemasukan,
             "penarikan": total_penarikan,
             "saldo_sisa": total_pemasukan - total_penarikan // Saldo bersih bulan tsb
@@ -2699,39 +2699,39 @@ pub async fn lihat_dashboard_wilayah(
         }
 
     // Kalau butuh grafik bulanan via endpoint spesifik
-    if let Some(grafik_req) = params.get("grafik_bulanan") {
-        if grafik_req == "true" {
-            let tahun_sekarang = chrono::Utc::now().year();
-            let tahun = params.get("tahun").and_then(|t| t.parse::<i32>().ok()).unwrap_or(tahun_sekarang);
-            
-            let semua_trx = transaksi_sampah::Entity::find()
-                .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id))
-                .all(&db)
-                .await
-                .unwrap_or_default();
+    if let Some(grafik_req) = params.get("grafik_bulanan")
+        && grafik_req == "true"
+    {
+        let tahun_sekarang = chrono::Utc::now().year();
+        let tahun = params.get("tahun").and_then(|t| t.parse::<i32>().ok()).unwrap_or(tahun_sekarang);
 
-            let month_names = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
-            let mut data_bulanan = vec![];
-            for i in 0..12 {
-                let mut berat = 0;
-                let mut rupiah = 0;
-                for trx in &semua_trx {
-                    if trx.tanggal.year() == tahun && trx.tanggal.month() as usize - 1 == i {
-                        berat += trx.berat;
-                        rupiah += trx.total_nilai;
-                    }
+        let semua_trx = transaksi_sampah::Entity::find()
+            .filter(transaksi_sampah::Column::WilayahId.eq(wilayah_id))
+            .all(&db)
+            .await
+            .unwrap_or_default();
+
+        let month_names = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
+        let mut data_bulanan = vec![];
+        for (i, nama_bulan) in month_names.iter().enumerate() {
+            let mut berat = 0;
+            let mut rupiah = 0;
+            for trx in &semua_trx {
+                if trx.tanggal.year() == tahun && trx.tanggal.month() as usize - 1 == i {
+                    berat += trx.berat;
+                    rupiah += trx.total_nilai;
                 }
-                data_bulanan.push(serde_json::json!({
-                    "bulan": month_names[i],
-                    "total_berat": berat,
-                    "total_nilai": rupiah
-                }));
             }
-            return Json(serde_json::json!({
-                "status": "sukses",
-                "data": data_bulanan
+            data_bulanan.push(serde_json::json!({
+                "bulan": nama_bulan,
+                "total_berat": berat,
+                "total_nilai": rupiah
             }));
         }
+        return Json(serde_json::json!({
+            "status": "sukses",
+            "data": data_bulanan
+        }));
     }
 
     // 1. Cek dulu apakah wilayahnya ada, sekalian ambil namanya untuk ditampilkan
@@ -3736,7 +3736,7 @@ pub async fn seed_data(
     }
 
     // ===== FASE 3: Buat Rekening Wilayah (1 per wilayah) =====
-    let bank_names = vec!["BRI", "BNI", "Mandiri", "BSI", "BCA"];
+    let bank_names = ["BRI", "BNI", "Mandiri", "BSI", "BCA"];
     for (idx, &w_id) in wilayah_ids.iter().enumerate() {
         let (nama_wil, _) = wilayah_data[idx];
         let bank = bank_names[idx % bank_names.len()];
@@ -3860,7 +3860,7 @@ pub async fn seed_data(
                 let offset_hari = rand::rng().random_range(0..15_i64);
                 let tanggal = tanggal_base + Duration::days(offset_hari);
 
-                let catatan_list = vec![
+                let catatan_list = [
                     "Sampah terpilah dengan baik",
                     "Setoran rutin bulanan",
                     "Hasil bank sampah fakultas",
@@ -3959,7 +3959,7 @@ pub async fn seed_data(
     }
 
     // ===== FASE 8: Notifikasi Dummy =====
-    let notif_data = vec![
+    let notif_data = [
         ("broadcast", "Pengumuman Sistem", "Selamat datang di SIM Tabung Hijau! Sistem telah diperbarui."),
         ("broadcast", "Jadwal Setoran", "Setoran sampah bulan ini dibuka mulai tanggal 1-15."),
         ("transaksi", "Transaksi Baru Dicatat", "Transaksi sampah plastik 25kg telah berhasil dicatat ke sistem."),
